@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090909">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Kimikea Connect">
+  <meta name="application-name" content="Kimikea Connect">
+  <meta name="format-detection" content="telephone=no">
+
+  <title>Kimikea Connect</title>
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+  <link rel="icon" type="image/png" sizes="1024x1024" href="./icon-1024.png">
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --black: #090909;
+      --panel: #121212;
+      --gold: #c9a24e;
+      --gold-light: #f1d68b;
+      --white: #ffffff;
+      --muted: #b8b2a6;
+      --line: rgba(201, 162, 78, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--black);
+    }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      overflow-x: hidden;
+      background: var(--black);
+      color: var(--white);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans JP", sans-serif;
+      letter-spacing: 0;
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .launcher {
+      display: grid;
+      min-height: 100vh;
+      min-height: 100svh;
+      place-items: center;
+      padding:
+        max(28px, env(safe-area-inset-top))
+        20px
+        max(28px, env(safe-area-inset-bottom));
+    }
+
+    .launcher-inner {
+      width: min(100%, 430px);
+      text-align: center;
+    }
+
+    .brand-icon {
+      display: block;
+      width: clamp(152px, 44vw, 208px);
+      height: auto;
+      margin: 0 auto 24px;
+      border: 1px solid var(--line);
+      border-radius: 22%;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(31px, 9vw, 44px);
+      font-weight: 500;
+      line-height: 1.15;
+    }
+
+    .tagline {
+      margin: 12px auto 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .status {
+      min-height: 24px;
+      margin: 28px 0 14px;
+      color: var(--gold-light);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .open-button {
+      display: grid;
+      width: 100%;
+      min-height: 58px;
+      place-items: center;
+      border: 1px solid var(--gold);
+      border-radius: 7px;
+      background: var(--gold);
+      color: var(--black);
+      font-size: 17px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .open-button:active {
+      background: var(--gold-light);
+      transform: translateY(1px);
+    }
+
+    .stop-button {
+      min-height: 44px;
+      margin-top: 10px;
+      padding: 8px 16px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      cursor: pointer;
+    }
+
+    .install-guide {
+      margin-top: 30px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      text-align: left;
+    }
+
+    .install-guide strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--gold-light);
+      font-size: 14px;
+    }
+
+    .install-guide p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .footer {
+      margin: 24px 0 0;
+      color: #777267;
+      font-size: 11px;
+    }
+
+    @media (min-width: 700px) {
+      .launcher {
+        padding-top: 48px;
+        padding-bottom: 48px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="launcher">
+    <div class="launcher-inner">
+      <img
+        class="brand-icon"
+        src="./icon-512.png"
+        width="512"
+        height="512"
+        alt="Kimikea Connect"
+      >
+
+      <p class="eyebrow">Kimikea Members Portal</p>
+      <h1>Kimikea Connect</h1>
+      <p class="tagline">NPO法人シールエクステ協会きみけあ<br>加盟店専用ポータル</p>
+
+      <p id="redirectStatus" class="status" aria-live="polite"></p>
+
+      <a
+        id="openAppButton"
+        class="open-button"
+        href="https://script.google.com/macros/s/AKfycbyWxvyWZ7_qTkCgvkuim-h_AhDQEHag7xexg8iDqyHE-toaRA6ttQPpNjUaNfTyTYhA/exec"
+      >
+        Kimikea Connectを開く
+      </a>
+
+      <button id="stopRedirectButton" class="stop-button" type="button">
+        自動転送を停止
+      </button>
+
+      <section class="install-guide">
+        <strong>iPhoneのホーム画面へ追加</strong>
+        <p>Safariの共有ボタンを押し、「ホーム画面に追加」を選択してください。追加作業中は上の「自動転送を停止」を押すと、このページに留まれます。</p>
+      </section>
+
+      <p class="footer">Kimikea Connect</p>
+
+      <noscript>
+        <p class="status">JavaScriptが無効です。上のボタンからアプリを開いてください。</p>
+      </noscript>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const APP_URL = 'https://script.google.com/macros/s/AKfycbyWxvyWZ7_qTkCgvkuim-h_AhDQEHag7xexg8iDqyHE-toaRA6ttQPpNjUaNfTyTYhA/exec';
+      const isStandalone =
+        window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+      const redirectSeconds = isStandalone ? 2 : 8;
+
+      const status = document.getElementById('redirectStatus');
+      const stopButton = document.getElementById('stopRedirectButton');
+      let remaining = redirectSeconds;
+      let redirectTimer = null;
+
+      function renderStatus() {
+        status.textContent = `${remaining}秒後にアプリを開きます`;
+      }
+
+      function openApp() {
+        window.location.replace(APP_URL);
+      }
+
+      function stopRedirect() {
+        if (redirectTimer) window.clearInterval(redirectTimer);
+        redirectTimer = null;
+        status.textContent = '自動転送を停止しました';
+        stopButton.hidden = true;
+      }
+
+      renderStatus();
+      redirectTimer = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          window.clearInterval(redirectTimer);
+          openApp();
+          return;
+        }
+        renderStatus();
+      }, 1000);
+
+      stopButton.addEventListener('click', stopRedirect);
+      document.getElementById('openAppButton').addEventListener('click', () => {
+        if (redirectTimer) window.clearInterval(redirectTimer);
+      });
+    })();
+  </script>
+</body>
+</html>
