@@ -208,6 +208,134 @@
     }
     .tab-button.active { background: var(--black); color: var(--white); }
 
+
+    .home-screen {
+      display: grid;
+      gap: 16px;
+      padding-bottom: 34px;
+    }
+    .home-hero {
+      padding: 22px 20px;
+      border: 1px solid #d9dfdd;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #ffffff 0%, #f7f1e6 58%, #e8f0f1 100%);
+      box-shadow: var(--shadow);
+    }
+    .home-kicker {
+      margin: 0 0 8px;
+      color: #6d8a91;
+      font-size: 13px;
+      font-weight: 850;
+    }
+    .home-title {
+      margin: 0;
+      color: var(--black);
+      font-size: clamp(26px, 7vw, 34px);
+      line-height: 1.16;
+      letter-spacing: 0;
+    }
+    .home-welcome {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .home-primary-card {
+      width: 100%;
+      min-height: 118px;
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 20px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--black);
+      color: var(--white);
+      box-shadow: 0 16px 36px rgba(17, 17, 17, 0.18);
+      cursor: pointer;
+      text-align: left;
+    }
+    .home-primary-icon,
+    .home-card-icon {
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: rgba(189, 147, 64, 0.18);
+      color: #d8b86a;
+      font-size: 25px;
+      font-weight: 900;
+    }
+    .home-primary-card strong,
+    .home-menu-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    .home-primary-card span,
+    .home-menu-card span {
+      display: block;
+      color: inherit;
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: 0.84;
+    }
+    .home-primary-arrow {
+      color: #d8b86a;
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .home-menu-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .home-menu-card {
+      min-height: 138px;
+      padding: 16px;
+      border: 1px solid #d9dfdd;
+      border-radius: 16px;
+      background: var(--white);
+      color: var(--text);
+      box-shadow: 0 10px 24px rgba(45, 58, 58, 0.07);
+      cursor: pointer;
+      text-align: left;
+    }
+    .home-menu-card:disabled {
+      cursor: default;
+      opacity: 0.82;
+    }
+    .home-menu-card .home-card-icon {
+      width: 42px;
+      height: 42px;
+      margin-bottom: 12px;
+      border-radius: 13px;
+      background: #eaf1f0;
+      color: #607f86;
+      font-size: 19px;
+    }
+    .coming-soon {
+      display: inline-flex !important;
+      width: fit-content;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--gold-soft);
+      color: #7d6026 !important;
+      font-size: 11px !important;
+      font-weight: 850;
+      opacity: 1 !important;
+    }
+    .order-back-row { margin-bottom: 14px; }
+    .order-back-row .button {
+      width: auto;
+      min-height: 42px;
+      padding-inline: 14px;
+    }
+
     .notice-list { display: grid; gap: 12px; }
     .notice-item {
       padding: 16px;
@@ -496,6 +624,17 @@
         font-size: 14px;
       }
       .tab-button.active { background: var(--gold); color: var(--black); }
+
+      .home-primary-card {
+        grid-template-columns: 48px 1fr auto;
+        min-height: 112px;
+        padding: 18px;
+      }
+      .home-primary-icon { width: 48px; height: 48px; }
+      .home-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .home-menu-card { min-height: 132px; padding: 14px; }
+      .home-menu-card strong { font-size: 16px; }
+      .home-menu-card span { font-size: 12px; }
     }
   </style>
 </head>
@@ -521,13 +660,66 @@
   <div id="portalView" class="app-shell" hidden>
     <header class="app-header">
       <div>
-        <h1 class="app-title">Kimikea Connect Order</h1>
+        <h1 class="app-title">Kimikea Connect</h1>
         <span id="headerMemberName" class="member-name"></span>
       </div>
       <button class="logout-button" type="button" onclick="handleLogout()">ログアウト</button>
     </header>
 
     <main>
+      <section id="homeView" class="home-screen" aria-label="Kimikea Connectホーム">
+        <section class="home-hero">
+          <p class="home-kicker">NPO法人シールエクステ協会きみけあ</p>
+          <h2 class="home-title">Kimikea Connect</h2>
+          <p id="homeWelcome" class="home-welcome">ようこそ。今日使う機能を選んでください。</p>
+        </section>
+
+        <button type="button" class="home-primary-card" onclick="openOrderPage()">
+          <span class="home-primary-icon">◎</span>
+          <span>
+            <strong>会員専用 注文ページ</strong>
+            <span>growシールエクステの注文、請求書、注文履歴を確認できます。</span>
+          </span>
+          <span class="home-primary-arrow">›</span>
+        </button>
+
+        <div class="home-menu-grid" aria-label="Kimikea Connectメニュー">
+          <button type="button" class="home-menu-card" onclick="openStylebook()">
+            <span class="home-card-icon">□</span>
+            <strong>スタイル図鑑</strong>
+            <span>施術写真、使用色、各色の本数を確認できます。</span>
+          </button>
+          <button type="button" class="home-menu-card" disabled>
+            <span class="home-card-icon">★</span>
+            <strong>人気カラー</strong>
+            <span>今月・今年の人気色を表示します。</span>
+            <span class="coming-soon">準備中</span>
+          </button>
+          <button type="button" class="home-menu-card" disabled>
+            <span class="home-card-icon">⌖</span>
+            <strong>加盟店マップ</strong>
+            <span>加盟店、コーディネーター店舗を案内します。</span>
+            <span class="coming-soon">準備中</span>
+          </button>
+          <button type="button" class="home-menu-card" disabled>
+            <span class="home-card-icon">AI</span>
+            <strong>AIカラー診断</strong>
+            <span>似合う色やスタイルを提案します。</span>
+            <span class="coming-soon">準備中</span>
+          </button>
+          <button type="button" class="home-menu-card" onclick="openNoticePage()">
+            <span class="home-card-icon">i</span>
+            <strong>お知らせ</strong>
+            <span>新色、イベント、講習情報を確認できます。</span>
+          </button>
+        </div>
+      </section>
+
+      <div id="orderWorkspace" hidden>
+        <div class="order-back-row">
+          <button type="button" class="button button-outline button-small" onclick="showHomePage()">ホームへ戻る</button>
+        </div>
+
       <section class="member-summary" aria-label="加盟店情報">
         <div><span class="summary-label">加盟店名</span><span id="profileName" class="summary-value"></span></div>
         <div><span class="summary-label">担当者</span><span id="profileContact" class="summary-value"></span></div>
@@ -636,6 +828,7 @@
           </div>
         </section>
       </div>
+      </div>
     </main>
   </div>
 
@@ -716,6 +909,99 @@
       return error && error.message ? error.message : String(error || 'エラーが発生しました。');
     }
 
+
+    function setBusy(id, isBusy) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.disabled = Boolean(isBusy);
+    }
+
+    function setMessage(id, message, isError) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.textContent = message || '';
+      element.classList.toggle('error', Boolean(isError));
+    }
+
+    function yen(value) {
+      return `¥${Number(value || 0).toLocaleString('ja-JP')}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      setBusy('loginButton', true);
+      setMessage('loginMessage', 'ログインしています...', false);
+      google.script.run
+        .withSuccessHandler((response) => {
+          state.sessionToken = response.sessionToken;
+          localStorage.setItem('kimikeaSessionToken', state.sessionToken);
+          setMessage('loginMessage', '', false);
+          loadPortal();
+        })
+        .withFailureHandler((error) => {
+          setBusy('loginButton', false);
+          setMessage('loginMessage', getErrorMessage(error), true);
+        })
+        .loginFranchise({
+          franchiseId: document.getElementById('loginFranchiseId').value.trim(),
+          password: document.getElementById('loginPassword').value,
+        });
+    }
+
+    function loadPortal() {
+      google.script.run
+        .withSuccessHandler((data) => {
+          state.franchise = data.franchise || null;
+          state.products = data.products || [];
+          state.orders = data.orders || [];
+          state.orderSettings = data.orderSettings || state.orderSettings;
+          document.getElementById('loginView').hidden = true;
+          document.getElementById('portalView').hidden = false;
+          setBusy('loginButton', false);
+          renderProfile();
+          populateCategorySelect();
+          populateProductSelect();
+          renderCart();
+          renderHistory();
+          showHomePage();
+        })
+        .withFailureHandler(handleSessionError)
+        .getPortalData(state.sessionToken);
+    }
+
+    function showHomePage() {
+      document.getElementById('homeView').hidden = false;
+      document.getElementById('orderWorkspace').hidden = true;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openOrderPage() {
+      document.getElementById('homeView').hidden = true;
+      document.getElementById('orderWorkspace').hidden = false;
+      switchTab('order');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openNoticePage() {
+      document.getElementById('homeView').hidden = true;
+      document.getElementById('orderWorkspace').hidden = false;
+      switchTab('notice');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openStylebook() {
+      window.location.href = './stylebook/';
+    }
+
     function renderProfile() {
       const franchise = state.franchise || {};
       document.getElementById('headerMemberName').textContent = franchise.franchiseName || '';
@@ -724,6 +1010,9 @@
       document.getElementById('profileEmail').textContent = franchise.email || '';
       document.getElementById('profilePhone').textContent = franchise.phone || '未登録';
       document.getElementById('profileAddress').textContent = franchise.address || '未登録';
+      document.getElementById('homeWelcome').textContent = franchise.franchiseName
+        ? `${franchise.franchiseName} 様、ようこそ。今日使う機能を選んでください。`
+        : 'ようこそ。今日使う機能を選んでください。';
     }
 
     function switchTab(tabName) {

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eef4f5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Kimikea Connect">
+  <meta name="application-name" content="Kimikea Connect">
+  <meta name="format-detection" content="telephone=no">
+
+  <title>レシピ投稿 | Kimikea Connect</title>
+
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="recipe-app">
+    <header class="app-header">
+      <a class="back-link" href="../index.html">戻る</a>
+      <div>
+        <p class="eyebrow">Recipe Post</p>
+        <h1>レシピ投稿</h1>
+      </div>
+    </header>
+
+    <section class="hero-card">
+      <p class="hero-label">1ページ完結</p>
+      <h2>写真を選んで、色と本数を入れて、すぐ共有。</h2>
+      <p>営業中でも短時間で投稿できるように、必須項目だけを先に並べています。詳しい説明は「詳細を追加」にまとめています。</p>
+    </section>
+
+    <section class="form-panel" aria-labelledby="formTitle">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Entry</p>
+          <h2 id="formTitle">新規レシピ</h2>
+        </div>
+        <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
+      </div>
+
+      <form id="recipeForm" class="recipe-form">
+        <input id="recipeId" type="hidden">
+
+        <div id="messageBox" class="message-box" hidden></div>
+
+        <section class="entry-block">
+          <h3>1. 施術写真 <span>必須</span></h3>
+          <label class="field image-field">
+            <span>スマホから写真を選択</span>
+            <input id="photoInput" type="file" accept="image/*">
+            <small>写真フォルダ、または撮影した写真を選べます。</small>
+          </label>
+          <div id="imagePreview" class="image-preview">
+            <span>写真プレビュー</span>
+          </div>
+        </section>
+
+        <section class="entry-block">
+          <h3>2. 施術タイプ <span>必須</span></h3>
+          <label class="field">
+            <span>施術タイプ</span>
+            <select id="treatmentType">
+              <option value="">選択してください</option>
+              <option>イヤリングカラー</option>
+              <option>インナーカラー</option>
+              <option>メッシュ</option>
+              <option>長さ出し</option>
+              <option>グラデーション</option>
+              <option>その他</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="entry-block color-editor" aria-labelledby="colorEditorTitle">
+          <div class="color-editor-head">
+            <div>
+              <h3 id="colorEditorTitle">3. 使用カラーと本数 <span>必須</span></h3>
+              <p>カラー名または番号と、本数を入力してください。</p>
+            </div>
+            <button id="addColorButton" class="sub-button" type="button">＋カラーを追加</button>
+          </div>
+          <div id="colorRows" class="color-rows"></div>
+          <p class="total-preview">合計 <strong id="totalPiecesPreview">0本</strong></p>
+        </section>
+
+        <section class="entry-block">
+          <h3>4. サロン情報 <span>必須</span></h3>
+          <div class="field-grid">
+            <label class="field">
+              <span>担当サロン名</span>
+              <input id="salonName" type="text" placeholder="例：エクステランド富士店" autocomplete="organization">
+            </label>
+
+            <label class="field">
+              <span>担当者名</span>
+              <input id="stylistName" type="text" placeholder="例：山田 花子" autocomplete="name">
+            </label>
+          </div>
+        </section>
+
+        <details class="optional-details">
+          <summary>5. 詳細を追加 <span>任意</span></summary>
+          <div class="optional-content">
+            <label class="field">
+              <span>レシピ名</span>
+              <input id="recipeName" type="text" placeholder="例：ホワイトベージュイヤリング">
+            </label>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>ベースの髪色</span>
+                <input id="baseColor" type="text" placeholder="例：ベージュブラウン">
+              </label>
+
+              <label class="field">
+                <span>ベースレベル</span>
+                <input id="baseLevel" type="text" placeholder="例：9レベル">
+              </label>
+            </div>
+
+            <label class="field">
+              <span>コメント</span>
+              <textarea id="comment" rows="4" placeholder="仕上がりの印象、提案ポイント、注意点など"></textarea>
+            </label>
+
+            <label class="field">
+              <span>おすすめタグ</span>
+              <input id="tagsInput" type="text" placeholder="例：初めて向け, 推し色, 職場OK">
+            </label>
+
+            <label class="field">
+              <span>難易度</span>
+              <select id="difficulty">
+                <option value="">選択しない</option>
+                <option value="1">★1</option>
+                <option value="2">★2</option>
+                <option value="3">★3</option>
+                <option value="4">★4</option>
+                <option value="5">★5</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <input id="registeredAt" type="hidden">
+
+        <div class="form-actions">
+          <button id="draftButton" class="draft-button" type="button">下書き保存</button>
+          <button id="publishButton" class="publish-button" type="submit">投稿する</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="search-area" aria-label="レシピ検索">
+      <div class="search-head">
+        <h2>公開レシピ検索</h2>
+        <button id="resetButton" type="button">リセット</button>
+      </div>
+
+      <label class="search-box">
+        <span>カラー番号・カラー名・施術タイプ・本数で検索</span>
+        <input id="searchInput" type="search" placeholder="例：WHITE、18番、イヤリング、8本">
+      </label>
+
+      <div class="filter-group" aria-label="施術タイプ">
+        <button type="button" data-filter="type" data-value="イヤリングカラー">イヤリングカラー</button>
+        <button type="button" data-filter="type" data-value="インナーカラー">インナーカラー</button>
+        <button type="button" data-filter="type" data-value="メッシュ">メッシュ</button>
+        <button type="button" data-filter="type" data-value="長さ出し">長さ出し</button>
+        <button type="button" data-filter="type" data-value="グラデーション">グラデーション</button>
+        <button type="button" data-filter="type" data-value="その他">その他</button>
+      </div>
+
+      <div class="filter-group" aria-label="本数">
+        <button type="button" data-filter="pieces" data-value="1-4">1〜4本</button>
+        <button type="button" data-filter="pieces" data-value="5-10">5〜10本</button>
+        <button type="button" data-filter="pieces" data-value="11-20">11〜20本</button>
+        <button type="button" data-filter="pieces" data-value="21+">21本以上</button>
+      </div>
+
+      <div class="sort-row">
+        <label>
+          <span>並び替え</span>
+          <select id="sortSelect">
+            <option value="new">新着順</option>
+            <option value="piecesAsc">本数が少ない順</option>
+            <option value="piecesDesc">本数が多い順</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="result-head" aria-live="polite">
+      <div>
+        <h2>公開レシピ一覧</h2>
+        <p>投稿済みのレシピが表示されます。</p>
+      </div>
+      <p id="resultCount">0件</p>
+    </section>
+
+    <section id="recipeGrid" class="recipe-grid" aria-label="公開レシピ一覧"></section>
+
+    <section class="draft-section">
+      <div class="result-head">
+        <div>
+          <h2>下書き</h2>
+          <p>下書き保存した投稿はここから編集して投稿できます。</p>
+        </div>
+        <p id="draftCount">0件</p>
+      </div>
+      <section id="draftGrid" class="recipe-grid compact-grid" aria-label="下書き一覧"></section>
+    </section>
+
+    <section class="storage-note">
+      <h2>保存方法</h2>
+      <p>本運用ではGoogleスプレッドシートにレシピ情報を保存し、写真はGoogle Driveに保存します。GitHub Pages側の画面からApps Scriptへ接続して使います。</p>
+    </section>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
