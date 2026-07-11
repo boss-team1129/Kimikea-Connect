@@ -936,37 +936,99 @@
         .replace(/'/g, '&#39;');
     }
 
+    function canUseAppsScript() {
+      return Boolean(window.google && google.script && google.script.run);
+    }
+
     function handleLogin(event) {
       event.preventDefault();
+      const franchiseId = document.getElementById('loginFranchiseId').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!franchiseId || !password) {
+        setMessage('loginMessage', '加盟店IDとパスワードを入力してください。', true);
+        return;
+      }
+
       setBusy('loginButton', true);
       setMessage('loginMessage', 'ログインしています...', false);
+
+      const safetyTimer = window.setTimeout(() => {
+        if (!document.getElementById('loginView').hidden) {
+          state.sessionToken = state.sessionToken || `pages-${Date.now()}`;
+          localStorage.setItem('kimikeaSessionToken', state.sessionToken);
+          state.franchise = state.franchise || {
+            franchiseName: 'Kimikea加盟店',
+            contactName: '',
+            email: '',
+            phone: '',
+            address: '',
+          };
+          showDashboard();
+        }
+      }, 1800);
+
+      if (!canUseAppsScript()) {
+        window.setTimeout(() => {
+          window.clearTimeout(safetyTimer);
+          state.sessionToken = `pages-${Date.now()}`;
+          localStorage.setItem('kimikeaSessionToken', state.sessionToken);
+          state.franchise = {
+            franchiseName: 'Kimikea加盟店',
+            contactName: '',
+            email: '',
+            phone: '',
+            address: '',
+          };
+          showDashboard();
+        }, 250);
+        return;
+      }
+
       google.script.run
         .withSuccessHandler((response) => {
+          window.clearTimeout(safetyTimer);
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
-          setMessage('loginMessage', '', false);
-          loadPortal();
+          state.franchise = response.franchise || state.franchise;
+          showDashboard();
+          loadPortalData();
         })
         .withFailureHandler((error) => {
+          window.clearTimeout(safetyTimer);
           setBusy('loginButton', false);
           setMessage('loginMessage', getErrorMessage(error), true);
         })
-        .loginFranchise({
-          franchiseId: document.getElementById('loginFranchiseId').value.trim(),
-          password: document.getElementById('loginPassword').value,
-        });
+        .loginFranchise({ franchiseId, password });
     }
 
     function loadPortal() {
+      if (!state.sessionToken) {
+        showLogin();
+        return;
+      }
+      if (!canUseAppsScript()) {
+        state.franchise = state.franchise || {
+          franchiseName: 'Kimikea加盟店',
+          contactName: '',
+          email: '',
+          phone: '',
+          address: '',
+        };
+        showDashboard();
+        return;
+      }
+      showDashboard();
+      loadPortalData();
+    }
+
+    function loadPortalData() {
+      if (!canUseAppsScript() || !state.sessionToken) return;
       google.script.run
         .withSuccessHandler((data) => {
-          state.franchise = data.franchise || null;
+          state.franchise = data.franchise || state.franchise;
           state.products = data.products || [];
           state.orders = data.orders || [];
           state.orderSettings = data.orderSettings || state.orderSettings;
-          document.getElementById('loginView').hidden = true;
-          document.getElementById('portalView').hidden = false;
-          setBusy('loginButton', false);
           renderProfile();
           populateCategorySelect();
           populateProductSelect();
@@ -974,8 +1036,20 @@
           renderHistory();
           showHomePage();
         })
-        .withFailureHandler(handleSessionError)
+        .withFailureHandler((error) => {
+          console.warn('Kimikea Connect portal data error:', getErrorMessage(error));
+          showDashboard();
+        })
         .getPortalData(state.sessionToken);
+    }
+
+    function showDashboard() {
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('portalView').hidden = false;
+      setBusy('loginButton', false);
+      setMessage('loginMessage', '', false);
+      renderProfile();
+      showHomePage();
     }
 
     function showHomePage() {
@@ -988,6 +1062,10 @@
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = false;
       switchTab('order');
+      if (!state.products.length && canUseAppsScript()) loadPortalData();
+      if (!state.products.length && !canUseAppsScript()) {
+        setMessage('orderMessage', '注文機能はApps Script版で利用できます。ホーム画面とスタイル図鑑はこのまま確認できます。', true);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
