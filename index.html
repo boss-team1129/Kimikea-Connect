@@ -242,81 +242,225 @@
       line-height: 1.7;
     }
     .home-primary-card {
-      width: 100%;
-      min-height: 118px;
-      display: grid;
-      grid-template-columns: 54px 1fr auto;
-      align-items: center;
-      gap: 14px;
-      padding: 20px;
-      border: 0;
-      border-radius: 18px;
-      background: var(--black);
-      color: var(--white);
-      box-shadow: 0 16px 36px rgba(17, 17, 17, 0.18);
-      cursor: pointer;
-      text-align: left;
+      background:
+        radial-gradient(circle at 76% 18%, rgba(255, 255, 255, 0.82), transparent 30%),
+        linear-gradient(145deg, rgba(255, 253, 249, 0.88), rgba(232, 240, 241, 0.78) 58%, rgba(245, 230, 197, 0.76));
+      color: var(--text);
     }
     .home-primary-icon,
     .home-card-icon {
+      position: relative;
       display: grid;
       place-items: center;
-      width: 54px;
-      height: 54px;
-      border-radius: 16px;
-      background: rgba(189, 147, 64, 0.18);
-      color: #d8b86a;
-      font-size: 25px;
+      width: 82px;
+      height: 82px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      border-radius: 27px;
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.96), transparent 30%),
+        linear-gradient(145deg, #ffffff 0%, #eef4f5 48%, #ead7ac 100%);
+      color: #2f3f45;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.86),
+        inset 0 -10px 22px rgba(146, 173, 184, 0.16),
+        0 14px 26px rgba(39, 55, 61, 0.14);
+      font-size: 34px;
       font-weight: 900;
+      text-shadow: 0 3px 8px rgba(88, 121, 132, 0.2);
+    }
+    .home-primary-icon::after,
+    .home-card-icon::after {
+      position: absolute;
+      inset: 9px 12px auto auto;
+      width: 22px;
+      height: 22px;
+      content: "";
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.66);
+      filter: blur(0.3px);
     }
     .home-primary-card strong,
     .home-menu-card strong {
       display: block;
-      margin-bottom: 5px;
-      font-size: 18px;
+      margin-bottom: 9px;
+      font-size: 23px;
       letter-spacing: 0;
     }
     .home-primary-card span,
     .home-menu-card span {
       display: block;
       color: inherit;
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 14px;
+      line-height: 1.62;
       opacity: 0.84;
     }
     .home-primary-arrow {
       color: #d8b86a;
-      font-size: 28px;
+      font-size: 34px;
       font-weight: 900;
     }
-    .home-menu-grid {
+    .home-carousel-section {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px;
+      margin-left: -16px;
+      margin-right: -16px;
     }
-    .home-menu-card {
-      min-height: 138px;
-      padding: 16px;
-      border: 1px solid #d9dfdd;
-      border-radius: 16px;
-      background: var(--white);
+    .home-carousel-hint {
+      margin: 0 16px;
+      color: #6d7f84;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .home-carousel {
+      display: flex;
+      gap: 14px;
+      min-height: 386px;
+      overflow-x: auto;
+      overflow-y: visible;
+      padding: 20px calc((100vw - min(78vw, 340px)) / 2) 18px;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: calc((100vw - min(78vw, 340px)) / 2);
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+    .home-carousel::-webkit-scrollbar { display: none; }
+    .home-carousel-card {
+      position: relative;
+      display: grid;
+      flex: 0 0 min(78vw, 340px);
+      min-height: 316px;
+      align-content: space-between;
+      gap: 18px;
+      padding: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.66);
+      border-radius: 32px;
+      background:
+        radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.7), transparent 28%),
+        radial-gradient(circle at 12% 86%, rgba(182, 155, 100, 0.16), transparent 34%),
+        linear-gradient(145deg, rgba(255, 253, 249, 0.82), rgba(247, 241, 230, 0.68) 48%, rgba(232, 240, 241, 0.74) 100%);
+      backdrop-filter: blur(18px) saturate(1.18);
+      -webkit-backdrop-filter: blur(18px) saturate(1.18);
       color: var(--text);
-      box-shadow: 0 10px 24px rgba(45, 58, 58, 0.07);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        inset 0 -14px 30px rgba(146, 173, 184, 0.1),
+        0 15px 34px rgba(39, 55, 61, 0.11);
       cursor: pointer;
       text-align: left;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
+      transform: scale(0.88) translateY(8px);
+      opacity: 0.58;
+      transition: transform 260ms cubic-bezier(.2, .8, .2, 1), opacity 260ms ease, box-shadow 260ms ease;
+      touch-action: pan-x;
+      animation: carouselSlideIn 620ms cubic-bezier(.2, .85, .25, 1) backwards;
     }
-    .home-menu-card:disabled {
-      cursor: default;
-      opacity: 0.82;
+    .home-carousel-card::after {
+      position: absolute;
+      right: -42px;
+      bottom: -50px;
+      width: 138px;
+      height: 138px;
+      content: "";
+      border-radius: 50%;
+      background: rgba(182, 155, 100, 0.15);
+      pointer-events: none;
     }
-    .home-menu-card .home-card-icon {
-      width: 42px;
-      height: 42px;
-      margin-bottom: 12px;
-      border-radius: 13px;
-      background: #eaf1f0;
-      color: #607f86;
-      font-size: 19px;
+    .home-carousel-card.is-active {
+      opacity: 1;
+      transform: scale(1.1) translateY(-4px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 -16px 32px rgba(146, 173, 184, 0.11),
+        0 20px 44px rgba(39, 55, 61, 0.15);
+    }
+    .home-carousel-card.is-bouncing {
+      animation: cardBounce 360ms cubic-bezier(.2, .9, .25, 1.2);
+    }
+    .home-carousel-card .home-card-icon,
+    .home-carousel-card .home-primary-icon {
+      margin-bottom: 20px;
+      color: #597b84;
+    }
+    .home-carousel-card.home-primary-card .home-primary-icon {
+      color: #7b6229;
+      font-size: 28px;
+    }
+    .home-carousel-card .home-primary-arrow {
+      position: absolute;
+      right: 22px;
+      bottom: 18px;
+    }
+    .home-card-number {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      color: currentColor;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      opacity: 0.42;
+    }
+    .home-menu-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding-bottom: 4px;
+    }
+    .home-menu-dot {
+      width: 8px;
+      height: 8px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(17, 17, 17, 0.2);
+      cursor: pointer;
+      transition: width 220ms ease, background 220ms ease;
+    }
+    .home-menu-dot.is-active {
+      width: 24px;
+      background: #111111;
+    }
+    .home-carousel-card:nth-child(1) { animation-delay: 20ms; }
+    .home-carousel-card:nth-child(2) { animation-delay: 80ms; }
+    .home-carousel-card:nth-child(3) { animation-delay: 140ms; }
+    .home-carousel-card:nth-child(4) { animation-delay: 200ms; }
+    .home-carousel-card:nth-child(5) { animation-delay: 260ms; }
+    .home-carousel-card:nth-child(6) { animation-delay: 320ms; }
+    .home-carousel-card:nth-child(7) { animation-delay: 380ms; }
+    @keyframes cardBounce {
+      0% { transform: scale(1.04) translateY(-2px); }
+      58% { transform: scale(1.125) translateY(-5px); }
+      100% { transform: scale(1.1) translateY(-4px); }
+    }
+    @keyframes carouselSlideIn {
+      0% {
+        translate: 42px 0;
+        filter: blur(4px);
+      }
+      100% {
+        translate: 0 0;
+        filter: blur(0);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .home-carousel {
+        scroll-behavior: auto;
+      }
+      .home-carousel-card,
+      .home-menu-dot {
+        transition: none;
+      }
+      .home-carousel-card.is-bouncing {
+        animation: none;
+      }
+      .home-carousel-card {
+        animation: none;
+      }
     }
     .coming-soon {
       display: inline-flex !important;
@@ -587,6 +731,24 @@
       .app-header { padding-top: max(13px, env(safe-area-inset-top)); }
       .app-title { font-size: 18px; }
       main { padding: 14px 12px calc(92px + env(safe-area-inset-bottom)); }
+      .home-carousel-section {
+        margin-left: -12px;
+        margin-right: -12px;
+      }
+      .home-carousel {
+        min-height: 344px;
+        padding-inline: calc((100vw - min(80vw, 330px)) / 2);
+        scroll-padding-inline: calc((100vw - min(80vw, 330px)) / 2);
+      }
+      .home-carousel-card {
+        flex-basis: min(80vw, 330px);
+        min-height: 302px;
+        padding: 22px;
+      }
+      .home-primary-card strong,
+      .home-menu-card strong {
+        font-size: 22px;
+      }
       .member-summary { grid-template-columns: 1fr; gap: 10px; padding: 15px; }
       .panel { padding: 16px 14px; margin-bottom: 10px; }
       .panel-title { font-size: 19px; }
@@ -662,16 +824,15 @@
       }
       .tab-button.active { background: var(--gold); color: var(--black); }
 
-      .home-primary-card {
-        grid-template-columns: 48px 1fr auto;
-        min-height: 112px;
-        padding: 18px;
+      .home-primary-icon,
+      .home-card-icon {
+        width: 60px;
+        height: 60px;
       }
-      .home-primary-icon { width: 48px; height: 48px; }
-      .home-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .home-menu-card { min-height: 132px; padding: 14px; }
-      .home-menu-card strong { font-size: 16px; }
-      .home-menu-card span { font-size: 12px; }
+      .home-menu-card span,
+      .home-primary-card span {
+        font-size: 13px;
+      }
     }
   </style>
 </head>
@@ -711,50 +872,72 @@
           <p id="homeWelcome" class="home-welcome">ようこそ。今日使う機能を選んでください。</p>
         </section>
 
-        <button type="button" class="home-primary-card" onclick="openOrderPage()">
-          <span class="home-primary-icon">◎</span>
-          <span>
-            <strong>会員専用 注文ページ</strong>
-            <span>growシールエクステの注文、請求書、注文履歴を確認できます。</span>
-          </span>
-          <span class="home-primary-arrow">›</span>
-        </button>
-
-        <div class="home-menu-grid" aria-label="Kimikea Connectメニュー">
-          <button type="button" class="home-menu-card" onclick="openStylebook()">
-            <span class="home-card-icon">□</span>
-            <strong>スタイル図鑑</strong>
-            <span>施術写真、使用色、各色の本数を確認できます。</span>
-          </button>
-          <button type="button" class="home-menu-card" onclick="openPublicPage('popular')">
-            <span class="home-card-icon">★</span>
-            <strong>人気カラー</strong>
-            <span>今月・今年の人気色を表示します。</span>
-            <span class="coming-soon">準備中</span>
-          </button>
-          <button type="button" class="home-menu-card" onclick="openPublicPage('map')">
-            <span class="home-card-icon">⌖</span>
-            <strong>加盟店マップ</strong>
-            <span>加盟店、コーディネーター店舗を案内します。</span>
-            <span class="coming-soon">準備中</span>
-          </button>
-          <button type="button" class="home-menu-card" onclick="openPublicPage('ai')">
-            <span class="home-card-icon">AI</span>
-            <strong>AIカラー診断</strong>
-            <span>似合う色やスタイルを提案します。</span>
-            <span class="coming-soon">準備中</span>
-          </button>
-          <button type="button" class="home-menu-card" onclick="openPublicPage('notice')">
-            <span class="home-card-icon">i</span>
-            <strong>お知らせ</strong>
-            <span>新色、イベント、講習情報を確認できます。</span>
-          </button>
-          <button type="button" class="home-menu-card" onclick="openPublicPage('coordinator')">
-            <span class="home-card-icon">＋</span>
-            <strong>コーディネーター講習案内</strong>
-            <span>講習内容、開催日、申込方法を確認できます。</span>
-          </button>
-        </div>
+        <section class="home-carousel-section" aria-label="Kimikea Connectメニュー">
+          <p class="home-carousel-hint">左右にスワイプして機能を選択</p>
+          <div id="homeCarousel" class="home-carousel" tabindex="0">
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openStylebook()">
+              <span class="home-card-number">01</span>
+              <span class="home-card-icon" aria-hidden="true">📖</span>
+              <span>
+                <strong>スタイル図鑑</strong>
+                <span>施術写真、使用色、各色の本数を確認できます。</span>
+              </span>
+            </button>
+            <button type="button" class="home-carousel-card home-primary-card" data-carousel-card onclick="openOrderPage()">
+              <span class="home-card-number">02</span>
+              <span class="home-primary-icon" aria-hidden="true">🧾✓</span>
+              <span>
+                <strong>会員専用 注文ページ</strong>
+                <span>growシールエクステの注文、請求書、注文履歴を確認できます。</span>
+              </span>
+              <span class="home-primary-arrow">›</span>
+            </button>
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('coordinator')">
+              <span class="home-card-number">03</span>
+              <span class="home-card-icon" aria-hidden="true">📝</span>
+              <span>
+                <strong>コーディネーター講習案内</strong>
+                <span>講習内容、開催日、申込方法を確認できます。</span>
+              </span>
+            </button>
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('map')">
+              <span class="home-card-number">04</span>
+              <span class="home-card-icon" aria-hidden="true">🗺️</span>
+              <span>
+                <strong>加盟店マップ</strong>
+                <span>加盟店、コーディネーター店舗を案内します。</span>
+                <span class="coming-soon">準備中</span>
+              </span>
+            </button>
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('popular')">
+              <span class="home-card-number">05</span>
+              <span class="home-card-icon">★</span>
+              <span>
+                <strong>人気カラー</strong>
+                <span>今月・今年の人気色を表示します。</span>
+                <span class="coming-soon">準備中</span>
+              </span>
+            </button>
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('ai')">
+              <span class="home-card-number">06</span>
+              <span class="home-card-icon">AI</span>
+              <span>
+                <strong>AIカラー診断</strong>
+                <span>似合う色やスタイルを提案します。</span>
+                <span class="coming-soon">準備中</span>
+              </span>
+            </button>
+            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('notice')">
+              <span class="home-card-number">07</span>
+              <span class="home-card-icon" aria-hidden="true">📣</span>
+              <span>
+                <strong>お知らせ</strong>
+                <span>新色、イベント、講習情報を確認できます。</span>
+              </span>
+            </button>
+          </div>
+          <div id="homeCarouselDots" class="home-menu-dots" aria-label="現在のメニュー位置"></div>
+        </section>
       </section>
 
       <section id="publicPageView" class="public-page" hidden>
@@ -1132,10 +1315,108 @@
         : '公開アプリ';
     }
 
+    let activeCarouselIndex = -1;
+    let carouselScrollTimer = null;
+
+    function getCarouselElements() {
+      const carousel = document.getElementById('homeCarousel');
+      const cards = carousel ? Array.from(carousel.querySelectorAll('[data-carousel-card]')) : [];
+      const dots = Array.from(document.querySelectorAll('#homeCarouselDots .home-menu-dot'));
+      return { carousel, cards, dots };
+    }
+
+    function buildCarouselDots() {
+      const { cards } = getCarouselElements();
+      const dotWrap = document.getElementById('homeCarouselDots');
+      if (!dotWrap || dotWrap.children.length === cards.length) return;
+      dotWrap.innerHTML = cards.map((card, index) => (
+        `<button type="button" class="home-menu-dot" aria-label="${escapeHtml(card.querySelector('strong')?.textContent || `メニュー${index + 1}`)}へ移動" onclick="scrollHomeCarouselTo(${index})"></button>`
+      )).join('');
+    }
+
+    function getNearestCarouselIndex() {
+      const { carousel, cards } = getCarouselElements();
+      if (!carousel || !cards.length) return 0;
+      const center = carousel.scrollLeft + carousel.clientWidth / 2;
+      let nearestIndex = 0;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      cards.forEach((card, index) => {
+        const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+        const distance = Math.abs(cardCenter - center);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      });
+      return nearestIndex;
+    }
+
+    function setActiveCarouselCard(index, shouldAnimate = false) {
+      const { cards, dots } = getCarouselElements();
+      if (!cards.length) return;
+      const boundedIndex = Math.max(0, Math.min(index, cards.length - 1));
+      cards.forEach((card, cardIndex) => {
+        const active = cardIndex === boundedIndex;
+        card.classList.toggle('is-active', active);
+        card.setAttribute('aria-current', active ? 'true' : 'false');
+      });
+      dots.forEach((dot, dotIndex) => {
+        dot.classList.toggle('is-active', dotIndex === boundedIndex);
+      });
+      if (boundedIndex !== activeCarouselIndex) {
+        activeCarouselIndex = boundedIndex;
+        if (shouldAnimate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const activeCard = cards[boundedIndex];
+          activeCard.classList.remove('is-bouncing');
+          window.requestAnimationFrame(() => activeCard.classList.add('is-bouncing'));
+          if (navigator.vibrate) {
+            try { navigator.vibrate(8); } catch (error) { /* unsupported vibration is safe to ignore */ }
+          }
+        }
+      }
+    }
+
+    function updateHomeCarousel(shouldAnimate = false) {
+      buildCarouselDots();
+      setActiveCarouselCard(getNearestCarouselIndex(), shouldAnimate);
+    }
+
+    function scrollHomeCarouselTo(index) {
+      const { cards } = getCarouselElements();
+      if (!cards[index]) return;
+      cards[index].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      setTimeout(() => setActiveCarouselCard(index, true), 180);
+    }
+
+    function initializeHomeCarousel() {
+      const { carousel, cards } = getCarouselElements();
+      if (!carousel || !cards.length || carousel.dataset.ready === 'true') {
+        updateHomeCarousel(false);
+        return;
+      }
+      carousel.dataset.ready = 'true';
+      buildCarouselDots();
+      cards.forEach((card) => {
+        card.addEventListener('animationend', () => card.classList.remove('is-bouncing'));
+      });
+      carousel.addEventListener('scroll', () => {
+        updateHomeCarousel(false);
+        window.clearTimeout(carouselScrollTimer);
+        carouselScrollTimer = window.setTimeout(() => updateHomeCarousel(true), 90);
+      }, { passive: true });
+      carousel.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') scrollHomeCarouselTo(activeCarouselIndex + 1);
+        if (event.key === 'ArrowLeft') scrollHomeCarouselTo(activeCarouselIndex - 1);
+      });
+      window.addEventListener('resize', () => updateHomeCarousel(false));
+      updateHomeCarousel(false);
+    }
+
     function showHomePage() {
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
+      initializeHomeCarousel();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
