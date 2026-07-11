@@ -99,6 +99,62 @@ const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
 const resetButton = document.getElementById('resetButton');
 const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
+const stylebookHome = document.getElementById('stylebookHome');
+const openLibraryButton = document.getElementById('openLibraryButton');
+const openPostButton = document.getElementById('openPostButton');
+const openDraftButton = document.getElementById('openDraftButton');
+const postView = document.getElementById('postView');
+const libraryView = document.getElementById('libraryView');
+const resultHead = document.getElementById('resultHead');
+const detailView = document.getElementById('detailView');
+const draftView = document.getElementById('draftView');
+
+function setSectionVisibility(mode) {
+  stylebookHome.hidden = mode !== 'home';
+  postView.hidden = mode !== 'post';
+  libraryView.hidden = mode !== 'library';
+  resultHead.hidden = mode !== 'library';
+  recipeGrid.hidden = mode !== 'library';
+  detailView.hidden = mode !== 'detail';
+  draftView.hidden = mode !== 'draft';
+}
+
+function showStylebookHome() {
+  setSectionVisibility('home');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showLibrary() {
+  render();
+  setSectionVisibility('library');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showPost() {
+  setSectionVisibility('post');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showDrafts() {
+  render();
+  setSectionVisibility('draft');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showRecipeDetail(id) {
+  const recipe = state.recipes.find(item => item.id === id);
+  if (!recipe) return;
+  detailView.innerHTML = `
+    <div class="view-back-row">
+      <button type="button" class="ghost-button" onclick="showLibrary()">写真一覧へ戻る</button>
+    </div>
+    <section class="detail-panel">
+      ${renderRecipe(recipe)}
+    </section>
+  `;
+  setSectionVisibility('detail');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -273,10 +329,10 @@ function renderRecipe(recipe) {
 
   return `
     <article class="recipe-card ${recipe.status === 'draft' ? 'is-draft' : ''}">
-      <div class="recipe-photo">
+      <button class="recipe-photo recipe-photo-button" type="button" data-action="view" data-id="${recipe.id}">
         <span class="type-badge">${recipe.status === 'draft' ? '下書き' : recipe.treatmentType}</span>
         ${renderPhoto(recipe)}
-      </div>
+      </button>
 
       <div class="recipe-body">
         <div class="recipe-title-row">
@@ -509,6 +565,8 @@ async function saveCurrentRecipe(status) {
     await persistRecipe(recipe);
     clearForm();
     render();
+    if (status === 'published') showLibrary();
+    else showDrafts();
     showMessage(status === 'published' ? '投稿しました。一覧に反映しました。' : '下書き保存しました。', 'success');
   } catch (error) {
     showMessage(error.message || '保存できませんでした。');
@@ -537,7 +595,7 @@ function editRecipe(id) {
   formTitle.textContent = recipe.status === 'draft' ? '下書き編集' : '公開レシピ編集';
   cancelEditButton.hidden = false;
   hideMessage();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showPost();
 }
 
 async function deleteRecipe(id) {
@@ -571,6 +629,7 @@ async function init() {
   addColorRow();
   await loadRecipes();
   render();
+  showStylebookHome();
 }
 
 photoInput.addEventListener('change', async event => {
@@ -584,6 +643,12 @@ photoInput.addEventListener('change', async event => {
   }
 });
 
+openLibraryButton.addEventListener('click', showLibrary);
+openPostButton.addEventListener('click', () => {
+  clearForm();
+  showPost();
+});
+openDraftButton.addEventListener('click', showDrafts);
 addColorButton.addEventListener('click', () => addColorRow());
 cancelEditButton.addEventListener('click', clearForm);
 draftButton.addEventListener('click', () => saveCurrentRecipe('draft'));
@@ -629,6 +694,7 @@ resetButton.addEventListener('click', () => {
 document.addEventListener('click', event => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
+  if (button.dataset.action === 'view') showRecipeDetail(button.dataset.id);
   if (button.dataset.action === 'edit') editRecipe(button.dataset.id);
   if (button.dataset.action === 'delete') deleteRecipe(button.dataset.id);
 });

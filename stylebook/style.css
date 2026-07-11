@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-height: 100%;
   background: var(--bg);
@@ -802,4 +806,119 @@ h1 {
   .meta-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.stylebook-home {
+  display: grid;
+  gap: 14px;
+  padding: 10px 0 28px;
+}
+.library-main-button,
+.stylebook-action-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 253, 249, 0.94);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  text-align: left;
+  cursor: pointer;
+}
+.library-main-button {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 15px;
+  align-items: center;
+  min-height: 136px;
+  padding: 22px;
+  background: linear-gradient(135deg, #fffdf9, #eef4f5 52%, #f4ead8);
+}
+.book-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: #2f3f45;
+  font-size: 31px;
+}
+.library-main-button strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 26px;
+  line-height: 1.18;
+}
+.library-main-button small,
+.stylebook-action-button small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.stylebook-action-button {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 12px;
+  align-items: center;
+  min-height: 92px;
+  padding: 16px;
+}
+.stylebook-action-button > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  font-size: 22px;
+  font-weight: 900;
+  grid-row: span 2;
+}
+.stylebook-action-button strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 19px;
+}
+.view-back-row {
+  margin-bottom: 12px;
+}
+.recipe-photo-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.detail-view {
+  display: grid;
+  gap: 14px;
+}
+.detail-view[hidden] { display: none; }
+.detail-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: var(--shadow);
+}
+.detail-panel .recipe-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (max-width: 560px) {
+  .library-main-button { grid-template-columns: 56px 1fr; padding: 18px; }
+  .book-icon { width: 56px; height: 56px; }
+  .library-main-button strong { font-size: 23px; }
+}
+
+section[hidden],
+div[hidden],
+form[hidden],
+[hidden] {
+  display: none !important;
 }

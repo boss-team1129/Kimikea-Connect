@@ -11,31 +11,48 @@
   <meta name="application-name" content="Kimikea Connect">
   <meta name="format-detection" content="telephone=no">
 
-  <title>レシピ投稿 | Kimikea Connect</title>
+  <title>スタイル図鑑 | Kimikea Connect</title>
 
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=20260711-1">
 </head>
 <body>
   <main class="recipe-app">
     <header class="app-header">
       <a class="back-link" href="../index.html">戻る</a>
       <div>
-        <p class="eyebrow">Recipe Post</p>
-        <h1>レシピ投稿</h1>
+        <p class="eyebrow">Recipe Book</p>
+        <h1>スタイル図鑑</h1>
       </div>
     </header>
 
-    <section class="hero-card">
-      <p class="hero-label">1ページ完結</p>
-      <h2>写真を選んで、色と本数を入れて、すぐ共有。</h2>
-      <p>営業中でも短時間で投稿できるように、必須項目だけを先に並べています。詳しい説明は「詳細を追加」にまとめています。</p>
+    <section id="stylebookHome" class="stylebook-home" aria-label="スタイル図鑑トップ">
+      <button type="button" id="openLibraryButton" class="library-main-button">
+        <span class="book-icon" aria-hidden="true">📖</span>
+        <span>
+          <strong>図鑑を見る</strong>
+          <small>投稿済みスタイルの写真一覧から、使用色と本数の詳細レシピを確認できます。</small>
+        </span>
+      </button>
+
+      <button type="button" id="openPostButton" class="stylebook-action-button">
+        <span>＋</span>
+        <strong>投稿する</strong>
+        <small>新しい施術写真とレシピを投稿します。</small>
+      </button>
+
+      <button type="button" id="openDraftButton" class="stylebook-action-button">
+        <span>□</span>
+        <strong>下書き</strong>
+        <small>保存済みの下書きを開いて編集できます。</small>
+      </button>
     </section>
 
-    <section class="form-panel" aria-labelledby="formTitle">
+    <section id="postView" class="form-panel" aria-labelledby="formTitle" hidden>
+      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
       <div class="panel-head">
         <div>
           <p class="eyebrow">Entry</p>
@@ -157,7 +174,8 @@
       </form>
     </section>
 
-    <section class="search-area" aria-label="レシピ検索">
+    <section id="libraryView" class="search-area" aria-label="レシピ検索" hidden>
+      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
       <div class="search-head">
         <h2>公開レシピ検索</h2>
         <button id="resetButton" type="button">リセット</button>
@@ -196,7 +214,7 @@
       </div>
     </section>
 
-    <section class="result-head" aria-live="polite">
+    <section id="resultHead" class="result-head" aria-live="polite" hidden>
       <div>
         <h2>公開レシピ一覧</h2>
         <p>投稿済みのレシピが表示されます。</p>
@@ -204,9 +222,12 @@
       <p id="resultCount">0件</p>
     </section>
 
-    <section id="recipeGrid" class="recipe-grid" aria-label="公開レシピ一覧"></section>
+    <section id="recipeGrid" class="recipe-grid" aria-label="公開レシピ一覧" hidden></section>
 
-    <section class="draft-section">
+    <section id="detailView" class="detail-view" hidden></section>
+
+    <section id="draftView" class="draft-section" hidden>
+      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
       <div class="result-head">
         <div>
           <h2>下書き</h2>
@@ -217,7 +238,7 @@
       <section id="draftGrid" class="recipe-grid compact-grid" aria-label="下書き一覧"></section>
     </section>
 
-    <section class="storage-note">
+    <section class="storage-note" hidden>
       <h2>保存方法</h2>
       <p>本運用ではGoogleスプレッドシートにレシピ情報を保存し、写真はGoogle Driveに保存します。GitHub Pages側の画面からApps Scriptへ接続して使います。</p>
     </section>
