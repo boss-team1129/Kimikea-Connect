@@ -95,10 +95,12 @@ const KCO_FRANCHISE_HEADERS = [
   'email',
   'phone',
   'initialPassword',
+  'passwordHash',
   'postalCode',
   'address',
   'contactName',
   'membershipStatus',
+  'passwordChangedAt',
   'createdAt',
   'updatedAt',
 ];
@@ -197,22 +199,74 @@ function loginFranchise(credentials) {
     item.visible
     && item.email
     && normalizeEmail_(item.email) === email
-    && normalizeLoginPassword_(item.initialPassword || KCO_DEFAULT_INITIAL_PASSWORD) === password
   ));
-  if (!franchise) {
+  if (!franchise || !isValidFranchisePassword_(franchise, password)) {
     throw new Error('メールアドレスまたはパスワードが正しくありません。');
   }
+
+  const passwordChangeRequired = isInitialPasswordLogin_(franchise, password);
 
   const sessionToken = Utilities.getUuid();
   CacheService.getScriptCache().put(
     createSessionKey_(sessionToken),
-    JSON.stringify({ franchiseId: franchise.franchiseId }),
+    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired }),
     KCO_CONFIG.SESSION_SECONDS
   );
   return {
     sessionToken,
     franchise: sanitizeFranchise_(franchise),
+    passwordChangeRequired,
   };
+}
+
+function completeInitialPasswordSetup(sessionToken, newPassword, confirmPassword) {
+  const franchise = getSessionFranchise_(sessionToken, { allowPasswordChange: true });
+  validateNewPassword_(newPassword, confirmPassword);
+  updateFranchisePassword_(franchise.franchiseId, newPassword);
+  CacheService.getScriptCache().put(
+    createSessionKey_(sessionToken),
+    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired: false }),
+    KCO_CONFIG.SESSION_SECONDS
+  );
+  return {
+    franchise: sanitizeFranchise_(findFranchiseById_(franchise.franchiseId)),
+    passwordChangeRequired: false,
+  };
+}
+
+function updateMemberEmail(sessionToken, newEmail) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const email = normalizeEmail_(newEmail);
+  if (!email || email.indexOf('@') === -1) {
+    throw new Error('正しいメールアドレスを入力してください。');
+  }
+
+  const duplicate = getFranchiseMasterRecords_().find((item) => (
+    item.franchiseId !== franchise.franchiseId
+    && item.visible
+    && normalizeEmail_(item.email) === email
+  ));
+  if (duplicate) {
+    throw new Error('このメールアドレスはすでに登録されています。');
+  }
+
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const indexes = getFranchiseMasterColumnIndexes_(sheet);
+  sheet.getRange(franchise.rowNumber, indexes.email + 1).setValue(email);
+  if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(new Date());
+  return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
+}
+
+function changeMemberPassword(sessionToken, currentPassword, newPassword, confirmPassword) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const current = normalizeLoginPassword_(currentPassword);
+  if (!isValidFranchisePassword_(franchise, current)) {
+    throw new Error('現在のパスワードが正しくありません。');
+  }
+  validateNewPassword_(newPassword, confirmPassword);
+  updateFranchisePassword_(franchise.franchiseId, newPassword);
+  return true;
 }
 
 function logoutFranchise(sessionToken) {
@@ -436,7 +490,7 @@ function setupFranchiseMaster_(ss) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
     sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', '', 'active', new Date(), new Date()],
+      ['K-1', 'TEAM hair', '', '', '', '', '', '', '', 'active', '', new Date(), new Date()],
     ]);
   } else {
     ensureFranchiseMasterColumns_(sheet);
@@ -464,7 +518,7 @@ function migrateProductionFranchiseRows_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) {
     sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', '', 'active', new Date(), new Date()],
+      ['K-1', 'TEAM hair', '', '', '', '', '', '', '', 'active', '', new Date(), new Date()],
     ]);
     return;
   }
@@ -481,6 +535,7 @@ function migrateProductionFranchiseRows_(sheet) {
   const updatedAtIndex = getIndex(['updatedAt', '更新日']);
 
   let hasTeamHair = false;
+  const rowsToDelete = [];
   values.slice(1).forEach((row, offset) => {
     const rowNumber = offset + 2;
     const memberId = memberIdIndex === -1 ? '' : String(row[memberIdIndex] || '').trim();
@@ -497,11 +552,11 @@ function migrateProductionFranchiseRows_(sheet) {
     }
 
     if (isTestRow) {
-      if (statusIndex !== -1) sheet.getRange(rowNumber, statusIndex + 1).setValue('inactive');
-      if (visibleIndex !== -1) sheet.getRange(rowNumber, visibleIndex + 1).setValue(false);
-      if (updatedAtIndex !== -1) sheet.getRange(rowNumber, updatedAtIndex + 1).setValue(new Date());
+      rowsToDelete.push(rowNumber);
     }
   });
+
+  rowsToDelete.reverse().forEach((rowNumber) => sheet.deleteRow(rowNumber));
 
   if (!hasTeamHair) {
     const newRow = new Array(sheet.getLastColumn()).fill('');
@@ -1245,7 +1300,7 @@ function createSessionKey_(sessionToken) {
   return `KCO_SESSION_${String(sessionToken || '').trim()}`;
 }
 
-function getSessionFranchise_(sessionToken) {
+function getSessionFranchise_(sessionToken, options) {
   const token = String(sessionToken || '').trim();
   if (!token) {
     throw new Error('ログインが必要です。');
@@ -1258,6 +1313,10 @@ function getSessionFranchise_(sessionToken) {
   }
 
   const session = JSON.parse(sessionJson);
+  if (session.passwordChangeRequired && !(options && options.allowPasswordChange)) {
+    throw new Error('新しいパスワード設定が必要です。');
+  }
+
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible && item.franchiseId === session.franchiseId
   ));
@@ -1268,7 +1327,10 @@ function getSessionFranchise_(sessionToken) {
 
   cache.put(
     createSessionKey_(token),
-    JSON.stringify({ franchiseId: franchise.franchiseId }),
+    JSON.stringify({
+      franchiseId: franchise.franchiseId,
+      passwordChangeRequired: Boolean(session.passwordChangeRequired),
+    }),
     KCO_CONFIG.SESSION_SECONDS
   );
   return franchise;
@@ -1390,10 +1452,12 @@ function getFranchiseMasterRecords_() {
   const emailIndex = findHeaderIndex(['email', 'メールアドレス']);
   const phoneIndex = findHeaderIndex(['phone', '電話', '電話番号']);
   const passwordIndex = findHeaderIndex(['initialPassword', 'パスワード', 'password']);
+  const passwordHashIndex = findHeaderIndex(['passwordHash', 'パスワードハッシュ']);
   const postalCodeIndex = findHeaderIndex(['postalCode', '郵便番号']);
   const addressIndex = findHeaderIndex(['address', '住所']);
   const contactNameIndex = findHeaderIndex(['contactName', '担当者', '担当者名']);
   const membershipStatusIndex = findHeaderIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
+  const passwordChangedAtIndex = findHeaderIndex(['passwordChangedAt', 'パスワード変更日']);
   const createdAtIndex = findHeaderIndex(['createdAt', '作成日', '登録日']);
   const updatedAtIndex = findHeaderIndex(['updatedAt', '更新日']);
   const visibleIndex = findHeaderIndex(['表示']);
@@ -1412,7 +1476,7 @@ function getFranchiseMasterRecords_() {
   }
 
   return values.slice(1)
-    .map((row) => {
+    .map((row, offset) => {
       const rawStatus = membershipStatusIndex === -1 ? '' : String(row[membershipStatusIndex] || '').trim();
       const visible = visibleIndex === -1 ? true : isVisible_(row[visibleIndex]);
       const membershipStatus = normalizeMembershipStatus_(rawStatus, visible);
@@ -1423,16 +1487,19 @@ function getFranchiseMasterRecords_() {
         memberId: String(row[franchiseIdIndex] || '').trim(),
         franchiseName: String(row[franchiseNameIndex] || '').trim(),
         salonName: String(row[franchiseNameIndex] || '').trim(),
+        rowNumber: offset + 2,
         contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
         email: String(row[emailIndex] || '').trim(),
         phone: normalizePhone_(row[phoneIndex]),
         initialPassword: passwordIndex === -1
           ? KCO_DEFAULT_INITIAL_PASSWORD
           : normalizeLoginPassword_(row[passwordIndex] || KCO_DEFAULT_INITIAL_PASSWORD),
+        passwordHash: passwordHashIndex === -1 ? '' : String(row[passwordHashIndex] || '').trim(),
         postalCode,
         address,
         fullAddress: [postalCode, address].filter(Boolean).join(' '),
         membershipStatus,
+        passwordChangedAt: passwordChangedAtIndex === -1 ? '' : row[passwordChangedAtIndex],
         createdAt: createdAtIndex === -1 ? '' : row[createdAtIndex],
         updatedAt: updatedAtIndex === -1 ? '' : row[updatedAtIndex],
         visible: membershipStatus === 'active',
@@ -1494,6 +1561,80 @@ function normalizeLoginPassword_(value) {
   return String(value || '')
     .normalize('NFKC')
     .replace(/\s/g, '');
+}
+
+function hashPassword_(password) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    normalizeLoginPassword_(password),
+    Utilities.Charset.UTF_8
+  );
+  return bytes
+    .map((byte) => (byte < 0 ? byte + 256 : byte).toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function isInitialPasswordLogin_(franchise, password) {
+  if (franchise.passwordHash) return false;
+  return normalizeLoginPassword_(franchise.initialPassword || KCO_DEFAULT_INITIAL_PASSWORD)
+    === normalizeLoginPassword_(password);
+}
+
+function isValidFranchisePassword_(franchise, password) {
+  const normalizedPassword = normalizeLoginPassword_(password);
+  if (!normalizedPassword) return false;
+  if (franchise.passwordHash) {
+    return franchise.passwordHash === hashPassword_(normalizedPassword);
+  }
+  return isInitialPasswordLogin_(franchise, normalizedPassword);
+}
+
+function validateNewPassword_(newPassword, confirmPassword) {
+  const password = normalizeLoginPassword_(newPassword);
+  const confirmation = normalizeLoginPassword_(confirmPassword);
+  if (!password || !confirmation) {
+    throw new Error('新しいパスワードと確認用パスワードを入力してください。');
+  }
+  if (password.length < 4) {
+    throw new Error('新しいパスワードは4文字以上で設定してください。');
+  }
+  if (password === KCO_DEFAULT_INITIAL_PASSWORD) {
+    throw new Error('初期パスワード0000は使用できません。');
+  }
+  if (password !== confirmation) {
+    throw new Error('新しいパスワードと確認用パスワードが一致しません。');
+  }
+}
+
+function getFranchiseMasterColumnIndexes_(sheet) {
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
+  return {
+    email: getIndex(['email', 'メールアドレス']),
+    initialPassword: getIndex(['initialPassword', 'パスワード', 'password']),
+    passwordHash: getIndex(['passwordHash', 'パスワードハッシュ']),
+    passwordChangedAt: getIndex(['passwordChangedAt', 'パスワード変更日']),
+    updatedAt: getIndex(['updatedAt', '更新日']),
+  };
+}
+
+function updateFranchisePassword_(franchiseId, newPassword) {
+  const franchise = findFranchiseById_(franchiseId);
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const indexes = getFranchiseMasterColumnIndexes_(sheet);
+  if (indexes.passwordHash === -1) {
+    throw new Error('加盟店マスタに passwordHash 列がありません。初期設定を再実行してください。');
+  }
+
+  const now = new Date();
+  sheet.getRange(franchise.rowNumber, indexes.passwordHash + 1).setValue(hashPassword_(newPassword));
+  if (indexes.initialPassword !== -1) sheet.getRange(franchise.rowNumber, indexes.initialPassword + 1).setValue('');
+  if (indexes.passwordChangedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.passwordChangedAt + 1).setValue(now);
+  if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(now);
 }
 
 function normalizeMembershipStatus_(value, visible) {

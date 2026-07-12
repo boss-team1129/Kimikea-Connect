@@ -972,6 +972,22 @@
       font-size: 13px;
       line-height: 1.6;
     }
+    .link-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 8px;
+      border: 0;
+      background: transparent;
+      color: #6d7f86;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      text-decoration: underline;
+      cursor: pointer;
+    }
     @media (max-width: 720px) {
       .login-shell {
         min-height: 100vh;
@@ -1135,7 +1151,27 @@
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
       <p class="form-note">登録済みのメールアドレスと、初期パスワード「0000」を入力してください</p>
+      <button class="link-button" type="button" onclick="showForgotPasswordHelp()">パスワードを忘れた方はこちら</button>
       <p id="loginMessage" class="message error" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section id="passwordSetupView" class="login-shell" hidden>
+    <form id="passwordSetupForm" class="login-panel" onsubmit="handleInitialPasswordSetup(event)">
+      <h1 class="brand">新しいパスワード設定</h1>
+      <div class="brand-accent"></div>
+      <p class="lead">初回ログインが完了しました。<br>今後使用するパスワードを設定してください。</p>
+      <div class="field">
+        <label for="newPassword">新しいパスワード</label>
+        <input id="newPassword" type="password" autocomplete="new-password" required>
+      </div>
+      <div class="field">
+        <label for="confirmPassword">確認用パスワード</label>
+        <input id="confirmPassword" type="password" autocomplete="new-password" required>
+      </div>
+      <button id="passwordSetupButton" class="button button-gold" type="submit">保存して進む</button>
+      <p class="form-note">保存後は初期パスワード「0000」ではログインできなくなります。</p>
+      <p id="passwordSetupMessage" class="message error" aria-live="polite"></p>
     </form>
   </section>
 
@@ -1420,15 +1456,26 @@
 
     function showLogin() {
       document.getElementById('portalView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('loginView').hidden = false;
       setBusy('loginButton', false);
     }
 
     function showOrderLogin() {
       document.getElementById('portalView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('loginView').hidden = false;
       setBusy('loginButton', false);
       setMessage('loginMessage', '', false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showPasswordSetup() {
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('portalView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = false;
+      setBusy('passwordSetupButton', false);
+      setMessage('passwordSetupMessage', '', false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1514,6 +1561,10 @@
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
           state.franchise = response.franchise || state.franchise;
+          if (response.passwordChangeRequired) {
+            showPasswordSetup();
+            return;
+          }
           showDashboard();
           openOrderPage();
           loadPortalData();
@@ -1527,6 +1578,48 @@
           setMessage('loginMessage', safeMessage, true);
         })
         .loginFranchise({ email, password });
+    }
+
+    function handleInitialPasswordSetup(event) {
+      event.preventDefault();
+      const newPassword = document.getElementById('newPassword').value.normalize('NFKC').replace(/\s/g, '');
+      const confirmPassword = document.getElementById('confirmPassword').value.normalize('NFKC').replace(/\s/g, '');
+      document.getElementById('newPassword').value = newPassword;
+      document.getElementById('confirmPassword').value = confirmPassword;
+
+      if (!newPassword || !confirmPassword) {
+        setMessage('passwordSetupMessage', '新しいパスワードと確認用パスワードを入力してください。', true);
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setMessage('passwordSetupMessage', '新しいパスワードと確認用パスワードが一致しません。', true);
+        return;
+      }
+      if (newPassword === '0000') {
+        setMessage('passwordSetupMessage', '初期パスワード0000は使用できません。', true);
+        return;
+      }
+
+      setBusy('passwordSetupButton', true);
+      setMessage('passwordSetupMessage', '保存しています...', false);
+      google.script.run
+        .withSuccessHandler((response) => {
+          state.franchise = response.franchise || state.franchise;
+          document.getElementById('newPassword').value = '';
+          document.getElementById('confirmPassword').value = '';
+          showDashboard();
+          openOrderPage();
+          loadPortalData();
+        })
+        .withFailureHandler((error) => {
+          setBusy('passwordSetupButton', false);
+          setMessage('passwordSetupMessage', getErrorMessage(error), true);
+        })
+        .completeInitialPasswordSetup(state.sessionToken, newPassword, confirmPassword);
+    }
+
+    function showForgotPasswordHelp() {
+      setMessage('loginMessage', 'パスワード再設定はKimikea本部へご連絡ください。本人確認後、再設定をご案内します。', false);
     }
 
     function loadPortal() {
@@ -1560,6 +1653,10 @@
         })
         .withFailureHandler((error) => {
           console.warn('Kimikea Connect portal data error:', getErrorMessage(error));
+          if (getErrorMessage(error).includes('新しいパスワード設定')) {
+            showPasswordSetup();
+            return;
+          }
           showDashboard();
         })
         .getPortalData(state.sessionToken);
@@ -1567,6 +1664,7 @@
 
     function showDashboard() {
       document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('portalView').hidden = false;
       setBusy('loginButton', false);
       setMessage('loginMessage', '', false);
@@ -2102,12 +2200,74 @@
             <span>投稿、下書き、図鑑を開きます。</span>
           </button>
         </div>
+        <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">
+          <h3>メールアドレス変更</h3>
+          <label class="field">
+            <span>新しいメールアドレス</span>
+            <input id="mypageNewEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required>
+          </label>
+          <button type="submit" class="button button-gold">メールアドレスを保存</button>
+        </form>
+        <form class="coordinator-form" onsubmit="handleMyPagePasswordChange(event)">
+          <h3>パスワード変更</h3>
+          <label class="field">
+            <span>現在のパスワード</span>
+            <input id="mypageCurrentPassword" type="password" autocomplete="current-password" required>
+          </label>
+          <label class="field">
+            <span>新しいパスワード</span>
+            <input id="mypageNewPassword" type="password" autocomplete="new-password" required>
+          </label>
+          <label class="field">
+            <span>確認用パスワード</span>
+            <input id="mypageConfirmPassword" type="password" autocomplete="new-password" required>
+          </label>
+          <button type="submit" class="button button-gold">パスワードを保存</button>
+        </form>
+        <button type="button" class="button button-outline" onclick="handleLogout()">ログアウト</button>
+        <p id="mypageMessage" class="message" aria-live="polite"></p>
       `;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    function handleMyPageEmailChange(event) {
+      event.preventDefault();
+      const newEmail = document.getElementById('mypageNewEmail').value.trim();
+      setMessage('mypageMessage', '保存しています...', false);
+      google.script.run
+        .withSuccessHandler((franchise) => {
+          state.franchise = franchise || state.franchise;
+          renderProfile();
+          setMessage('mypageMessage', 'メールアドレスを更新しました。', false);
+        })
+        .withFailureHandler((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        })
+        .updateMemberEmail(state.sessionToken, newEmail);
+    }
+
+    function handleMyPagePasswordChange(event) {
+      event.preventDefault();
+      const currentPassword = document.getElementById('mypageCurrentPassword').value.normalize('NFKC').replace(/\s/g, '');
+      const newPassword = document.getElementById('mypageNewPassword').value.normalize('NFKC').replace(/\s/g, '');
+      const confirmPassword = document.getElementById('mypageConfirmPassword').value.normalize('NFKC').replace(/\s/g, '');
+      setMessage('mypageMessage', '保存しています...', false);
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('mypageCurrentPassword').value = '';
+          document.getElementById('mypageNewPassword').value = '';
+          document.getElementById('mypageConfirmPassword').value = '';
+          setMessage('mypageMessage', 'パスワードを更新しました。', false);
+        })
+        .withFailureHandler((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        })
+        .changeMemberPassword(state.sessionToken, currentPassword, newPassword, confirmPassword);
+    }
+
     function goKimikeaHomeFromNav() {
       document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('portalView').hidden = false;
       setMessage('loginMessage', '', false);
       updateAuthDisplay();
