@@ -3,249 +3,202 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#eef4f5">
+  <meta name="theme-color" content="#f7f4ee">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Kimikea Connect">
   <meta name="application-name" content="Kimikea Connect">
   <meta name="format-detection" content="telephone=no">
-
   <title>スタイル図鑑 | Kimikea Connect</title>
-
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
   <link rel="stylesheet" href="../shared-nav.css?v=20260712-1">
-  <link rel="stylesheet" href="./style.css?v=20260711-1">
+  <link rel="stylesheet" href="./style.css?v=20260712-gallery">
 </head>
 <body>
-  <main class="recipe-app">
-    <header class="app-header">
-      <a class="back-link" href="../index.html">戻る</a>
-      <div>
-        <p class="eyebrow">Recipe Book</p>
+  <main class="stylebook-app">
+    <header class="topbar">
+      <a class="back-link" href="../index.html" aria-label="Kimikea Connectホームへ戻る">戻る</a>
+      <div class="topbar-title">
+        <p>Kimikea Connect</p>
         <h1>スタイル図鑑</h1>
       </div>
+      <button id="openAdminButton" class="icon-button" type="button" aria-label="本部管理">管理</button>
     </header>
 
-    <section id="stylebookHome" class="stylebook-home" aria-label="スタイル図鑑トップ">
-      <button type="button" id="openLibraryButton" class="library-main-button">
-        <span class="book-icon" aria-hidden="true">📖</span>
-        <span>
-          <strong>図鑑を見る</strong>
-          <small>投稿済みスタイルの写真一覧から、使用色と本数の詳細レシピを確認できます。</small>
-        </span>
-      </button>
-
-      <button type="button" id="openPostButton" class="stylebook-action-button">
-        <span>＋</span>
-        <strong>投稿する</strong>
-        <small>新しい施術写真とレシピを投稿します。</small>
-      </button>
-
-      <button type="button" id="openDraftButton" class="stylebook-action-button">
-        <span>□</span>
-        <strong>下書き</strong>
-        <small>保存済みの下書きを開いて編集できます。</small>
-      </button>
+    <section id="rolePanel" class="role-panel" aria-label="テストユーザー切り替え">
+      <label>
+        <span>テストユーザー</span>
+        <select id="userSelect"></select>
+      </label>
+      <p id="roleHelp">権限ごとの表示確認用です。本番ではKimikeaログインと連携します。</p>
     </section>
 
-    <section id="postView" class="form-panel" aria-labelledby="formTitle" hidden>
-      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
-      <div class="panel-head">
-        <div>
-          <p class="eyebrow">Entry</p>
-          <h2 id="formTitle">新規レシピ</h2>
-        </div>
-        <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
+    <section id="galleryView" class="view-section">
+      <div class="compact-search">
+        <label class="search-input">
+          <span aria-hidden="true">⌕</span>
+          <input id="keywordInput" type="search" placeholder="スタイルを検索">
+        </label>
+        <button id="filterToggle" class="mini-button" type="button">絞込</button>
+        <select id="sortSelect" class="sort-select" aria-label="並び替え">
+          <option value="recommended">おすすめ</option>
+          <option value="popular">人気順</option>
+          <option value="new">新着順</option>
+          <option value="saved">保存数順</option>
+        </select>
       </div>
 
-      <form id="recipeForm" class="recipe-form">
-        <input id="recipeId" type="hidden">
-
-        <div id="messageBox" class="message-box" hidden></div>
-
-        <section class="entry-block">
-          <h3>1. 施術写真 <span>必須</span></h3>
-          <label class="field image-field">
-            <span>スマホから写真を選択</span>
-            <input id="photoInput" type="file" accept="image/*">
-            <small>写真フォルダ、または撮影した写真を選べます。</small>
+      <section id="filterPanel" class="filter-panel" hidden>
+        <div class="filter-row">
+          <h2>エクステの色</h2>
+          <div id="colorFilters" class="chip-grid"></div>
+        </div>
+        <div class="filter-row">
+          <h2>施術スタイル</h2>
+          <div id="styleFilters" class="chip-grid"></div>
+        </div>
+        <div class="filter-row two-col">
+          <label>
+            <span>店舗</span>
+            <select id="shopFilter" multiple></select>
           </label>
-          <div id="imagePreview" class="image-preview">
-            <span>写真プレビュー</span>
-          </div>
-        </section>
+          <label>
+            <span>担当者</span>
+            <select id="staffFilter" multiple></select>
+          </label>
+        </div>
+        <label class="saved-only">
+          <input id="savedOnlyToggle" type="checkbox">
+          <span>保存済みのみ表示</span>
+        </label>
+      </section>
 
-        <section class="entry-block">
-          <h3>2. 施術タイプ <span>必須</span></h3>
+      <div class="result-meta">
+        <div id="activeChips" class="active-chips"></div>
+        <div class="result-actions">
+          <span id="resultCount">0件</span>
+          <button id="clearFiltersButton" class="text-button" type="button">すべて解除</button>
+        </div>
+      </div>
+
+      <section id="galleryGrid" class="gallery-grid" aria-label="スタイル写真一覧"></section>
+      <div id="infiniteSentinel" class="sentinel" aria-hidden="true"></div>
+    </section>
+
+    <section id="detailView" class="view-section detail-view" hidden></section>
+
+    <section id="postView" class="view-section form-view" hidden>
+      <div class="view-head">
+        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <h2 id="postFormTitle">スタイル投稿</h2>
+      </div>
+      <form id="postForm" class="post-form">
+        <input id="postId" type="hidden">
+        <label class="image-uploader">
+          <span>写真</span>
+          <input id="imageInput" type="file" accept="image/*">
+          <strong>写真を選択</strong>
+          <small>スマホの写真フォルダから選べます。</small>
+        </label>
+        <div id="imagePreview" class="image-preview">写真プレビュー</div>
+
+        <label class="field">
+          <span>追加写真URL（任意・カンマ区切り）</span>
+          <input id="additionalImagesInput" type="text" placeholder="https://...">
+        </label>
+        <label class="field">
+          <span>スタイル名</span>
+          <input id="titleInput" type="text" placeholder="例：ホワイトベージュイヤリング" required>
+        </label>
+        <label class="field">
+          <span>説明文</span>
+          <textarea id="descriptionInput" rows="4" placeholder="提案ポイント、仕上がりの印象など"></textarea>
+        </label>
+
+        <div class="field-grid">
           <label class="field">
-            <span>施術タイプ</span>
-            <select id="treatmentType">
-              <option value="">選択してください</option>
-              <option>イヤリングカラー</option>
-              <option>インナーカラー</option>
-              <option>メッシュ</option>
-              <option>長さ出し</option>
-              <option>グラデーション</option>
-              <option>その他</option>
+            <span>エクステの色</span>
+            <select id="colorSelect" multiple required></select>
+          </label>
+          <label class="field">
+            <span>施術スタイル</span>
+            <select id="styleTypeSelect" multiple required></select>
+          </label>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>使用本数</span>
+            <input id="extensionCountInput" type="number" min="1" inputmode="numeric" required>
+          </label>
+          <label class="field">
+            <span>公開状態</span>
+            <select id="statusInput">
+              <option value="published">公開</option>
+              <option value="private">非公開</option>
             </select>
           </label>
-        </section>
-
-        <section class="entry-block color-editor" aria-labelledby="colorEditorTitle">
-          <div class="color-editor-head">
-            <div>
-              <h3 id="colorEditorTitle">3. 使用カラーと本数 <span>必須</span></h3>
-              <p>カラー名または番号と、本数を入力してください。</p>
-            </div>
-            <button id="addColorButton" class="sub-button" type="button">＋カラーを追加</button>
-          </div>
-          <div id="colorRows" class="color-rows"></div>
-          <p class="total-preview">合計 <strong id="totalPiecesPreview">0本</strong></p>
-        </section>
-
-        <section class="entry-block">
-          <h3>4. サロン情報 <span>必須</span></h3>
-          <div class="field-grid">
-            <label class="field">
-              <span>担当サロン名</span>
-              <input id="salonName" type="text" placeholder="例：エクステランド富士店" autocomplete="organization">
-            </label>
-
-            <label class="field">
-              <span>担当者名</span>
-              <input id="stylistName" type="text" placeholder="例：山田 花子" autocomplete="name">
-            </label>
-          </div>
-        </section>
-
-        <details class="optional-details">
-          <summary>5. 詳細を追加 <span>任意</span></summary>
-          <div class="optional-content">
-            <label class="field">
-              <span>レシピ名</span>
-              <input id="recipeName" type="text" placeholder="例：ホワイトベージュイヤリング">
-            </label>
-
-            <div class="field-grid">
-              <label class="field">
-                <span>ベースの髪色</span>
-                <input id="baseColor" type="text" placeholder="例：ベージュブラウン">
-              </label>
-
-              <label class="field">
-                <span>ベースレベル</span>
-                <input id="baseLevel" type="text" placeholder="例：9レベル">
-              </label>
-            </div>
-
-            <label class="field">
-              <span>コメント</span>
-              <textarea id="comment" rows="4" placeholder="仕上がりの印象、提案ポイント、注意点など"></textarea>
-            </label>
-
-            <label class="field">
-              <span>おすすめタグ</span>
-              <input id="tagsInput" type="text" placeholder="例：初めて向け, 推し色, 職場OK">
-            </label>
-
-            <label class="field">
-              <span>難易度</span>
-              <select id="difficulty">
-                <option value="">選択しない</option>
-                <option value="1">★1</option>
-                <option value="2">★2</option>
-                <option value="3">★3</option>
-                <option value="4">★4</option>
-                <option value="5">★5</option>
-              </select>
-            </label>
-          </div>
-        </details>
-
-        <input id="registeredAt" type="hidden">
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>店舗</span>
+            <select id="shopSelect" required></select>
+          </label>
+          <label class="field">
+            <span>担当者</span>
+            <select id="staffSelect" required></select>
+          </label>
+        </div>
 
         <div class="form-actions">
-          <button id="draftButton" class="draft-button" type="button">下書き保存</button>
-          <button id="publishButton" class="publish-button" type="submit">投稿する</button>
+          <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
+          <button class="primary-button" type="submit">保存する</button>
         </div>
+        <p id="formMessage" class="message" aria-live="polite"></p>
       </form>
     </section>
 
-    <section id="libraryView" class="search-area" aria-label="レシピ検索" hidden>
-      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
-      <div class="search-head">
-        <h2>公開レシピ検索</h2>
-        <button id="resetButton" type="button">リセット</button>
+    <section id="savedView" class="view-section" hidden>
+      <div class="view-head">
+        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <h2>保存したスタイル</h2>
       </div>
+      <section id="savedGrid" class="gallery-grid"></section>
+    </section>
 
-      <label class="search-box">
-        <span>カラー番号・カラー名・施術タイプ・本数で検索</span>
-        <input id="searchInput" type="search" placeholder="例：WHITE、18番、イヤリング、8本">
-      </label>
-
-      <div class="filter-group" aria-label="施術タイプ">
-        <button type="button" data-filter="type" data-value="イヤリングカラー">イヤリングカラー</button>
-        <button type="button" data-filter="type" data-value="インナーカラー">インナーカラー</button>
-        <button type="button" data-filter="type" data-value="メッシュ">メッシュ</button>
-        <button type="button" data-filter="type" data-value="長さ出し">長さ出し</button>
-        <button type="button" data-filter="type" data-value="グラデーション">グラデーション</button>
-        <button type="button" data-filter="type" data-value="その他">その他</button>
+    <section id="adminView" class="view-section admin-view" hidden>
+      <div class="view-head">
+        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <h2>本部管理ダッシュボード</h2>
       </div>
-
-      <div class="filter-group" aria-label="本数">
-        <button type="button" data-filter="pieces" data-value="1-4">1〜4本</button>
-        <button type="button" data-filter="pieces" data-value="5-10">5〜10本</button>
-        <button type="button" data-filter="pieces" data-value="11-20">11〜20本</button>
-        <button type="button" data-filter="pieces" data-value="21+">21本以上</button>
-      </div>
-
-      <div class="sort-row">
-        <label>
-          <span>並び替え</span>
-          <select id="sortSelect">
-            <option value="new">新着順</option>
-            <option value="piecesAsc">本数が少ない順</option>
-            <option value="piecesDesc">本数が多い順</option>
-          </select>
-        </label>
+      <div id="adminDenied" class="admin-denied" hidden>本部管理者のみアクセスできます。</div>
+      <div id="adminContent">
+        <section id="adminStats" class="admin-stats"></section>
+        <nav class="admin-tabs" aria-label="管理メニュー">
+          <button class="active" type="button" data-admin-tab="posts">投稿管理</button>
+          <button type="button" data-admin-tab="colors">カラー管理</button>
+          <button type="button" data-admin-tab="types">施術管理</button>
+          <button type="button" data-admin-tab="shops">店舗管理</button>
+          <button type="button" data-admin-tab="staff">担当者管理</button>
+          <button type="button" data-admin-tab="users">ユーザー管理</button>
+          <button type="button" data-admin-tab="deleted">削除済み</button>
+        </nav>
+        <section id="adminTable" class="admin-table-wrap"></section>
       </div>
     </section>
 
-    <section id="resultHead" class="result-head" aria-live="polite" hidden>
-      <div>
-        <h2>公開レシピ一覧</h2>
-        <p>投稿済みのレシピが表示されます。</p>
-      </div>
-      <p id="resultCount">0件</p>
-    </section>
-
-    <section id="recipeGrid" class="recipe-grid" aria-label="公開レシピ一覧" hidden></section>
-
-    <section id="detailView" class="detail-view" hidden></section>
-
-    <section id="draftView" class="draft-section" hidden>
-      <div class="view-back-row"><button type="button" class="ghost-button" onclick="showStylebookHome()">トップへ戻る</button></div>
-      <div class="result-head">
-        <div>
-          <h2>下書き</h2>
-          <p>下書き保存した投稿はここから編集して投稿できます。</p>
-        </div>
-        <p id="draftCount">0件</p>
-      </div>
-      <section id="draftGrid" class="recipe-grid compact-grid" aria-label="下書き一覧"></section>
-    </section>
-
-    <section class="storage-note" hidden>
-      <h2>保存方法</h2>
-      <p>本運用ではGoogleスプレッドシートにレシピ情報を保存し、写真はGoogle Driveに保存します。GitHub Pages側の画面からApps Scriptへ接続して使います。</p>
-    </section>
+    <nav class="quick-actions" aria-label="スタイル図鑑メニュー">
+      <button type="button" data-action="show-gallery">図鑑</button>
+      <button type="button" data-action="show-post">投稿</button>
+      <button type="button" data-action="show-saved">保存</button>
+      <button type="button" data-action="show-admin">管理</button>
+    </nav>
   </main>
 
-  <script src="./script.js"></script>
+  <script src="./script.js?v=20260712-gallery"></script>
   <script src="../shared-nav.js?v=20260712-1"></script>
 </body>
 </html>
