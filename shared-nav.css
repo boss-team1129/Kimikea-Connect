@@ -139,3 +139,35 @@ body.kc-has-bottom-nav .tabs {
     transition: none;
   }
 }
+
+/* 2026-07-12: smaller shared navigation */
+body.kc-has-bottom-nav {
+  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+}
+body.kc-has-bottom-nav main,
+body.kc-has-bottom-nav .app-shell,
+body.kc-has-bottom-nav .recipe-app {
+  padding-bottom: max(92px, calc(78px + env(safe-area-inset-bottom, 0px)));
+}
+body.kc-has-bottom-nav .tabs {
+  bottom: max(84px, calc(78px + env(safe-area-inset-bottom, 0px))) !important;
+}
+.kc-bottom-nav {
+  width: min(92vw, 480px);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 22px;
+}
+.kc-bottom-nav::before { inset: 5px; border-radius: 18px; }
+.kc-bottom-nav__button {
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 5px 3px 4px;
+}
+.kc-bottom-nav__icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.kc-bottom-nav__label { font-size: 11px; }

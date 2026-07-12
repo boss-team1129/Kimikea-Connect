@@ -524,3 +524,72 @@ img { display: block; max-width: 100%; }
   .topbar { padding-left: 6px; padding-right: 6px; }
   .menu-card-grid { padding: 0 2px; }
 }
+
+/* 2026-07-12: complete stylebook hub and management views */
+html,
+body,
+.stylebook-app { background: var(--bg); }
+.stylebook-app { padding-bottom: max(92px, calc(86px + env(safe-area-inset-bottom))); }
+.menu-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.menu-card.admin-only:not([hidden]) { display: grid; }
+.manage-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 8px 18px;
+}
+.manage-card {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 128px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 12px 28px rgba(35,45,49,.08);
+}
+.manage-thumb {
+  width: 96px;
+  min-height: 118px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #eee8df;
+}
+.manage-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.manage-body { display: grid; align-content: center; gap: 5px; min-width: 0; }
+.manage-body strong { font-size: 17px; line-height: 1.2; }
+.manage-body small { color: var(--muted); font-size: 11px; font-weight: 750; }
+.manage-status {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef5f6;
+  color: #48656e;
+  font-size: 10px;
+  font-weight: 900;
+}
+.manage-status.draft { background: #fff1dd; color: #9c7334; }
+.manage-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.manage-actions .ghost-button,
+.manage-actions .primary-button,
+.manage-actions .danger-button { min-height: 32px; padding: 0 10px; font-size: 12px; }
+.manage-section-title {
+  margin: 10px 2px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.empty-state.compact { padding: 18px 10px; }
+.form-actions { display: grid; grid-template-columns: 1fr 1fr; }
+.form-actions .primary-button { grid-column: span 2; }
+@media (max-width: 430px) {
+  .role-panel { margin-bottom: 6px; }
+  .topbar { grid-template-columns: 48px 1fr 48px; }
+  .back-link, .icon-button { min-height: 36px; font-size: 12px; }
+  .menu-card { min-height: 118px; padding: 14px; border-radius: 20px; }
+  .menu-card.primary { min-height: 132px; }
+  .menu-card strong { font-size: 18px; }
+  .menu-card-icon { width: 38px; height: 38px; border-radius: 14px; }
+}

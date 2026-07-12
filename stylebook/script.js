@@ -45,6 +45,7 @@ const el = {
   galleryGrid: document.getElementById('galleryGrid'),
   savedGrid: document.getElementById('savedGrid'),
   draftsGrid: document.getElementById('draftsGrid'),
+  mineGrid: document.getElementById('mineGrid'),
   menuAdminCard: document.getElementById('menuAdminCard'),
   infiniteSentinel: document.getElementById('infiniteSentinel'),
   galleryView: document.getElementById('galleryView'),
@@ -201,7 +202,7 @@ function seedData() {
       createdAt: todayIso(index),
       updatedAt: todayIso(index % 5),
       saveCount: (index * 7) % 41,
-      status: isPrivate ? 'private' : 'published',
+      status: isPrivate ? 'draft' : 'published',
       isPublished: !isPrivate,
       deletedAt: '',
       deletedByUserId: '',
@@ -308,6 +309,10 @@ function filteredPosts() {
     if (state.sort === 'popular') return (b.saveCount + b.extensionCount) - (a.saveCount + a.extensionCount);
     if (state.sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt);
     if (state.sort === 'saved') return b.saveCount - a.saveCount;
+    if (state.sort === 'savedDate') {
+      const savedMap = new Map(state.db.savedStyles.filter(save => save.userId === currentUser().id).map(save => [save.stylePostId, save.createdAt]));
+      return new Date(savedMap.get(b.id) || 0) - new Date(savedMap.get(a.id) || 0);
+    }
     return (b.saveCount * 2 + new Date(b.createdAt).getTime() / 1000000000) - (a.saveCount * 2 + new Date(a.createdAt).getTime() / 1000000000);
   });
   return posts;
@@ -392,12 +397,37 @@ function renderGalleryItem(post) {
   return `
     <article class="gallery-item" data-id="${post.id}">
       <button class="photo-button" type="button" data-action="detail" data-id="${post.id}">
-        <img src="${post.imageUrl}" alt="${escapeHtml(post.title)}" loading="lazy">
+        <img src="${post.imageUrl}" alt="${escapeHtml(post.title || 'スタイル写真')}" loading="lazy">
         <span class="photo-meta">${escapeHtml(shop?.name || '')}<br>${escapeHtml(person?.name || '')}</span>
       </button>
       <button class="save-button ${isSaved(post.id) ? 'saved' : ''}" type="button" data-action="save" data-id="${post.id}" aria-label="保存">
         ${isSaved(post.id) ? '●' : '○'}
       </button>
+    </article>`;
+}
+
+function renderManageItem(post, mode = 'mine') {
+  const shop = getById('shops', post.shopId);
+  const person = getById('staff', post.staffId);
+  const title = post.title || 'スタイル名未入力';
+  const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
+  const dateLabel = new Date(post.updatedAt || post.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `
+    <article class="manage-card">
+      <button type="button" class="manage-thumb" data-action="detail" data-id="${post.id}">
+        <img src="${post.imageUrl}" alt="${escapeHtml(title)}">
+      </button>
+      <div class="manage-body">
+        <span class="manage-status ${isDraft ? 'draft' : 'published'}">${isDraft ? '下書き' : '公開中'}</span>
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(shop?.name || '')} / ${escapeHtml(person?.name || '')}</small>
+        <small>${mode === 'drafts' ? '保存日時' : '更新'}：${dateLabel}</small>
+        <div class="manage-actions">
+          <button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>
+          ${isDraft ? `<button type="button" class="primary-button" data-action="publish" data-id="${post.id}">投稿する</button>` : ''}
+          <button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>
+        </div>
+      </div>
     </article>`;
 }
 
@@ -439,7 +469,7 @@ function renderGallery() {
 
 function showView(name) {
   state.currentView = name;
-  ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'adminView'].forEach(key => {
+  ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'mineView', 'adminView'].forEach(key => {
     const view = document.getElementById(key);
     if (view) view.hidden = key !== `${name}View`;
   });
@@ -524,23 +554,50 @@ function renderSaved() {
 }
 
 function showSaved() {
-  renderSaved();
-  showView('saved');
+  state.savedOnly = true;
+  state.sort = 'savedDate';
+  state.visibleCount = PAGE_SIZE;
+  el.savedOnlyToggle.checked = true;
+  el.sortSelect.value = 'savedDate';
+  showView('gallery');
+}
+
+function ownPosts({ draftsOnly = false } = {}) {
+  const user = currentUser();
+  return state.db.stylePosts
+    .filter(post => !post.deletedAt && post.createdByUserId === user.id)
+    .filter(post => {
+      const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
+      return draftsOnly ? isDraft : true;
+    })
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
 function renderDrafts() {
-  const user = currentUser();
-  const posts = state.db.stylePosts.filter(post => (
-    !post.deletedAt
-    && post.createdByUserId === user.id
-    && (post.status === 'private' || post.status === 'draft' || !post.isPublished)
-  ));
-  el.draftsGrid.innerHTML = posts.length ? posts.map(renderGalleryItem).join('') : '<p class="empty-state">下書きはまだありません。</p>';
+  const posts = ownPosts({ draftsOnly: true });
+  el.draftsGrid.innerHTML = posts.length ? posts.map(post => renderManageItem(post, 'drafts')).join('') : '<p class="empty-state">下書きはまだありません。</p>';
 }
 
 function showDrafts() {
   renderDrafts();
   showView('drafts');
+}
+
+function renderMine() {
+  const posts = ownPosts();
+  const published = posts.filter(post => post.isPublished && post.status === 'published');
+  const drafts = posts.filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished);
+  el.mineGrid.innerHTML = posts.length ? `
+    <div class="manage-section-title">公開中 ${published.length}件</div>
+    ${published.map(post => renderManageItem(post, 'mine')).join('') || '<p class="empty-state compact">公開中の投稿はありません。</p>'}
+    <div class="manage-section-title">下書き ${drafts.length}件</div>
+    ${drafts.map(post => renderManageItem(post, 'drafts')).join('') || '<p class="empty-state compact">下書きはありません。</p>'}
+  ` : '<p class="empty-state">自分の投稿はまだありません。</p>';
+}
+
+function showMine() {
+  renderMine();
+  showView('mine');
 }
 
 function selectedValues(select) {
@@ -627,6 +684,9 @@ function submitPost(event) {
     el.formMessage.classList.add('error');
     return;
   }
+  const submitter = event.submitter;
+  const requestedStatus = submitter?.dataset?.submitStatus || el.statusInput.value || 'published';
+  el.statusInput.value = requestedStatus;
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
@@ -642,14 +702,14 @@ function submitPost(event) {
     createdAt: editing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     saveCount: editing?.saveCount || 0,
-    status: el.statusInput.value,
-    isPublished: el.statusInput.value === 'published',
+    status: requestedStatus,
+    isPublished: requestedStatus === 'published',
     deletedAt: editing?.deletedAt || '',
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
   };
-  if (!post.title || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.shopId || !post.staffId) {
-    el.formMessage.textContent = '必須項目を入力してください。';
+  if (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.shopId || !post.staffId) {
+    el.formMessage.textContent = requestedStatus === 'draft' ? '写真、色、本数、施術、店舗、担当者を入力すると下書き保存できます。' : '必須項目を入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -658,6 +718,20 @@ function submitPost(event) {
   else state.db.stylePosts.unshift(post);
   saveDb();
   clearPostForm();
+  showDetail(post.id);
+}
+
+
+function publishPost(postId) {
+  const post = state.db.stylePosts.find(item => item.id === postId);
+  if (!post || !canManagePost(post)) {
+    alert('この投稿を公開する権限がありません。');
+    return;
+  }
+  post.status = 'published';
+  post.isPublished = true;
+  post.updatedAt = new Date().toISOString();
+  saveDb();
   showDetail(post.id);
 }
 
@@ -675,7 +749,9 @@ function logicalDeletePost(postId) {
   post.isPublished = false;
   post.status = 'deleted';
   saveDb();
-  showView('gallery');
+  if (state.currentView === 'drafts') showDrafts();
+  else if (state.currentView === 'mine') showMine();
+  else showView('gallery');
 }
 
 function restorePost(postId) {
@@ -866,13 +942,23 @@ function bindEvents() {
     if (actionName === 'save') toggleSave(id);
     if (actionName === 'edit') showPostForm(id);
     if (actionName === 'delete') logicalDeletePost(id);
+    if (actionName === 'publish') publishPost(id);
     if (actionName === 'restore') restorePost(id);
     if (actionName === 'hard-delete') hardDeletePost(id);
     if (actionName === 'show-menu') showView('menu');
+    if (actionName === 'open-gallery') {
+      state.savedOnly = false;
+      state.sort = 'recommended';
+      state.visibleCount = PAGE_SIZE;
+      el.savedOnlyToggle.checked = false;
+      el.sortSelect.value = 'recommended';
+      showView('gallery');
+    }
     if (actionName === 'show-gallery' || actionName === 'back-gallery') showView('gallery');
     if (actionName === 'show-post') showPostForm();
     if (actionName === 'show-saved') showSaved();
     if (actionName === 'show-drafts') showDrafts();
+    if (actionName === 'show-mine') showMine();
     if (actionName === 'show-admin') renderAdmin();
     if (actionName === 'share') navigator.share?.({ title: document.title, url: location.href }).catch(() => {});
     if (actionName === 'similar') {
