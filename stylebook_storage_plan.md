@@ -1,86 +1,85 @@
-# Kimikea Connect Style Book 保存設計
+# Kimikea Connect Stylebook 実運用保存設計
 
-作成日: 2026-07-10
+更新日: 2026-07-12
 
-## 現在の画面
+## 運用方針
 
-`docs/stylebook/` のレシピ投稿画面は、スマホで1ページ完結で登録できる構成。
+スタイル図鑑は、加盟店スタッフがスマホから投稿した施術写真とレシピを、GoogleスプレッドシートとGoogle Driveへ保存する。
 
-画面上でできること:
+GitHub Pagesは画面表示を担当し、保存・編集・削除・保存解除などのデータ操作はApps Script Webアプリが担当する。
 
-- 施術写真の選択
-- 使用カラーと本数の複数登録
-- 合計本数の自動計算
-- 下書き保存
-- 投稿する
-- 編集
-- 削除
-- 公開レシピ検索
+## 本番保存先
 
-GitHub Pages上でApps Script URLを未設定の場合は、確認用としてブラウザ内保存を使う。
+- 投稿データ: Googleスプレッドシート
+- 画像データ: Google Drive
+- 画像フォルダ名: `Kimikea Connect Stylebook Images`
+- Apps Scriptコード: `stylebook_apps_script.gs`
 
-```text
-ブラウザ localStorage
-key: kimikea_stylebook_recipes_v2
+## 作成されるシート
+
+- `style_posts`: 投稿、下書き、削除済み投稿
+- `style_saves`: ユーザーごとの保存スタイル
+- `style_colors`: エクステカラー
+- `style_types`: 施術スタイル
+- `style_shops`: 店舗
+- `style_staff`: 担当者
+- `style_users`: 投稿者、管理者、権限
+
+## 画面側の接続設定
+
+`stylebook/script.js` の上部にある以下へ、Apps ScriptのWebアプリURLを設定する。
+
+```js
+const STYLEBOOK_API_URL = 'ここにApps Script WebアプリURLを入れる';
 ```
 
-## 本運用の保存先
+URLが未設定の場合は、画面確認用としてブラウザ内保存で動作する。本番運用では必ずURLを設定する。
 
-本運用ではGoogleスプレッドシートを保存先にする。
+## 初期設定手順
 
-作成するシート:
+1. Googleスプレッドシートを作成する
+2. 拡張機能 > Apps Script を開く
+3. `stylebook_apps_script.gs` の内容を貼り付ける
+4. `setupKimikeaStylebook()` を手動実行する
+5. 権限許可を行う
+6. Webアプリとしてデプロイする
+7. 発行URLを `STYLEBOOK_API_URL` に設定する
+8. GitHub Pagesへ反映する
 
-- レシピ一覧
-- レシピカラー詳細
+## 権限ルール
 
-Apps Script:
+- `member`: 投稿、下書き、保存、自分の投稿編集・削除
+- `contributor`: memberと同じ。既存互換用
+- `shop_admin`: 将来の店舗管理者拡張用
+- `headquarters_admin`: 全投稿の編集、削除、復元、完全削除
 
-- `stylebook_apps_script.gs`
+処理側でも、投稿者本人または本部管理者だけが編集・削除できるように確認する。
 
-画像保存先:
+## 投稿で保存する情報
 
-- Google Drive
-- フォルダ名: `Kimikea Connect Stylebook Images`
+- 投稿ID
+- タイトル
+- コメント
+- メイン画像URL
+- 追加画像URL
+- 使用カラー
+- 施術スタイル
+- 使用本数
+- 店舗
+- 担当者
+- 投稿者
+- 投稿日時
+- 更新日時
+- 保存数
+- ステータス: `draft` / `published` / `deleted`
 
-## レシピ一覧
+## 動作確認
 
-| 列 | 内容 |
-| --- | --- |
-| レシピID | recipe-で始まる一意ID |
-| ステータス | draft / published / deleted |
-| 登録日 | 施術事例の登録日 |
-| レシピ名 | 表示名 |
-| 施術タイプ | イヤリングカラー、インナーカラーなど |
-| ベースの髪色 | ベースカラー |
-| ベースレベル | 例: 9レベル |
-| 合計本数 | 使用本数合計 |
-| 担当サロン名 | 登録サロン |
-| 担当者名 | 登録者 |
-| コメント | 提案メモ、仕上がり説明 |
-| おすすめタグ | カンマ区切り |
-| 難易度 | 1〜5 |
-| 写真URL | Google Drive等に保存した画像URL |
-| 写真ファイルID | Google DriveファイルID |
-| 投稿者ID | 将来ログイン連携で利用 |
-| 作成日時 | システム作成日時 |
-| 更新日時 | システム更新日時 |
+本番URL設定後、以下を確認する。
 
-## レシピカラー詳細
-
-| 列 | 内容 |
-| --- | --- |
-| レシピID | レシピ一覧と紐づくID |
-| カラー順 | 表示順 |
-| 商品カテゴリー | ダークカラー、ライトカラー、原色 |
-| カラー名 | growカラー名・番号 |
-| 使用本数 | 色ごとの本数 |
-| 色見本 | 画面表示用カラーコード |
-
-## 次の開発
-
-1. Apps Scriptへ `stylebook_apps_script.gs` を貼り付ける
-2. `setupKimikeaStylebook()` を実行してシートとDriveフォルダを作成する
-3. Webアプリとしてデプロイする
-4. 発行URLを `docs/stylebook/script.js` の `STYLEBOOK_API_URL` に設定する
-5. GitHub Pagesへ反映する
-6. 将来ログイン連携で、サロン名・担当者名を自動入力する
+1. スマホで写真を選択して投稿する
+2. 投稿後すぐ図鑑一覧に表示される
+3. ページをリロードしても残る
+4. 画像がGoogle Driveに保存される
+5. 下書き保存、編集、投稿、削除ができる
+6. 保存したスタイルがマイページ導線から確認できる

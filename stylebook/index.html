@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
   <link rel="stylesheet" href="../shared-nav.css?v=20260712-2">
-  <link rel="stylesheet" href="./style.css?v=20260712-menu-2">
+  <link rel="stylesheet" href="./style.css?v=20260712-live-1">
 </head>
 <body>
   <main class="stylebook-app">
@@ -148,9 +148,10 @@
         <div id="imagePreview" class="image-preview">写真プレビュー</div>
 
         <label class="field">
-          <span>追加写真URL（任意・カンマ区切り）</span>
-          <input id="additionalImagesInput" type="text" placeholder="https://...">
+          <span>追加写真（任意・複数選択可）</span>
+          <input id="additionalImageFiles" type="file" accept="image/*" multiple>
         </label>
+        <input id="additionalImagesInput" type="hidden">
         <div class="field-grid">
           <label class="field">
             <span>エクステの色</span>
@@ -242,7 +243,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260712-menu-2"></script>
+  <script src="./script.js?v=20260712-live-1"></script>
   <script src="../shared-nav.js?v=20260712-1"></script>
 </body>
 </html>

@@ -3,6 +3,10 @@ const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
 
+// Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
+// 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
+const STYLEBOOK_API_URL = '';
+
 const roles = {
   member: 'member',
   contributor: 'contributor',
@@ -25,6 +29,9 @@ const state = {
   currentDetailId: '',
   currentEditId: '',
   currentImageData: '',
+  currentAdditionalImageData: [],
+  backendMode: 'local',
+  isLoading: false,
   adminTab: 'posts',
 };
 
@@ -64,6 +71,7 @@ const el = {
   imageInput: document.getElementById('imageInput'),
   imagePreview: document.getElementById('imagePreview'),
   additionalImagesInput: document.getElementById('additionalImagesInput'),
+  additionalImageFiles: document.getElementById('additionalImageFiles'),
   titleInput: document.getElementById('titleInput'),
   descriptionInput: document.getElementById('descriptionInput'),
   colorSelect: document.getElementById('colorSelect'),
@@ -175,47 +183,9 @@ function seedData() {
     { id: 'user-hq', name: '本部管理者', email: 'admin@example.com', role: roles.headquarters_admin, shopId: '', staffId: '' },
   ];
 
-  const titleWords = ['ホワイトベージュ', 'ピンクイヤリング', 'ナチュラル長さ出し', 'ブルーインナー', 'グレージュメッシュ', '推し色ポイント', 'ラベンダーデザイン', '大人ハイライト'];
-  const posts = Array.from({ length: 36 }, (_, index) => {
-    const colorA = extensionColors[index % extensionColors.length];
-    const colorB = extensionColors[(index + 7) % extensionColors.length];
-    const type = styleTypes[index % styleTypes.length];
-    const shop = shops[index % shops.length];
-    const shopStaff = staff.filter(item => item.shopId === shop.id);
-    const stylist = shopStaff[index % shopStaff.length] || staff[0];
-    const owner = users[(index % 3) + 1];
-    const count = [4, 6, 8, 10, 12, 20, 40, 60, 80][index % 9];
-    const id = `post-${String(index + 1).padStart(3, '0')}`;
-    const isPrivate = index % 17 === 0;
-    return {
-      id,
-      title: `${titleWords[index % titleWords.length]} ${index + 1}`,
-      description: `${type.name}の提案レシピ。${colorA.colorName}を中心に、顔まわりと全体のバランスを見ながら自然に仕上げます。`,
-      imageUrl: buildImageSvg(index + 1, titleWords[index % titleWords.length], colorA.imageUrl, colorB.imageUrl, ['#f7efe3', '#d9e8eb', '#ead6df'][index % 3]),
-      additionalImages: [],
-      extensionColorIds: index % 4 === 0 ? [colorA.id, colorB.id] : [colorA.id],
-      styleTypeIds: [type.id],
-      extensionCount: count,
-      shopId: shop.id,
-      staffId: stylist.id,
-      createdByUserId: owner.id,
-      createdAt: todayIso(index),
-      updatedAt: todayIso(index % 5),
-      saveCount: (index * 7) % 41,
-      status: isPrivate ? 'draft' : 'published',
-      isPublished: !isPrivate,
-      deletedAt: '',
-      deletedByUserId: '',
-      deleteReason: '',
-    };
-  });
-
   return {
-    stylePosts: posts,
-    savedStyles: [
-      { id: 'save-001', userId: 'user-member', stylePostId: 'post-002', createdAt: todayIso(1) },
-      { id: 'save-002', userId: 'user-member', stylePostId: 'post-006', createdAt: todayIso(2) },
-    ],
+    stylePosts: [],
+    savedStyles: [],
     extensionColors,
     styleTypes,
     shops,
@@ -224,13 +194,61 @@ function seedData() {
   };
 }
 
-function loadDb() {
+function hasRemoteApi() {
+  return Boolean(STYLEBOOK_API_URL && STYLEBOOK_API_URL.startsWith('https://'));
+}
+
+async function apiRequest(action, payload = {}) {
+  if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
+  const response = await fetch(STYLEBOOK_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action,
+      userId: currentUser()?.id || state.currentUserId,
+      ...payload,
+    }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.message || '処理に失敗しました。');
+  return data;
+}
+
+async function loadRemoteDb() {
+  const response = await fetch(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}`, {
+    cache: 'no-store',
+  });
+  const data = await response.json();
+  if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
+  state.db = data.database;
+  state.backendMode = 'remote';
+  localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+}
+
+async function loadDb() {
+  if (hasRemoteApi()) {
+    try {
+      await loadRemoteDb();
+      return;
+    } catch (error) {
+      console.warn('Stylebook remote API failed. Falling back to local storage.', error);
+    }
+  }
   const saved = localStorage.getItem(DB_KEY);
   if (saved) {
     state.db = JSON.parse(saved);
+    const posts = state.db.stylePosts || [];
+    const hasOnlyOldDemoPosts = posts.length && posts.every(post => /^post-\d{3}$/.test(String(post.id || '')));
+    if (hasOnlyOldDemoPosts) {
+      state.db.stylePosts = [];
+      state.db.savedStyles = [];
+      localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+    }
+    state.backendMode = 'local';
     return;
   }
   state.db = seedData();
+  state.backendMode = 'local';
   saveDb();
 }
 
@@ -238,8 +256,16 @@ function saveDb() {
   localStorage.setItem(DB_KEY, JSON.stringify(state.db));
 }
 
+async function refreshRemoteDb() {
+  if (!hasRemoteApi()) return;
+  await loadRemoteDb();
+  renderUserSelect();
+  renderFilterControls();
+  renderSelectOptions();
+}
+
 function currentUser() {
-  return state.db.users.find(user => user.id === state.currentUserId) || state.db.users[0];
+  return state.db?.users?.find(user => user.id === state.currentUserId) || state.db?.users?.[0] || null;
 }
 
 function canPost() {
@@ -247,11 +273,12 @@ function canPost() {
 }
 
 function canManageAll() {
-  return currentUser().role === roles.headquarters_admin;
+  return currentUser()?.role === roles.headquarters_admin;
 }
 
 function canManagePost(post) {
   const user = currentUser();
+  if (!user) return false;
   if (user.role === roles.headquarters_admin) return true;
   if (post.createdByUserId === user.id) return true;
   // 店舗管理者の店舗内管理は将来拡張用。現時点では本人投稿のみ編集できます。
@@ -271,7 +298,8 @@ function activePosts({ includePrivate = false, includeDeleted = false } = {}) {
 }
 
 function savedPostIds() {
-  const userId = currentUser().id;
+  const userId = currentUser()?.id;
+  if (!userId) return new Set();
   return new Set(state.db.savedStyles.filter(save => save.userId === userId).map(save => save.stylePostId));
 }
 
@@ -497,6 +525,7 @@ function showDetail(postId) {
       <div class="detail-photo-wrap">
         <img class="detail-photo" src="${post.imageUrl}" alt="${escapeHtml(post.title)}">
       </div>
+      ${(post.additionalImages || []).length ? `<div class="detail-subphotos">${post.additionalImages.map((url, index) => `<img src="${escapeHtml(url)}" alt="${escapeHtml(post.title || '追加写真')} ${index + 1}">`).join('')}</div>` : ''}
       <div class="detail-body">
         <div class="detail-title-row">
           <h2>${escapeHtml(post.title)}</h2>
@@ -526,19 +555,32 @@ function showDetail(postId) {
   showView('detail');
 }
 
-function toggleSave(postId) {
-  const userId = currentUser().id;
+async function toggleSave(postId) {
+  const userId = currentUser()?.id;
+  if (!userId) {
+    alert('保存するにはログインユーザーが必要です。');
+    return;
+  }
   const existing = state.db.savedStyles.find(save => save.userId === userId && save.stylePostId === postId);
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post) return;
-  if (existing) {
-    state.db.savedStyles = state.db.savedStyles.filter(save => save.id !== existing.id);
-    post.saveCount = Math.max(0, Number(post.saveCount || 0) - 1);
-  } else {
-    state.db.savedStyles.push({ id: uid('save'), userId, stylePostId: postId, createdAt: new Date().toISOString() });
-    post.saveCount = Number(post.saveCount || 0) + 1;
+  try {
+    if (state.backendMode === 'remote') {
+      await apiRequest('toggleSave', { postId });
+      await refreshRemoteDb();
+    } else if (existing) {
+      state.db.savedStyles = state.db.savedStyles.filter(save => save.id !== existing.id);
+      post.saveCount = Math.max(0, Number(post.saveCount || 0) - 1);
+      saveDb();
+    } else {
+      state.db.savedStyles.push({ id: uid('save'), userId, stylePostId: postId, createdAt: new Date().toISOString() });
+      post.saveCount = Number(post.saveCount || 0) + 1;
+      saveDb();
+    }
+  } catch (error) {
+    alert(error.message || '保存状態を変更できませんでした。');
+    return;
   }
-  saveDb();
   if (state.currentView === 'detail') showDetail(postId);
   else if (state.currentView === 'saved') renderSaved();
   else renderGallery();
@@ -564,6 +606,7 @@ function showSaved() {
 
 function ownPosts({ draftsOnly = false } = {}) {
   const user = currentUser();
+  if (!user) return [];
   return state.db.stylePosts
     .filter(post => !post.deletedAt && post.createdByUserId === user.id)
     .filter(post => {
@@ -626,11 +669,22 @@ async function resizeImage(file) {
   });
 }
 
+async function resizeImages(files) {
+  const list = Array.from(files || []);
+  const resized = [];
+  for (const file of list) {
+    resized.push(await resizeImage(file));
+  }
+  return resized;
+}
+
 function clearPostForm() {
   state.currentEditId = '';
   state.currentImageData = '';
+  state.currentAdditionalImageData = [];
   el.postForm.reset();
   el.postId.value = '';
+  el.additionalImagesInput.value = '';
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
@@ -645,6 +699,7 @@ function fillPostForm(post) {
   el.titleInput.value = post.title;
   el.descriptionInput.value = post.description;
   el.additionalImagesInput.value = (post.additionalImages || []).join(', ');
+  state.currentAdditionalImageData = [];
   el.extensionCountInput.value = post.extensionCount;
   el.statusInput.value = post.status;
   el.shopSelect.value = post.shopId;
@@ -670,7 +725,7 @@ function showPostForm(postId = '') {
   showView('post');
 }
 
-function submitPost(event) {
+async function submitPost(event) {
   event.preventDefault();
   if (!canPost()) return;
   const editing = state.currentEditId ? state.db.stylePosts.find(post => post.id === state.currentEditId) : null;
@@ -678,21 +733,28 @@ function submitPost(event) {
     alert('この投稿を編集する権限がありません。');
     return;
   }
-  const imageUrl = state.currentImageData || editing?.imageUrl;
+  let imageUrl = state.currentImageData || editing?.imageUrl || '';
+  const submitter = event.submitter;
+  const requestedStatus = submitter?.dataset?.submitStatus || el.statusInput.value || 'published';
+  el.statusInput.value = requestedStatus;
+  if (!imageUrl && requestedStatus === 'draft') {
+    imageUrl = buildImageSvg(Date.now() % 100, '下書き', '#efe6d6', '#e2eef0', '#d8c5d8');
+  }
   if (!imageUrl) {
     el.formMessage.textContent = '写真を選択してください。';
     el.formMessage.classList.add('error');
     return;
   }
-  const submitter = event.submitter;
-  const requestedStatus = submitter?.dataset?.submitStatus || el.statusInput.value || 'published';
-  el.statusInput.value = requestedStatus;
+  const additionalImages = [
+    ...el.additionalImagesInput.value.split(',').map(value => value.trim()).filter(Boolean),
+    ...state.currentAdditionalImageData,
+  ].filter(Boolean);
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
     description: el.descriptionInput.value.trim(),
     imageUrl,
-    additionalImages: el.additionalImagesInput.value.split(',').map(value => value.trim()).filter(Boolean),
+    additionalImages,
     extensionColorIds: selectedValues(el.colorSelect),
     styleTypeIds: selectedValues(el.styleTypeSelect),
     extensionCount: Number(el.extensionCountInput.value || 0),
@@ -708,34 +770,57 @@ function submitPost(event) {
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
   };
-  if (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.shopId || !post.staffId) {
-    el.formMessage.textContent = requestedStatus === 'draft' ? '写真、色、本数、施術、店舗、担当者を入力すると下書き保存できます。' : '必須項目を入力してください。';
+  if (requestedStatus === 'published' && (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.shopId || !post.staffId)) {
+    el.formMessage.textContent = '公開するには、写真、色、本数、施術、店舗、担当者を入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
-  const index = state.db.stylePosts.findIndex(item => item.id === post.id);
-  if (index >= 0) state.db.stylePosts[index] = post;
-  else state.db.stylePosts.unshift(post);
-  saveDb();
-  clearPostForm();
-  showDetail(post.id);
+  el.formMessage.classList.remove('error');
+  el.formMessage.textContent = requestedStatus === 'draft' ? '下書きを保存しています...' : '投稿を保存しています...';
+  try {
+    if (state.backendMode === 'remote') {
+      const result = await apiRequest('savePost', { post });
+      await refreshRemoteDb();
+      clearPostForm();
+      showDetail(result.id || post.id);
+      return;
+    }
+    const index = state.db.stylePosts.findIndex(item => item.id === post.id);
+    if (index >= 0) state.db.stylePosts[index] = post;
+    else state.db.stylePosts.unshift(post);
+    saveDb();
+    clearPostForm();
+    showDetail(post.id);
+  } catch (error) {
+    el.formMessage.textContent = error.message || '保存できませんでした。';
+    el.formMessage.classList.add('error');
+  }
 }
 
 
-function publishPost(postId) {
+async function publishPost(postId) {
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post || !canManagePost(post)) {
     alert('この投稿を公開する権限がありません。');
     return;
   }
-  post.status = 'published';
-  post.isPublished = true;
-  post.updatedAt = new Date().toISOString();
-  saveDb();
-  showDetail(post.id);
+  try {
+    if (state.backendMode === 'remote') {
+      await apiRequest('publishPost', { postId });
+      await refreshRemoteDb();
+    } else {
+      post.status = 'published';
+      post.isPublished = true;
+      post.updatedAt = new Date().toISOString();
+      saveDb();
+    }
+    showDetail(post.id);
+  } catch (error) {
+    alert(error.message || '公開できませんでした。');
+  }
 }
 
-function logicalDeletePost(postId) {
+async function logicalDeletePost(postId) {
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post || !canManagePost(post)) {
     alert('この投稿を削除する権限がありません。');
@@ -743,37 +828,65 @@ function logicalDeletePost(postId) {
   }
   const reason = prompt('削除理由を入力してください。', '管理上の理由') || '';
   if (!confirm('この投稿を非表示にします。よろしいですか？')) return;
-  post.deletedAt = new Date().toISOString();
-  post.deletedByUserId = currentUser().id;
-  post.deleteReason = reason;
-  post.isPublished = false;
-  post.status = 'deleted';
-  saveDb();
+  try {
+    if (state.backendMode === 'remote') {
+      await apiRequest('deletePost', { postId, reason });
+      await refreshRemoteDb();
+    } else {
+      post.deletedAt = new Date().toISOString();
+      post.deletedByUserId = currentUser().id;
+      post.deleteReason = reason;
+      post.isPublished = false;
+      post.status = 'deleted';
+      saveDb();
+    }
+  } catch (error) {
+    alert(error.message || '削除できませんでした。');
+    return;
+  }
   if (state.currentView === 'drafts') showDrafts();
   else if (state.currentView === 'mine') showMine();
   else showView('gallery');
 }
 
-function restorePost(postId) {
+async function restorePost(postId) {
   if (!canManageAll()) return;
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post) return;
-  post.deletedAt = '';
-  post.deletedByUserId = '';
-  post.deleteReason = '';
-  post.status = 'published';
-  post.isPublished = true;
-  saveDb();
-  renderAdmin();
+  try {
+    if (state.backendMode === 'remote') {
+      await apiRequest('restorePost', { postId });
+      await refreshRemoteDb();
+    } else {
+      post.deletedAt = '';
+      post.deletedByUserId = '';
+      post.deleteReason = '';
+      post.status = 'published';
+      post.isPublished = true;
+      saveDb();
+    }
+    renderAdmin();
+  } catch (error) {
+    alert(error.message || '復元できませんでした。');
+  }
 }
 
-function hardDeletePost(postId) {
+async function hardDeletePost(postId) {
   if (!canManageAll()) return;
   if (!confirm('完全削除します。元に戻せません。')) return;
-  state.db.stylePosts = state.db.stylePosts.filter(post => post.id !== postId);
-  state.db.savedStyles = state.db.savedStyles.filter(save => save.stylePostId !== postId);
-  saveDb();
-  renderAdmin();
+  try {
+    if (state.backendMode === 'remote') {
+      await apiRequest('hardDeletePost', { postId });
+      await refreshRemoteDb();
+    } else {
+      state.db.stylePosts = state.db.stylePosts.filter(post => post.id !== postId);
+      state.db.savedStyles = state.db.savedStyles.filter(save => save.stylePostId !== postId);
+      saveDb();
+    }
+    renderAdmin();
+  } catch (error) {
+    alert(error.message || '完全削除できませんでした。');
+  }
 }
 
 function renderAdminStats() {
@@ -874,10 +987,14 @@ function clearFilters() {
 }
 
 function bindEvents() {
-  el.userSelect.addEventListener('change', () => {
+  el.userSelect.addEventListener('change', async () => {
     state.currentUserId = el.userSelect.value;
     localStorage.setItem(SESSION_KEY, state.currentUserId);
-    renderUserSelect();
+    if (state.backendMode === 'remote') {
+      await refreshRemoteDb();
+    } else {
+      renderUserSelect();
+    }
     renderGallery();
   });
   el.keywordInput.addEventListener('input', event => {
@@ -904,6 +1021,18 @@ function bindEvents() {
     if (!file) return;
     state.currentImageData = await resizeImage(file);
     el.imagePreview.innerHTML = `<img src="${state.currentImageData}" alt="">`;
+  });
+  el.additionalImageFiles.addEventListener('change', async event => {
+    const files = event.target.files;
+    if (!files || !files.length) {
+      state.currentAdditionalImageData = [];
+      return;
+    }
+    state.currentAdditionalImageData = await resizeImages(files);
+    const existing = el.additionalImagesInput.value.split(',').map(value => value.trim()).filter(Boolean);
+    const total = existing.length + state.currentAdditionalImageData.length;
+    const currentPreview = (state.currentImageData || state.currentEditId) ? el.imagePreview.innerHTML.replace(/<small class="additional-count">.*?<\/small>/, '') : '写真プレビュー';
+    el.imagePreview.innerHTML = `${currentPreview}<small class="additional-count">追加写真 ${total}枚</small>`;
   });
   el.postForm.addEventListener('submit', submitPost);
   el.cancelEditButton.addEventListener('click', clearPostForm);
@@ -1026,8 +1155,9 @@ function bindEvents() {
   });
 }
 
-function init() {
-  loadDb();
+async function init() {
+  await loadDb();
+  if (!currentUser()) state.currentUserId = state.db.users[0]?.id || '';
   renderUserSelect();
   renderFilterControls();
   renderSelectOptions();
