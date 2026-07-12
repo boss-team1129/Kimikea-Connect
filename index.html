@@ -241,174 +241,262 @@
       font-size: 15px;
       line-height: 1.7;
     }
-    .home-primary-card {
-      background:
-        radial-gradient(circle at 76% 18%, rgba(255, 255, 255, 0.82), transparent 30%),
-        linear-gradient(145deg, rgba(255, 253, 249, 0.88), rgba(232, 240, 241, 0.78) 58%, rgba(245, 230, 197, 0.76));
-      color: var(--text);
-    }
-    .home-primary-icon,
-    .home-card-icon {
+    .home-hero {
       position: relative;
-      display: grid;
-      place-items: center;
-      width: 82px;
-      height: 82px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.78);
-      border-radius: 27px;
+      border: 0;
       background:
-        radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.96), transparent 30%),
-        linear-gradient(145deg, #ffffff 0%, #eef4f5 48%, #ead7ac 100%);
-      color: #2f3f45;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.86),
-        inset 0 -10px 22px rgba(146, 173, 184, 0.16),
-        0 14px 26px rgba(39, 55, 61, 0.14);
-      font-size: 34px;
-      font-weight: 900;
-      text-shadow: 0 3px 8px rgba(88, 121, 132, 0.2);
+        radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.94), transparent 26%),
+        radial-gradient(circle at 88% 10%, rgba(186, 207, 214, 0.34), transparent 30%),
+        radial-gradient(circle at 80% 86%, rgba(219, 186, 205, 0.22), transparent 30%),
+        linear-gradient(145deg, rgba(255, 253, 248, 0.86), rgba(247, 239, 226, 0.72));
+      box-shadow: 0 18px 44px rgba(54, 48, 37, 0.08);
     }
-    .home-primary-icon::after,
-    .home-card-icon::after {
+    .home-hero::after {
       position: absolute;
-      inset: 9px 12px auto auto;
-      width: 22px;
-      height: 22px;
-      content: "";
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.66);
-      filter: blur(0.3px);
-    }
-    .home-primary-card strong,
-    .home-menu-card strong {
-      display: block;
-      margin-bottom: 9px;
-      font-size: 23px;
-      letter-spacing: 0;
-    }
-    .home-primary-card span,
-    .home-menu-card span {
-      display: block;
-      color: inherit;
-      font-size: 14px;
-      line-height: 1.62;
-      opacity: 0.84;
-    }
-    .home-primary-arrow {
-      color: #d8b86a;
-      font-size: 34px;
-      font-weight: 900;
-    }
-    .home-carousel-section {
-      display: grid;
-      gap: 14px;
-      margin-left: -16px;
-      margin-right: -16px;
-    }
-    .home-carousel-hint {
-      margin: 0 16px;
-      color: #6d7f84;
-      font-size: 13px;
-      font-weight: 800;
-      text-align: center;
-    }
-    .home-carousel {
-      display: flex;
-      gap: 14px;
-      min-height: 386px;
-      overflow-x: auto;
-      overflow-y: visible;
-      padding: 20px calc((100vw - min(78vw, 340px)) / 2) 18px;
-      scroll-snap-type: x mandatory;
-      scroll-padding-inline: calc((100vw - min(78vw, 340px)) / 2);
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior-x: contain;
-    }
-    .home-carousel::-webkit-scrollbar { display: none; }
-    .home-carousel-card {
-      position: relative;
-      display: grid;
-      flex: 0 0 min(78vw, 340px);
-      min-height: 316px;
-      align-content: space-between;
-      gap: 18px;
-      padding: 24px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.66);
-      border-radius: 32px;
-      background:
-        radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.7), transparent 28%),
-        radial-gradient(circle at 12% 86%, rgba(182, 155, 100, 0.16), transparent 34%),
-        linear-gradient(145deg, rgba(255, 253, 249, 0.82), rgba(247, 241, 230, 0.68) 48%, rgba(232, 240, 241, 0.74) 100%);
-      backdrop-filter: blur(18px) saturate(1.18);
-      -webkit-backdrop-filter: blur(18px) saturate(1.18);
-      color: var(--text);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.82),
-        inset 0 -14px 30px rgba(146, 173, 184, 0.1),
-        0 15px 34px rgba(39, 55, 61, 0.11);
-      cursor: pointer;
-      text-align: left;
-      scroll-snap-align: center;
-      scroll-snap-stop: always;
-      transform: scale(0.88) translateY(8px);
-      opacity: 0.58;
-      transition: transform 260ms cubic-bezier(.2, .8, .2, 1), opacity 260ms ease, box-shadow 260ms ease;
-      touch-action: pan-x;
-      animation: carouselSlideIn 620ms cubic-bezier(.2, .85, .25, 1) backwards;
-    }
-    .home-carousel-card::after {
-      position: absolute;
-      right: -42px;
-      bottom: -50px;
+      right: 18px;
+      bottom: -42px;
       width: 138px;
       height: 138px;
       content: "";
       border-radius: 50%;
-      background: rgba(182, 155, 100, 0.15);
+      background: rgba(184, 205, 212, 0.28);
+      filter: blur(2px);
+    }
+    .home-orbit-section {
+      position: relative;
+      display: grid;
+      gap: 12px;
+      min-height: min(640px, calc(100svh - 208px));
+      padding: 6px 0 max(20px, env(safe-area-inset-bottom));
+      overflow: hidden;
+      user-select: none;
+    }
+    .home-orbit-section::before,
+    .home-orbit-section::after {
+      position: absolute;
+      inset: auto;
+      z-index: 0;
+      content: "";
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(24px);
+    }
+    .home-orbit-section::before {
+      top: 26px;
+      left: 8%;
+      width: 156px;
+      height: 156px;
+      background: rgba(237, 202, 212, 0.36);
+    }
+    .home-orbit-section::after {
+      right: 0;
+      bottom: 72px;
+      width: 188px;
+      height: 188px;
+      background: rgba(174, 201, 209, 0.34);
+    }
+    .home-orbit-brand {
+      position: relative;
+      z-index: 2;
+      margin: 0;
+      color: rgba(22, 24, 25, 0.62);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .home-orbit-hint {
+      position: relative;
+      z-index: 2;
+      margin: -4px 0 0;
+      color: #71888e;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .home-orbit-stage {
+      position: relative;
+      z-index: 1;
+      height: clamp(380px, 62svh, 560px);
+      min-height: 380px;
+      margin: 0 -16px;
+      outline: none;
+      perspective: 980px;
+      perspective-origin: 50% 46%;
+      touch-action: pan-y;
+      transform-style: preserve-3d;
+    }
+    .home-orbit-stage::before {
+      position: absolute;
+      left: 50%;
+      bottom: 22px;
+      width: min(74vw, 420px);
+      height: 58px;
+      content: "";
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(65, 57, 47, 0.17), rgba(65, 57, 47, 0));
+      transform: translateX(-50%);
+      filter: blur(7px);
       pointer-events: none;
     }
-    .home-carousel-card.is-active {
-      opacity: 1;
-      transform: scale(1.1) translateY(-4px);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.9),
-        inset 0 -16px 32px rgba(146, 173, 184, 0.11),
-        0 20px 44px rgba(39, 55, 61, 0.15);
-    }
-    .home-carousel-card.is-bouncing {
-      animation: cardBounce 360ms cubic-bezier(.2, .9, .25, 1.2);
-    }
-    .home-carousel-card .home-card-icon,
-    .home-carousel-card .home-primary-icon {
-      margin-bottom: 20px;
-      color: #597b84;
-    }
-    .home-carousel-card.home-primary-card .home-primary-icon {
-      color: #7b6229;
-      font-size: 28px;
-    }
-    .home-carousel-card .home-primary-arrow {
+    .home-orbit-item {
       position: absolute;
-      right: 22px;
-      bottom: 18px;
+      top: 42%;
+      left: 50%;
+      display: grid;
+      justify-items: center;
+      width: min(88vw, 420px);
+      min-height: 348px;
+      padding: 0 18px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      text-align: center;
+      transform-style: preserve-3d;
+      transform-origin: center center;
+      will-change: transform, opacity, filter;
+      pointer-events: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: filter 180ms ease, opacity 180ms ease;
     }
-    .home-card-number {
+    .home-orbit-item[aria-hidden="true"] {
+      pointer-events: none;
+    }
+    .home-orbit-item.is-side {
+      pointer-events: auto;
+    }
+    .home-orbit-item.is-active {
+      z-index: 10;
+    }
+    .home-orbit-item.is-bouncing .home-orbit-image-wrap {
+      animation: orbitBounce 360ms cubic-bezier(.2, .9, .2, 1.2);
+    }
+    .home-orbit-image-wrap {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: min(84vw, 390px);
+      height: min(84vw, 390px);
+      max-height: 420px;
+      pointer-events: none;
+    }
+    .home-orbit-item.is-active .home-orbit-image-wrap,
+    .home-orbit-item.is-active .home-orbit-copy {
+      pointer-events: auto;
+    }
+    .home-orbit-image-wrap::before {
       position: absolute;
-      top: 18px;
-      right: 20px;
-      color: currentColor;
-      font-size: 12px;
+      inset: 9% 7% 2%;
+      content: "";
+      border-radius: 42% 44% 48% 45%;
+      background:
+        radial-gradient(circle at 32% 18%, rgba(255, 255, 255, 0.76), transparent 26%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(222, 191, 213, 0.12), rgba(176, 204, 213, 0.14));
+      filter: blur(12px);
+      opacity: 0.78;
+    }
+    .home-orbit-image {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+      filter: drop-shadow(0 24px 28px rgba(37, 43, 48, 0.16));
+    }
+    .home-orbit-fallback {
+      position: absolute;
+      z-index: 0;
+      display: grid;
+      place-items: center;
+      width: 64%;
+      aspect-ratio: 1;
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 34%;
+      background:
+        radial-gradient(circle at 28% 24%, rgba(255,255,255,0.96), transparent 28%),
+        linear-gradient(145deg, #fffaf0, #dfedf0 52%, #ead7aa);
+      color: #435a61;
+      font-size: clamp(18px, 7vw, 34px);
       font-weight: 900;
-      letter-spacing: 0.08em;
-      opacity: 0.42;
+      box-shadow: 0 24px 48px rgba(35,45,49,0.12), inset 0 1px 0 rgba(255,255,255,0.85);
+    }
+    .home-orbit-image:not([data-broken="true"]) + .home-orbit-fallback {
+      display: none;
+    }
+    .home-orbit-copy {
+      position: relative;
+      z-index: 2;
+      width: min(92vw, 430px);
+      max-width: min(92vw, 430px);
+      margin-top: -14px;
+      padding: 12px 18px 0;
+      pointer-events: none;
+      display: none;
+    }
+    .home-orbit-active-copy {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      justify-items: center;
+      width: min(92vw, 440px);
+      min-height: 112px;
+      margin: -34px auto 0;
+      padding: 10px 14px 0;
+      text-align: center;
+    }
+    .home-orbit-title {
+      display: block;
+      color: #181a1b;
+      font-size: clamp(23px, 6vw, 34px);
+      font-weight: 950;
+      letter-spacing: 0;
+      line-height: 1.14;
+      overflow-wrap: anywhere;
+      text-shadow: 0 2px 0 rgba(255,255,255,0.72);
+    }
+    .home-orbit-active-title {
+      display: block;
+      color: #181a1b;
+      font-size: clamp(25px, 7vw, 36px);
+      font-weight: 950;
+      letter-spacing: 0;
+      line-height: 1.14;
+      overflow-wrap: anywhere;
+      text-shadow: 0 2px 0 rgba(255,255,255,0.8);
+    }
+    .home-orbit-description {
+      display: block;
+      margin-top: 9px;
+      color: #65777d;
+      font-size: clamp(13px, 3.5vw, 16px);
+      font-weight: 760;
+      line-height: 1.62;
+      overflow-wrap: anywhere;
+    }
+    .home-orbit-active-description {
+      display: block;
+      max-width: 34em;
+      margin-top: 9px;
+      color: #65777d;
+      font-size: clamp(13px, 3.5vw, 16px);
+      font-weight: 760;
+      line-height: 1.62;
+      overflow-wrap: anywhere;
     }
     .home-menu-dots {
+      position: relative;
+      z-index: 3;
       display: flex;
       justify-content: center;
       gap: 8px;
+      min-height: 24px;
       padding-bottom: 4px;
     }
     .home-menu-dot {
@@ -417,48 +505,26 @@
       padding: 0;
       border: 0;
       border-radius: 999px;
-      background: rgba(17, 17, 17, 0.2);
+      background: rgba(28, 30, 31, 0.18);
       cursor: pointer;
-      transition: width 220ms ease, background 220ms ease;
+      transition: width 220ms ease, background 220ms ease, transform 220ms ease;
     }
     .home-menu-dot.is-active {
-      width: 24px;
-      background: #111111;
+      width: 26px;
+      background: linear-gradient(90deg, #b99a53, #c8d7dc);
+      transform: translateY(-1px);
     }
-    .home-carousel-card:nth-child(1) { animation-delay: 20ms; }
-    .home-carousel-card:nth-child(2) { animation-delay: 80ms; }
-    .home-carousel-card:nth-child(3) { animation-delay: 140ms; }
-    .home-carousel-card:nth-child(4) { animation-delay: 200ms; }
-    .home-carousel-card:nth-child(5) { animation-delay: 260ms; }
-    .home-carousel-card:nth-child(6) { animation-delay: 320ms; }
-    .home-carousel-card:nth-child(7) { animation-delay: 380ms; }
-    @keyframes cardBounce {
-      0% { transform: scale(1.04) translateY(-2px); }
-      58% { transform: scale(1.125) translateY(-5px); }
-      100% { transform: scale(1.1) translateY(-4px); }
-    }
-    @keyframes carouselSlideIn {
-      0% {
-        translate: 42px 0;
-        filter: blur(4px);
-      }
-      100% {
-        translate: 0 0;
-        filter: blur(0);
-      }
+    @keyframes orbitBounce {
+      0% { transform: scale(0.975) translateY(3px); }
+      58% { transform: scale(1.035) translateY(-6px); }
+      100% { transform: scale(1) translateY(0); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .home-carousel {
-        scroll-behavior: auto;
-      }
-      .home-carousel-card,
+      .home-orbit-item,
       .home-menu-dot {
         transition: none;
       }
-      .home-carousel-card.is-bouncing {
-        animation: none;
-      }
-      .home-carousel-card {
+      .home-orbit-item.is-bouncing .home-orbit-image-wrap {
         animation: none;
       }
     }
@@ -731,23 +797,38 @@
       .app-header { padding-top: max(13px, env(safe-area-inset-top)); }
       .app-title { font-size: 18px; }
       main { padding: 14px 12px calc(92px + env(safe-area-inset-bottom)); }
-      .home-carousel-section {
-        margin-left: -12px;
-        margin-right: -12px;
+      .home-screen {
+        gap: 14px;
       }
-      .home-carousel {
-        min-height: 344px;
-        padding-inline: calc((100vw - min(80vw, 330px)) / 2);
-        scroll-padding-inline: calc((100vw - min(80vw, 330px)) / 2);
+      .home-hero {
+        padding: 18px 18px;
       }
-      .home-carousel-card {
-        flex-basis: min(80vw, 330px);
-        min-height: 302px;
-        padding: 22px;
+      .home-orbit-section {
+        min-height: min(560px, calc(100svh - 190px));
+        padding-bottom: max(22px, env(safe-area-inset-bottom));
       }
-      .home-primary-card strong,
-      .home-menu-card strong {
-        font-size: 22px;
+      .home-orbit-stage {
+        height: clamp(320px, 48svh, 460px);
+        min-height: 320px;
+        margin-inline: -12px;
+      }
+      .home-orbit-item {
+        top: 42%;
+        width: min(90vw, 390px);
+        min-height: 292px;
+        padding-inline: 10px;
+      }
+      .home-orbit-image-wrap {
+        width: min(78vw, 330px);
+        height: min(78vw, 330px);
+      }
+      .home-orbit-copy {
+        max-width: 88vw;
+        margin-top: -20px;
+      }
+      .home-orbit-active-copy {
+        min-height: 96px;
+        margin-top: -52px;
       }
       .member-summary { grid-template-columns: 1fr; gap: 10px; padding: 15px; }
       .panel { padding: 16px 14px; margin-bottom: 10px; }
@@ -872,69 +953,84 @@
           <p id="homeWelcome" class="home-welcome">ようこそ。今日使う機能を選んでください。</p>
         </section>
 
-        <section class="home-carousel-section" aria-label="Kimikea Connectメニュー">
-          <p class="home-carousel-hint">左右にスワイプして機能を選択</p>
-          <div id="homeCarousel" class="home-carousel" tabindex="0">
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openStylebook()">
-              <span class="home-card-number">01</span>
-              <span class="home-card-icon" aria-hidden="true">📖</span>
-              <span>
-                <strong>スタイル図鑑</strong>
-                <span>施術写真、使用色、各色の本数を確認できます。</span>
+        <section class="home-orbit-section" aria-label="Kimikea Connectメニュー">
+          <p class="home-orbit-brand">Kimikea Connect</p>
+          <p class="home-orbit-hint">左右にスワイプして機能を選択</p>
+          <div id="homeCarousel" class="home-orbit-stage" tabindex="0" aria-live="polite">
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="stylebook" onclick="activateOrbitItem(event, 0)" aria-label="スタイル図鑑を開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/stylebook-transparent.webp" alt="スタイル図鑑の開いた本イラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">図鑑</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">スタイル図鑑</strong>
+                <span class="home-orbit-description">施術写真、使用色、各色の本数を確認できます。</span>
               </span>
             </button>
-            <button type="button" class="home-carousel-card home-primary-card" data-carousel-card onclick="openOrderPage()">
-              <span class="home-card-number">02</span>
-              <span class="home-primary-icon" aria-hidden="true">🧾✓</span>
-              <span>
-                <strong>会員専用 注文ページ</strong>
-                <span>growシールエクステの注文、請求書、注文履歴を確認できます。</span>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="order" onclick="activateOrbitItem(event, 1)" aria-label="会員オーダーシステムを開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/member-order-transparent.webp" alt="注文用紙とチェックのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">注文</span>
               </span>
-              <span class="home-primary-arrow">›</span>
-            </button>
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('coordinator')">
-              <span class="home-card-number">03</span>
-              <span class="home-card-icon" aria-hidden="true">📝</span>
-              <span>
-                <strong>コーディネーター講習案内</strong>
-                <span>講習内容、開催日、申込方法を確認できます。</span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">会員オーダーシステム</strong>
+                <span class="home-orbit-description">growシールエクステの注文、請求書、注文履歴を確認できます。</span>
               </span>
             </button>
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('map')">
-              <span class="home-card-number">04</span>
-              <span class="home-card-icon" aria-hidden="true">🗺️</span>
-              <span>
-                <strong>加盟店マップ</strong>
-                <span>加盟店、コーディネーター店舗を案内します。</span>
-                <span class="coming-soon">準備中</span>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="coordinator" onclick="activateOrbitItem(event, 2)" aria-label="講習案内を開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/academy-transparent.webp" alt="ノートと鉛筆の講習案内イラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">講習</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">講習案内</strong>
+                <span class="home-orbit-description">講習内容、開催日、申込方法を確認できます。</span>
               </span>
             </button>
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('popular')">
-              <span class="home-card-number">05</span>
-              <span class="home-card-icon">★</span>
-              <span>
-                <strong>人気カラー</strong>
-                <span>今月・今年の人気色を表示します。</span>
-                <span class="coming-soon">準備中</span>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="map" onclick="activateOrbitItem(event, 3)" aria-label="加盟店マップを開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/map-transparent.webp" alt="地図と位置ピンのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">地図</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">加盟店マップ</strong>
+                <span class="home-orbit-description">加盟店、コーディネーター店舗を案内します。</span>
               </span>
             </button>
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('ai')">
-              <span class="home-card-number">06</span>
-              <span class="home-card-icon">AI</span>
-              <span>
-                <strong>AIカラー診断</strong>
-                <span>似合う色やスタイルを提案します。</span>
-                <span class="coming-soon">準備中</span>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="popular" onclick="activateOrbitItem(event, 4)" aria-label="人気ランキングを開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/ranking-transparent.webp" alt="人気ランキングのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">人気</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">人気ランキング</strong>
+                <span class="home-orbit-description">今月・今年の人気色を表示します。</span>
               </span>
             </button>
-            <button type="button" class="home-carousel-card home-menu-card" data-carousel-card onclick="openPublicPage('notice')">
-              <span class="home-card-number">07</span>
-              <span class="home-card-icon" aria-hidden="true">📣</span>
-              <span>
-                <strong>お知らせ</strong>
-                <span>新色、イベント、講習情報を確認できます。</span>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="ai" onclick="activateOrbitItem(event, 5)" aria-label="あなたのピッタリを探すを開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/ai-diagnosis-transparent.webp" alt="AI診断のイラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">AI</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">あなたのピッタリを探す</strong>
+                <span class="home-orbit-description">似合う色やスタイルを提案します。</span>
               </span>
             </button>
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="notice" onclick="activateOrbitItem(event, 6)" aria-label="お知らせを開く">
+              <span class="home-orbit-image-wrap">
+                <img class="home-orbit-image" src="assets/home-icons/news-transparent.webp" alt="拡声器のお知らせイラスト" draggable="false" onerror="handleOrbitImageError(this)">
+                <span class="home-orbit-fallback" aria-hidden="true">お知らせ</span>
+              </span>
+              <span class="home-orbit-copy">
+                <strong class="home-orbit-title">お知らせ</strong>
+                <span class="home-orbit-description">新色、イベント、講習情報を確認できます。</span>
+              </span>
+            </button>
+          </div>
+          <div class="home-orbit-active-copy" aria-live="polite">
+            <strong id="homeOrbitActiveTitle" class="home-orbit-active-title">スタイル図鑑</strong>
+            <span id="homeOrbitActiveDescription" class="home-orbit-active-description">施術写真、使用色、各色の本数を確認できます。</span>
           </div>
           <div id="homeCarouselDots" class="home-menu-dots" aria-label="現在のメニュー位置"></div>
         </section>
@@ -1315,101 +1411,313 @@
         : '公開アプリ';
     }
 
-    let activeCarouselIndex = -1;
-    let carouselScrollTimer = null;
+    const ORBIT_STORAGE_KEY = 'kimikea_home_orbit_index';
+    let activeCarouselIndex = 0;
+    let orbitFrame = 0;
+    let orbitDrag = null;
 
     function getCarouselElements() {
-      const carousel = document.getElementById('homeCarousel');
-      const cards = carousel ? Array.from(carousel.querySelectorAll('[data-carousel-card]')) : [];
+      const stage = document.getElementById('homeCarousel');
+      const cards = stage ? Array.from(stage.querySelectorAll('[data-carousel-card]')) : [];
       const dots = Array.from(document.querySelectorAll('#homeCarouselDots .home-menu-dot'));
-      return { carousel, cards, dots };
+      return { stage, cards, dots };
+    }
+
+    function normalizeOrbitIndex(index, length) {
+      if (!length) return 0;
+      return ((Math.round(index) % length) + length) % length;
+    }
+
+    function getOrbitDistance(index, position, length) {
+      let distance = index - position;
+      while (distance > length / 2) distance -= length;
+      while (distance < -length / 2) distance += length;
+      return distance;
     }
 
     function buildCarouselDots() {
       const { cards } = getCarouselElements();
       const dotWrap = document.getElementById('homeCarouselDots');
       if (!dotWrap || dotWrap.children.length === cards.length) return;
-      dotWrap.innerHTML = cards.map((card, index) => (
-        `<button type="button" class="home-menu-dot" aria-label="${escapeHtml(card.querySelector('strong')?.textContent || `メニュー${index + 1}`)}へ移動" onclick="scrollHomeCarouselTo(${index})"></button>`
-      )).join('');
+      dotWrap.innerHTML = cards.map((card, index) => {
+        const label = card.querySelector('.home-orbit-title')?.textContent || `メニュー${index + 1}`;
+        return `<button type="button" class="home-menu-dot" aria-label="${escapeHtml(label)}へ移動" onclick="setOrbitIndex(${index}, true)"></button>`;
+      }).join('');
     }
 
-    function getNearestCarouselIndex() {
-      const { carousel, cards } = getCarouselElements();
-      if (!carousel || !cards.length) return 0;
-      const center = carousel.scrollLeft + carousel.clientWidth / 2;
-      let nearestIndex = 0;
-      let nearestDistance = Number.POSITIVE_INFINITY;
+    function renderOrbit(position, shouldAnimate = false) {
+      const { stage, cards, dots } = getCarouselElements();
+      if (!stage || !cards.length) return;
+      const length = cards.length;
+      const activeIndex = normalizeOrbitIndex(position, length);
+      const width = stage.clientWidth || window.innerWidth || 390;
+      const radius = Math.min(width * 0.62, 300);
+      const depth = Math.min(width * 0.72, 330);
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
       cards.forEach((card, index) => {
-        const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-        const distance = Math.abs(cardCenter - center);
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestIndex = index;
-        }
-      });
-      return nearestIndex;
-    }
+        const distance = getOrbitDistance(index, position, length);
+        const abs = Math.abs(distance);
+        const angle = (distance / length) * Math.PI * 2;
+        const x = Math.sin(angle) * radius;
+        const z = Math.cos(angle) * depth;
+        const y = abs < 0.5 ? -12 : Math.min(abs * 18, 58);
+        const rotateY = -Math.sin(angle) * 54;
+        const scale = abs < 0.5 ? 1 : abs < 1.5 ? 0.64 : abs < 2.5 ? 0.46 : 0.34;
+        const opacity = abs < 0.5 ? 1 : abs < 1.5 ? 0.62 : abs < 2.5 ? 0.28 : 0.14;
+        const blur = reduced || abs < 1.5 ? 0 : Math.min((abs - 1.2) * 1.2, 2.4);
+        const zIndex = Math.round(100 - abs * 12 + z / 20);
+        const active = index === activeIndex;
+        const side = Math.round(abs) === 1;
 
-    function setActiveCarouselCard(index, shouldAnimate = false) {
-      const { cards, dots } = getCarouselElements();
-      if (!cards.length) return;
-      const boundedIndex = Math.max(0, Math.min(index, cards.length - 1));
-      cards.forEach((card, cardIndex) => {
-        const active = cardIndex === boundedIndex;
+        card.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) rotateY(${rotateY}deg) scale(${scale})`;
+        card.style.opacity = opacity.toFixed(3);
+        card.style.filter = blur ? `blur(${blur.toFixed(2)}px)` : 'none';
+        card.style.zIndex = String(zIndex);
+        card.style.pointerEvents = side ? 'auto' : 'none';
         card.classList.toggle('is-active', active);
+        card.classList.toggle('is-side', side && !active);
         card.setAttribute('aria-current', active ? 'true' : 'false');
+        card.tabIndex = active ? 0 : -1;
       });
-      dots.forEach((dot, dotIndex) => {
-        dot.classList.toggle('is-active', dotIndex === boundedIndex);
-      });
-      if (boundedIndex !== activeCarouselIndex) {
-        activeCarouselIndex = boundedIndex;
-        if (shouldAnimate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          const activeCard = cards[boundedIndex];
+
+      dots.forEach((dot, index) => dot.classList.toggle('is-active', index === activeIndex));
+      const activeCard = cards[activeIndex];
+      const activeTitle = activeCard?.querySelector('.home-orbit-title')?.textContent || '';
+      const activeDescription = activeCard?.querySelector('.home-orbit-description')?.textContent || '';
+      const titleTarget = document.getElementById('homeOrbitActiveTitle');
+      const descriptionTarget = document.getElementById('homeOrbitActiveDescription');
+      if (titleTarget) titleTarget.textContent = activeTitle;
+      if (descriptionTarget) descriptionTarget.textContent = activeDescription;
+
+      if (shouldAnimate && activeIndex !== activeCarouselIndex) {
+        activeCarouselIndex = activeIndex;
+        if (!reduced && activeCard) {
           activeCard.classList.remove('is-bouncing');
           window.requestAnimationFrame(() => activeCard.classList.add('is-bouncing'));
-          if (navigator.vibrate) {
-            try { navigator.vibrate(8); } catch (error) { /* unsupported vibration is safe to ignore */ }
-          }
         }
+        if (navigator.vibrate) {
+          try { navigator.vibrate(8); } catch (error) { /* vibration is optional */ }
+        }
+      } else {
+        activeCarouselIndex = activeIndex;
       }
     }
 
-    function updateHomeCarousel(shouldAnimate = false) {
-      buildCarouselDots();
-      setActiveCarouselCard(getNearestCarouselIndex(), shouldAnimate);
+    function animateOrbitTo(targetIndex, shouldAnimate = true) {
+      const { cards } = getCarouselElements();
+      if (!cards.length) return;
+      window.cancelAnimationFrame(orbitFrame);
+      const length = cards.length;
+      const start = activeCarouselIndex;
+      let delta = targetIndex - start;
+      while (delta > length / 2) delta -= length;
+      while (delta < -length / 2) delta += length;
+      const end = start + delta;
+      const startTime = performance.now();
+      const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 360;
+      const ease = (t) => 1 - Math.pow(1 - t, 3);
+
+      function step(now) {
+        const progress = Math.min(1, (now - startTime) / duration);
+        renderOrbit(start + delta * ease(progress), false);
+        if (progress < 1) {
+          orbitFrame = window.requestAnimationFrame(step);
+          return;
+        }
+        setOrbitIndex(end, shouldAnimate);
+      }
+      orbitFrame = window.requestAnimationFrame(step);
     }
 
-    function scrollHomeCarouselTo(index) {
+    function setOrbitIndex(index, shouldAnimate = true) {
       const { cards } = getCarouselElements();
-      if (!cards[index]) return;
-      cards[index].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      setTimeout(() => setActiveCarouselCard(index, true), 180);
+      if (!cards.length) return;
+      activeCarouselIndex = normalizeOrbitIndex(index, cards.length);
+      localStorage.setItem(ORBIT_STORAGE_KEY, String(activeCarouselIndex));
+      renderOrbit(activeCarouselIndex, shouldAnimate);
+    }
+
+    function openOrbitMenu(key) {
+      if (key === 'stylebook') {
+        openStylebook();
+        return;
+      }
+      if (key === 'order') {
+        openOrderPage();
+        return;
+      }
+      openPublicPage(key);
+    }
+
+    function activateOrbitItem(event, index) {
+      const { cards } = getCarouselElements();
+      if (!cards.length) return;
+      if (orbitDrag?.didDrag) {
+        event.preventDefault();
+        return;
+      }
+      const normalized = normalizeOrbitIndex(index, cards.length);
+      if (normalized !== activeCarouselIndex) {
+        event.preventDefault();
+        animateOrbitTo(normalized, true);
+        return;
+      }
+      openOrbitMenu(cards[normalized].dataset.menuKey);
+    }
+
+    function handleOrbitImageError(image) {
+      image.dataset.broken = 'true';
+      image.alt = `${image.alt}（画像準備中）`;
     }
 
     function initializeHomeCarousel() {
-      const { carousel, cards } = getCarouselElements();
-      if (!carousel || !cards.length || carousel.dataset.ready === 'true') {
-        updateHomeCarousel(false);
-        return;
-      }
-      carousel.dataset.ready = 'true';
+      const { stage, cards } = getCarouselElements();
+      if (!stage || !cards.length) return;
       buildCarouselDots();
-      cards.forEach((card) => {
-        card.addEventListener('animationend', () => card.classList.remove('is-bouncing'));
-      });
-      carousel.addEventListener('scroll', () => {
-        updateHomeCarousel(false);
-        window.clearTimeout(carouselScrollTimer);
-        carouselScrollTimer = window.setTimeout(() => updateHomeCarousel(true), 90);
-      }, { passive: true });
-      carousel.addEventListener('keydown', (event) => {
-        if (event.key === 'ArrowRight') scrollHomeCarouselTo(activeCarouselIndex + 1);
-        if (event.key === 'ArrowLeft') scrollHomeCarouselTo(activeCarouselIndex - 1);
-      });
-      window.addEventListener('resize', () => updateHomeCarousel(false));
-      updateHomeCarousel(false);
+
+      if (stage.dataset.ready !== 'true') {
+        stage.dataset.ready = 'true';
+        const saved = Number(localStorage.getItem(ORBIT_STORAGE_KEY));
+        activeCarouselIndex = Number.isFinite(saved) ? normalizeOrbitIndex(saved, cards.length) : 0;
+
+        stage.addEventListener('pointerdown', (event) => {
+          if (event.button && event.button !== 0) return;
+          window.cancelAnimationFrame(orbitFrame);
+          orbitDrag = {
+            id: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastX: event.clientX,
+            lastTime: performance.now(),
+            velocity: 0,
+            startIndex: activeCarouselIndex,
+            didDrag: false,
+          };
+          stage.setPointerCapture?.(event.pointerId);
+        });
+
+        stage.addEventListener('pointermove', (event) => {
+          if (!orbitDrag || orbitDrag.id !== event.pointerId) return;
+          const dx = event.clientX - orbitDrag.startX;
+          const dy = event.clientY - orbitDrag.startY;
+          if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            event.preventDefault();
+            orbitDrag.didDrag = true;
+            const now = performance.now();
+            const elapsed = Math.max(16, now - orbitDrag.lastTime);
+            orbitDrag.velocity = (event.clientX - orbitDrag.lastX) / elapsed;
+            orbitDrag.lastX = event.clientX;
+            orbitDrag.lastTime = now;
+            renderOrbit(orbitDrag.startIndex - dx / 118, false);
+          }
+        }, { passive: false });
+
+        const finishDrag = (event) => {
+          if (!orbitDrag || orbitDrag.id !== event.pointerId) return;
+          const dx = event.clientX - orbitDrag.startX;
+          const movement = -dx / 118;
+          const flick = -orbitDrag.velocity * 7;
+          const target = Math.abs(dx) > 24 ? Math.round(orbitDrag.startIndex + movement + flick) : orbitDrag.startIndex;
+          const didDrag = orbitDrag.didDrag;
+          orbitDrag = { didDrag };
+          animateOrbitTo(target, true);
+          window.setTimeout(() => { orbitDrag = null; }, 120);
+        };
+        stage.addEventListener('pointerup', finishDrag);
+        stage.addEventListener('pointercancel', finishDrag);
+
+        stage.addEventListener('touchstart', (event) => {
+          const touch = event.touches[0];
+          if (!touch) return;
+          window.cancelAnimationFrame(orbitFrame);
+          orbitDrag = {
+            id: 'touch',
+            startX: touch.clientX,
+            startY: touch.clientY,
+            lastX: touch.clientX,
+            lastTime: performance.now(),
+            velocity: 0,
+            startIndex: activeCarouselIndex,
+            didDrag: false,
+          };
+        }, { passive: true });
+
+        stage.addEventListener('touchmove', (event) => {
+          if (!orbitDrag || orbitDrag.id !== 'touch') return;
+          const touch = event.touches[0];
+          if (!touch) return;
+          const dx = touch.clientX - orbitDrag.startX;
+          const dy = touch.clientY - orbitDrag.startY;
+          if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            event.preventDefault();
+            orbitDrag.didDrag = true;
+            const now = performance.now();
+            const elapsed = Math.max(16, now - orbitDrag.lastTime);
+            orbitDrag.velocity = (touch.clientX - orbitDrag.lastX) / elapsed;
+            orbitDrag.lastX = touch.clientX;
+            orbitDrag.lastTime = now;
+            renderOrbit(orbitDrag.startIndex - dx / 118, false);
+          }
+        }, { passive: false });
+
+        stage.addEventListener('touchend', (event) => {
+          if (!orbitDrag || orbitDrag.id !== 'touch') return;
+          const touch = event.changedTouches[0];
+          const dx = touch ? touch.clientX - orbitDrag.startX : 0;
+          const movement = -dx / 118;
+          const flick = -orbitDrag.velocity * 7;
+          const target = Math.abs(dx) > 24 ? Math.round(orbitDrag.startIndex + movement + flick) : orbitDrag.startIndex;
+          const didDrag = orbitDrag.didDrag;
+          orbitDrag = { didDrag };
+          animateOrbitTo(target, true);
+          window.setTimeout(() => { orbitDrag = null; }, 120);
+        }, { passive: true });
+
+        stage.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            animateOrbitTo(activeCarouselIndex + 1, true);
+          }
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            animateOrbitTo(activeCarouselIndex - 1, true);
+          }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            const card = cards[activeCarouselIndex];
+            if (card) openOrbitMenu(card.dataset.menuKey);
+          }
+        });
+
+        stage.addEventListener('click', (event) => {
+          if (orbitDrag?.didDrag) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          const rect = stage.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          event.preventDefault();
+          event.stopPropagation();
+          if (x > rect.width * 0.68) {
+            animateOrbitTo(activeCarouselIndex + 1, true);
+            return;
+          }
+          if (x < rect.width * 0.32) {
+            animateOrbitTo(activeCarouselIndex - 1, true);
+            return;
+          }
+          const activeCard = cards[activeCarouselIndex];
+          if (activeCard) openOrbitMenu(activeCard.dataset.menuKey);
+        }, true);
+
+        window.addEventListener('resize', () => renderOrbit(activeCarouselIndex, false));
+      }
+
+      renderOrbit(activeCarouselIndex, false);
     }
 
     function showHomePage() {
@@ -1438,7 +1746,7 @@
 
     const publicPages = {
       popular: {
-        title: '人気カラー',
+        title: '人気ランキング',
         lead: '今月の人気色と今年の人気色を表示するページです。現在は準備中です。',
         items: ['今月の人気色：準備中', '今年の人気色：準備中', '今後、注文データや投稿レシピから自動集計します。']
       },
@@ -1448,7 +1756,7 @@
         items: ['地域検索：準備中', '店舗詳細：準備中', 'コーディネーター紹介：準備中']
       },
       ai: {
-        title: 'AIカラー診断',
+        title: 'あなたのピッタリを探す',
         lead: '似合うエクステカラーやスタイルを提案する機能です。現在は準備中です。',
         items: ['肌なじみ診断：準備中', '職場OKカラー提案：準備中', '推し色スタイル提案：準備中']
       },
