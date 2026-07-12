@@ -1,0 +1,141 @@
+:root {
+  --kc-nav-cream: rgba(255, 252, 246, 0.84);
+  --kc-nav-white: rgba(255, 255, 255, 0.78);
+  --kc-nav-line: rgba(198, 169, 111, 0.28);
+  --kc-nav-gold: #b98a3c;
+  --kc-nav-blue: #8faeb8;
+  --kc-nav-pink: #d9a3ad;
+  --kc-nav-lavender: #b7a8d8;
+  --kc-nav-text: #2c2822;
+  --kc-nav-muted: #796f62;
+}
+
+body.kc-has-bottom-nav {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
+body.kc-has-bottom-nav main,
+body.kc-has-bottom-nav .app-shell,
+body.kc-has-bottom-nav .recipe-app {
+  padding-bottom: max(112px, calc(88px + env(safe-area-inset-bottom, 0px)));
+}
+
+body.kc-has-bottom-nav .tabs {
+  bottom: max(96px, calc(88px + env(safe-area-inset-bottom, 0px))) !important;
+}
+
+.kc-bottom-nav {
+  position: fixed;
+  z-index: 9999;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  width: min(94vw, 520px);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--kc-nav-line);
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(250, 244, 233, 0.7)),
+    var(--kc-nav-cream);
+  box-shadow:
+    0 18px 44px rgba(48, 39, 24, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.kc-bottom-nav::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: -1;
+  border-radius: 21px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(217, 163, 173, 0.20), transparent 34%),
+    radial-gradient(circle at 78% 20%, rgba(143, 174, 184, 0.22), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(185, 138, 60, 0.16), transparent 44%);
+}
+
+.kc-bottom-nav__button {
+  appearance: none;
+  min-width: 0;
+  min-height: 58px;
+  border: 0;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 7px 4px 6px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--kc-nav-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.kc-bottom-nav__button:active {
+  transform: scale(0.94);
+}
+
+.kc-bottom-nav__button:hover,
+.kc-bottom-nav__button:focus-visible {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 60, 0.18);
+  outline: none;
+}
+
+.kc-bottom-nav__icon {
+  width: 29px;
+  height: 29px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #201c17;
+  font-size: 17px;
+  font-weight: 800;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(244, 235, 218, 0.72));
+  box-shadow:
+    0 7px 16px rgba(68, 54, 30, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.kc-bottom-nav__button:nth-child(2) .kc-bottom-nav__icon {
+  color: #9c7334;
+}
+
+.kc-bottom-nav__button:nth-child(3) .kc-bottom-nav__icon {
+  color: #668d9a;
+}
+
+.kc-bottom-nav__button:nth-child(4) .kc-bottom-nav__icon {
+  color: #987fc4;
+}
+
+.kc-bottom-nav__label {
+  display: block;
+  max-width: 100%;
+  color: var(--kc-nav-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+@media (min-width: 760px) {
+  .kc-bottom-nav {
+    bottom: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kc-bottom-nav__button {
+    transition: none;
+  }
+}
