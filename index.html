@@ -2139,6 +2139,12 @@
     }
 
     function goKimikeaBackFromNav() {
+      const orderWorkspace = document.getElementById('orderWorkspace');
+      const isOrderVisible = orderWorkspace && !orderWorkspace.hidden;
+      if (isOrderVisible) {
+        showOrderLogin();
+        return;
+      }
       const isHomeVisible = !document.getElementById('portalView').hidden
         && !document.getElementById('homeView').hidden;
       if (isHomeVisible || window.history.length <= 1) {
