@@ -8,6 +8,19 @@ Kimikea Connect は、注文サイトではない。
 
 注文、スタイル共有、教育、情報共有、加盟店検索、売れる提案を一つにまとめる。
 
+## 正式公開URL
+
+加盟店・コーディネーターへ案内するKimikea Connectの入口URLは、今後ずっと以下に統一する。
+
+[https://boss-team1129.github.io/Kimikea-Connect/](https://boss-team1129.github.io/Kimikea-Connect/)
+
+- 本番公開は `boss-team1129/Kimikea-Connect` の `main` ブランチからGitHub Pagesで行う
+- 新しいリポジトリや別フォルダで公開URLを増やさない
+- Apps ScriptのWebアプリURLは裏側のAPIとして使用し、加盟店には案内しない
+- テスト中のURLや確認用URLは加盟店へ案内しない
+- キャッシュ対策は公開URLを変えず、ファイルのバージョン更新やキャッシュ更新で対応する
+- 今後の更新でも、既存のログイン情報、投稿データ、注文履歴、保存データを削除しない
+
 ## 目的
 
 - 加盟店・コーディネーターが毎日の仕事で使える

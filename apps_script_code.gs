@@ -41,6 +41,7 @@ const KCO_INVOICE_ISSUER = {
 };
 
 const KCO_PRODUCT_HEADERS = [
+  '商品コード',
   '商品カテゴリー',
   'カラー',
   '仕入価格',
@@ -117,10 +118,53 @@ const KCO_DETAIL_HEADERS = [
   '利益',
 ];
 
-function doGet() {
+function doGet(event) {
+  if (event && event.parameter && event.parameter.api) {
+    return handleJsonpApi_(event);
+  }
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Kimikea Connect')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function handleJsonpApi_(event) {
+  const callback = String(event.parameter.callback || '').trim();
+  const apiName = String(event.parameter.api || '').trim();
+  if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: 'Invalid callback.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const allowedApi = {
+    getAppAppearance,
+    loginFranchise,
+    completeInitialPasswordSetup,
+    getPortalData,
+    updateMemberEmail,
+    changeMemberPassword,
+    submitCartOrder,
+    getInvoicePdfData,
+    logoutFranchise,
+  };
+
+  let payload;
+  try {
+    if (!allowedApi[apiName]) {
+      throw new Error('利用できないAPIです。');
+    }
+    const args = event.parameter.args ? JSON.parse(event.parameter.args) : [];
+    if (!Array.isArray(args)) {
+      throw new Error('API引数の形式が正しくありません。');
+    }
+    payload = { ok: true, data: allowedApi[apiName].apply(null, args) };
+  } catch (error) {
+    payload = { ok: false, error: error && error.message ? error.message : String(error) };
+  }
+
+  return ContentService
+    .createTextOutput(`${callback}(${JSON.stringify(payload)});`)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function getAppAppearance() {
@@ -297,6 +341,7 @@ function getVisibleProducts(sessionToken) {
 
 function getClientProducts_() {
   return getVisibleProducts_().map((product) => ({
+    productCode: product.productCode,
     category: product.category,
     color: product.color,
     salesPrice: product.salesPrice,
@@ -305,6 +350,8 @@ function getClientProducts_() {
 
 function getVisibleProducts_() {
   const sheet = getSheet_(KCO_CONFIG.PRODUCT_MASTER);
+  ensureProductMasterColumns_(sheet);
+  fillMissingProductCodes_(sheet);
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
 
@@ -314,13 +361,14 @@ function getVisibleProducts_() {
   return values.slice(1)
     .filter((row) => isVisible_(row[index['表示']]))
     .map((row) => ({
+      productCode: String(row[index['商品コード']] || '').trim(),
       category: String(row[index['商品カテゴリー']] || ''),
       color: String(row[index['カラー']] || ''),
       purchasePrice: Number(row[index['仕入価格']] || 0),
       salesPrice: Number(row[index['販売価格']] || 0),
       stock: row[index['在庫']],
     }))
-    .filter((product) => product.category && product.color && product.salesPrice > 0);
+    .filter((product) => product.productCode && product.category && product.color && product.salesPrice > 0);
 }
 
 function getProductCategories(sessionToken) {
@@ -354,10 +402,10 @@ function submitCartOrder(order) {
   const detailRows = [];
 
   order.items.forEach((item) => {
-    const key = createProductKey_(item.category, item.color);
+    const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
     const product = productMap[key];
     if (!product) {
-      throw new Error(`商品マスタに見つかりません: ${item.category} / ${item.color}`);
+      throw new Error(`商品マスタに見つかりません: ${item.productCode || `${item.category} / ${item.color}`}`);
     }
 
     const qty = Number(item.quantity || 0);
@@ -450,7 +498,10 @@ function setupProductMaster_(ss) {
       ...createProductRows_('原色', ['VW', 'WHITE', 'VN', 'SkyBLUE', 'SB', 'RED', 'PURPLE', 'PINK', 'PEACH', 'PaleSILVER', 'PalePURPLE', 'PalePINK', 'PaleBULUE', 'Orange', 'NAVYBLUE', 'NAVY', 'MASTARD', 'LavenderGray', 'LavenderAsh', 'LAVENDER', 'HP', 'GREEN', 'FS', 'EF']),
     ];
     sheet.getRange(2, 1, rows.length, KCO_PRODUCT_HEADERS.length).setValues(rows);
-    sheet.getRange(2, 3, rows.length, 2).setNumberFormat('¥#,##0');
+    sheet.getRange(2, 4, rows.length, 2).setNumberFormat('¥#,##0');
+  } else {
+    ensureProductMasterColumns_(sheet);
+    fillMissingProductCodes_(sheet);
   }
   applyHeaderStyle_(sheet, KCO_PRODUCT_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_PRODUCT_HEADERS.length);
@@ -458,7 +509,8 @@ function setupProductMaster_(ss) {
 
 function createProductRows_(category, colors) {
   const price = KCO_CATEGORY_PRICES[category];
-  return colors.map((color) => [
+  return colors.map((color, index) => [
+    createDefaultProductCode_(category, index + 1),
     category,
     color,
     price.purchasePrice,
@@ -466,6 +518,54 @@ function createProductRows_(category, colors) {
     100,
     true,
   ]);
+}
+
+function ensureProductMasterColumns_(sheet) {
+  const existingHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+
+  KCO_PRODUCT_HEADERS.forEach((header) => {
+    if (existingHeaders.indexOf(normalizeMasterHeader_(header)) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    existingHeaders.push(normalizeMasterHeader_(header));
+  });
+}
+
+function fillMissingProductCodes_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return;
+  const headers = values[0].map(normalizeMasterHeader_);
+  const codeIndex = findMasterHeaderIndex_(headers, ['商品コード']);
+  const categoryIndex = findMasterHeaderIndex_(headers, ['商品カテゴリー']);
+  if (codeIndex < 0 || categoryIndex < 0) return;
+
+  const counters = {};
+  values.slice(1).forEach((row) => {
+    const category = String(row[categoryIndex] || '').trim();
+    const code = String(row[codeIndex] || '').trim();
+    if (!category || !code) return;
+    counters[category] = Number(counters[category] || 0) + 1;
+  });
+  values.slice(1).forEach((row, rowOffset) => {
+    const rowNumber = rowOffset + 2;
+    if (String(row[codeIndex] || '').trim()) return;
+    const category = String(row[categoryIndex] || '').trim();
+    counters[category] = Number(counters[category] || 0) + 1;
+    sheet.getRange(rowNumber, codeIndex + 1).setValue(createDefaultProductCode_(category, counters[category]));
+  });
+}
+
+function createDefaultProductCode_(category, sequence) {
+  const prefixes = {
+    'ダークカラー': 'DC',
+    'ライトカラー': 'LC',
+    '原色': 'OR',
+  };
+  const prefix = prefixes[category] || 'EX';
+  return `${prefix}${String(sequence).padStart(3, '0')}`;
 }
 
 function setupOrders_(ss) {
@@ -1291,6 +1391,7 @@ function getProductMap_() {
   const products = getVisibleProducts_();
   const map = {};
   products.forEach((product) => {
+    map[createProductCodeKey_(product.productCode)] = product;
     map[createProductKey_(product.category, product.color)] = product;
   });
   return map;
@@ -1678,6 +1779,10 @@ function createOrderNumber_(date, lastRow) {
 
 function createProductKey_(category, color) {
   return `${normalize_(category)}::${normalize_(color)}`;
+}
+
+function createProductCodeKey_(productCode) {
+  return `code::${normalize_(productCode)}`;
 }
 
 function getSheet_(name) {
