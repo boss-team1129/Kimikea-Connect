@@ -1,6 +1,6 @@
 /**
  * Kimikea Connect Order
- * grow専用 カート形式注文Webアプリ
+ * 提携メーカー専用 カート形式注文Webアプリ
  *
  * 使い方:
  * 1. Googleスプレッドシートを作成する
@@ -77,7 +77,7 @@ const KCO_DEFAULT_SETTINGS = [
   ['管理者メール', '', '協会に届く注文通知。複数の場合はカンマ区切り', true],
   ['送信元名', 'Kimikea Connect Order', '注文・発送メールに表示する送信者名', true],
   ['加盟店メール送信', 'TRUE', '加盟店にも控えメールを送る', true],
-  ['grow通知メール', '', 'growへ送る注文メール。複数の場合はカンマ区切り', false],
+  ['メーカー通知メール', '', '提携メーカーへ送る注文メール。複数の場合はカンマ区切り', false],
   ['振込先銀行名', '静岡銀行', '請求書に表示する銀行名', true],
   ['振込先支店名', '富士駅南支店', '請求書に表示する支店名', true],
   ['口座種別', '普通', '普通・当座など', true],
@@ -675,8 +675,8 @@ function sendOrderNotificationEmails_(ss, summary, invoiceSettings, orderRules) 
   if (settings.sendFranchiseEmail && summary.franchiseEmail) {
     sendMailList_([summary.franchiseEmail], subject, franchiseBody, [invoicePdf], settings.senderName);
   }
-  if (settings.sendGrowEmail) {
-    sendMailList_(settings.growEmails, subject, adminBody, [], settings.senderName);
+  if (settings.sendManufacturerEmail) {
+    sendMailList_(settings.manufacturerEmails, subject, adminBody, [], settings.senderName);
   }
 }
 
@@ -686,8 +686,8 @@ function getNotificationSettings_(ss) {
     adminEmails: [],
     senderName: 'Kimikea Connect Order',
     sendFranchiseEmail: true,
-    sendGrowEmail: false,
-    growEmails: [],
+    sendManufacturerEmail: false,
+    manufacturerEmails: [],
   };
   if (!sheet || sheet.getLastRow() <= 1) return settings;
 
@@ -707,9 +707,9 @@ function getNotificationSettings_(ss) {
     if (item === '加盟店メール送信') {
       settings.sendFranchiseEmail = enabled && isTruthy_(value);
     }
-    if (item === 'grow通知メール' && enabled) {
-      settings.sendGrowEmail = true;
-      settings.growEmails = parseEmailList_(value);
+    if ((item === 'メーカー通知メール') && enabled) {
+      settings.sendManufacturerEmail = true;
+      settings.manufacturerEmails = parseEmailList_(value);
     }
   });
   return settings;

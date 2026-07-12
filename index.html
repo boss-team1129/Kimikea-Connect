@@ -1181,7 +1181,6 @@
         <h1 class="app-title">Kimikea Connect</h1>
         <span id="headerMemberName" class="member-name"></span>
       </div>
-      <button id="logoutButton" class="logout-button is-hidden" type="button" onclick="handleLogout()">ログアウト</button>
     </header>
 
     <main>
@@ -1206,14 +1205,14 @@
                 <span class="home-orbit-description">施術写真、使用色、各色の本数を確認できます。</span>
               </span>
             </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="order" onclick="activateOrbitItem(event, 1)" aria-label="会員オーダーシステムを開く">
+            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="order" onclick="activateOrbitItem(event, 1)" aria-label="エクステ注文を開く">
               <span class="home-orbit-image-wrap">
                 <img class="home-orbit-image" src="assets/home-icons/member-order-transparent.webp?v=20260712-final" alt="注文用紙とチェックのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
                 <span class="home-orbit-fallback" aria-hidden="true">注文</span>
               </span>
               <span class="home-orbit-copy">
-                <strong class="home-orbit-title">会員オーダーシステム</strong>
-                <span class="home-orbit-description">growシールエクステの注文、請求書、注文履歴を確認できます。</span>
+                <strong class="home-orbit-title">エクステ注文</strong>
+                <span class="home-orbit-description">加盟店専用 エクステを注文する</span>
               </span>
             </button>
             <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="coordinator" onclick="activateOrbitItem(event, 2)" aria-label="講習案内を開く">
@@ -1310,7 +1309,7 @@
 
       <div id="orderTab">
         <section class="panel">
-          <h2 class="panel-title">商品を追加</h2>
+          <h2 class="panel-title">エクステ注文</h2>
           <div class="product-row">
             <div>
               <span class="field-label">商品カテゴリー</span>
@@ -1377,7 +1376,7 @@
             </article>
             <article class="notice-item">
               <span class="notice-date">ご注文について</span>
-              <h3 class="notice-title">注文後すぐにgrowへ発注します</h3>
+              <h3 class="notice-title">注文後すぐに提携メーカーへ発注します</h3>
               <p class="notice-body">請求書は登録メールアドレスへ自動送信されます。発送状況は注文履歴から確認できます。</p>
             </article>
           </div>
