@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
   <link rel="stylesheet" href="../shared-nav.css?v=20260712-2">
-  <link rel="stylesheet" href="./style.css?v=20260713-drive-1">
+  <link rel="stylesheet" href="./style.css?v=20260713-form-1">
 </head>
 <body>
   <main class="stylebook-app">
@@ -153,10 +153,13 @@
         </label>
         <input id="additionalImagesInput" type="hidden">
         <div class="field-grid">
-          <label class="field">
+          <section class="field color-picker-field">
             <span>エクステの色</span>
-            <select id="colorSelect" multiple required></select>
-          </label>
+            <input id="colorSearchInput" type="search" placeholder="色番号・色名で検索 例：N-1 / ベージュ / ピンク">
+            <div id="colorChoiceList" class="color-choice-list" aria-label="エクステカラー一覧"></div>
+            <p id="selectedColorSummary" class="selected-color-summary">選択中の色はありません。</p>
+            <select id="colorSelect" multiple hidden></select>
+          </section>
           <label class="field">
             <span>使用本数</span>
             <input id="extensionCountInput" type="number" min="1" inputmode="numeric" required>
@@ -177,14 +180,18 @@
         <input id="statusInput" type="hidden" value="published">
         <div class="field-grid">
           <label class="field">
-            <span>店舗</span>
-            <select id="shopSelect" required></select>
+            <span>サロン名</span>
+            <input id="salonNameInput" type="text" list="shopNameOptions" placeholder="例：TEAM hair" required>
           </label>
           <label class="field">
-            <span>担当者</span>
-            <select id="staffSelect" required></select>
+            <span>担当者名</span>
+            <input id="staffNameInput" type="text" list="staffNameOptions" placeholder="例：村松 剛好" required>
           </label>
         </div>
+        <datalist id="shopNameOptions"></datalist>
+        <datalist id="staffNameOptions"></datalist>
+        <select id="shopSelect" hidden></select>
+        <select id="staffSelect" hidden></select>
 
         <div class="form-actions">
           <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
@@ -243,7 +250,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260713-drive-1"></script>
+  <script src="./script.js?v=20260713-form-1"></script>
   <script src="../shared-nav.js?v=20260712-1"></script>
 </body>
 </html>

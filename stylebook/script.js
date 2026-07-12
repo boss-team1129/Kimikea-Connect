@@ -74,10 +74,17 @@ const el = {
   additionalImageFiles: document.getElementById('additionalImageFiles'),
   titleInput: document.getElementById('titleInput'),
   descriptionInput: document.getElementById('descriptionInput'),
+  colorSearchInput: document.getElementById('colorSearchInput'),
+  colorChoiceList: document.getElementById('colorChoiceList'),
+  selectedColorSummary: document.getElementById('selectedColorSummary'),
   colorSelect: document.getElementById('colorSelect'),
   styleTypeSelect: document.getElementById('styleTypeSelect'),
   extensionCountInput: document.getElementById('extensionCountInput'),
   statusInput: document.getElementById('statusInput'),
+  salonNameInput: document.getElementById('salonNameInput'),
+  staffNameInput: document.getElementById('staffNameInput'),
+  shopNameOptions: document.getElementById('shopNameOptions'),
+  staffNameOptions: document.getElementById('staffNameOptions'),
   shopSelect: document.getElementById('shopSelect'),
   staffSelect: document.getElementById('staffSelect'),
   cancelEditButton: document.getElementById('cancelEditButton'),
@@ -132,6 +139,26 @@ function imageTag(url, alt, className = '') {
   const src = normalizeImageUrl(url);
   const classAttr = className ? ` class="${escapeHtml(className)}"` : '';
   return `<img${classAttr} src="${escapeHtml(src)}" alt="${escapeHtml(alt || 'スタイル写真')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.gallery-item,.manage-card,.detail-card,td')?.classList.add('image-load-error'); this.alt='画像を読み込めません';">`;
+}
+
+function displaySalonName(post) {
+  return post.salonName || getById('shops', post.shopId)?.name || '';
+}
+
+function displayStaffName(post) {
+  return post.staffName || getById('staff', post.staffId)?.name || '';
+}
+
+function colorSwatchStyle(color) {
+  const value = color.imageUrl || '#efe9df';
+  if (/^#|rgb|hsl|linear-gradient/.test(value)) return `background:${escapeHtml(value)}`;
+  return `background-image:url('${escapeHtml(normalizeImageUrl(value))}')`;
+}
+
+function activeColors() {
+  return (state.db.extensionColors || [])
+    .filter(color => color.isActive)
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 }
 
 function buildImageSvg(seed, title, a, b, c) {
@@ -339,13 +366,11 @@ function isSaved(postId) {
 }
 
 function postSearchText(post) {
-  const shop = getById('shops', post.shopId);
-  const staff = getById('staff', post.staffId);
   const colors = post.extensionColorIds.map(id => getById('extensionColors', id)).filter(Boolean);
   const types = post.styleTypeIds.map(id => getById('styleTypes', id)).filter(Boolean);
   return [
     post.title, post.description, post.extensionCount,
-    shop?.name, staff?.name,
+    displaySalonName(post), displayStaffName(post),
     ...colors.flatMap(color => [color.colorCode, color.colorName, color.category]),
     ...types.map(type => type.name),
   ].join(' ').toLowerCase();
@@ -391,11 +416,9 @@ function updateRoleVisibility() {
 }
 
 function renderFilterControls() {
-  const colorGroups = state.db.extensionColors
-    .filter(color => color.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+  const colorGroups = activeColors()
     .map(color => `<button type="button" class="chip ${state.selectedColorIds.has(color.id) ? 'active' : ''}" data-filter-color="${color.id}">
-      <span class="swatch" style="background:${escapeHtml(color.imageUrl)}"></span>${escapeHtml(color.colorCode)} ${escapeHtml(color.colorName)}
+      <span class="swatch" style="${colorSwatchStyle(color)}"></span>${escapeHtml(color.colorCode)} ${escapeHtml(color.colorName)}
     </button>`).join('');
   el.colorFilters.innerHTML = colorGroups;
 
@@ -416,10 +439,10 @@ function renderFilterControls() {
 }
 
 function renderSelectOptions() {
-  el.colorSelect.innerHTML = state.db.extensionColors
-    .filter(color => color.isActive)
+  el.colorSelect.innerHTML = activeColors()
     .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(color.colorCode)} ${escapeHtml(color.colorName)}</option>`)
     .join('');
+  renderColorChoiceList();
   el.styleTypeSelect.innerHTML = state.db.styleTypes
     .filter(type => type.isActive)
     .map(type => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
@@ -428,15 +451,69 @@ function renderSelectOptions() {
     .filter(shop => shop.isActive)
     .map(shop => `<option value="${shop.id}">${escapeHtml(shop.name)}</option>`)
     .join('');
+  el.shopNameOptions.innerHTML = state.db.shops
+    .filter(shop => shop.isActive)
+    .map(shop => `<option value="${escapeHtml(shop.name)}"></option>`)
+    .join('');
+  el.staffNameOptions.innerHTML = state.db.staff
+    .filter(person => person.isActive)
+    .map(person => `<option value="${escapeHtml(person.name)}"></option>`)
+    .join('');
   renderStaffSelectForForm();
 }
 
+function renderColorChoiceList() {
+  const query = (el.colorSearchInput?.value || '').trim().toLowerCase();
+  const selected = new Set(selectedValues(el.colorSelect));
+  const categories = ['ダークカラー', 'ライトカラー', '原色'];
+  const colors = activeColors().filter(color => {
+    if (!query) return true;
+    return [color.colorCode, color.colorName, color.category].join(' ').toLowerCase().includes(query);
+  });
+  const categoryHtml = categories.map(category => {
+    const list = colors.filter(color => color.category === category);
+    if (!list.length) return '';
+    return `<section class="color-category"><h3>${escapeHtml(category)}</h3><div class="color-choice-grid">${list.map(color => `
+      <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}">
+        <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
+        <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
+        <small>${escapeHtml(color.category)}</small>
+      </button>
+    `).join('')}</div></section>`;
+  }).join('');
+  const otherColors = colors.filter(color => !categories.includes(color.category));
+  const otherHtml = otherColors.length ? `<section class="color-category"><h3>その他</h3><div class="color-choice-grid">${otherColors.map(color => `
+    <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}">
+      <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
+      <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
+      <small>${escapeHtml(color.category)}</small>
+    </button>
+  `).join('')}</div></section>` : '';
+  el.colorChoiceList.innerHTML = categoryHtml + otherHtml || '<p class="empty-state compact">該当する色がありません。</p>';
+  const selectedLabels = activeColors()
+    .filter(color => selected.has(color.id))
+    .map(color => `${color.colorCode} ${color.colorName}`);
+  el.selectedColorSummary.textContent = selectedLabels.length ? `選択中：${selectedLabels.join('、')}` : '選択中の色はありません。';
+}
+
 function renderStaffSelectForForm() {
-  const shopId = el.shopSelect.value || state.db.shops[0]?.id;
+  const shopId = el.shopSelect.value || '';
   el.staffSelect.innerHTML = state.db.staff
-    .filter(person => person.isActive && person.shopId === shopId)
+    .filter(person => person.isActive && (!shopId || person.shopId === shopId))
     .map(person => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
     .join('');
+}
+
+function findShopByName(name) {
+  const normalized = String(name || '').trim();
+  return state.db.shops.find(shop => shop.isActive && shop.name === normalized) || null;
+}
+
+function findStaffByName(name, shopId = '') {
+  const normalized = String(name || '').trim();
+  return state.db.staff.find(person => person.isActive && person.name === normalized && (!shopId || person.shopId === shopId))
+    || state.db.staff.find(person => person.isActive && person.name === normalized)
+    || null;
 }
 
 function colorLabels(post) {
@@ -451,13 +528,13 @@ function typeLabels(post) {
 }
 
 function renderGalleryItem(post) {
-  const shop = getById('shops', post.shopId);
-  const person = getById('staff', post.staffId);
+  const salonName = displaySalonName(post);
+  const staffName = displayStaffName(post);
   return `
     <article class="gallery-item" data-id="${post.id}">
       <button class="photo-button" type="button" data-action="detail" data-id="${post.id}">
         ${imageTag(post.imageUrl, post.title || 'スタイル写真')}
-        <span class="photo-meta">${escapeHtml(shop?.name || '')}<br>${escapeHtml(person?.name || '')}</span>
+        <span class="photo-meta">${escapeHtml(salonName)}<br>${escapeHtml(staffName)}</span>
       </button>
       <button class="save-button ${isSaved(post.id) ? 'saved' : ''}" type="button" data-action="save" data-id="${post.id}" aria-label="保存">
         ${isSaved(post.id) ? '●' : '○'}
@@ -466,8 +543,8 @@ function renderGalleryItem(post) {
 }
 
 function renderManageItem(post, mode = 'mine') {
-  const shop = getById('shops', post.shopId);
-  const person = getById('staff', post.staffId);
+  const salonName = displaySalonName(post);
+  const staffName = displayStaffName(post);
   const title = post.title || 'スタイル名未入力';
   const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
   const dateLabel = new Date(post.updatedAt || post.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -479,7 +556,7 @@ function renderManageItem(post, mode = 'mine') {
       <div class="manage-body">
         <span class="manage-status ${isDraft ? 'draft' : 'published'}">${isDraft ? '下書き' : '公開中'}</span>
         <strong>${escapeHtml(title)}</strong>
-        <small>${escapeHtml(shop?.name || '')} / ${escapeHtml(person?.name || '')}</small>
+        <small>${escapeHtml(salonName)} / ${escapeHtml(staffName)}</small>
         <small>${mode === 'drafts' ? '保存日時' : '更新'}：${dateLabel}</small>
         <div class="manage-actions">
           <button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>
@@ -546,8 +623,8 @@ function showDetail(postId) {
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post || post.deletedAt) return;
   state.currentDetailId = postId;
-  const shop = getById('shops', post.shopId);
-  const person = getById('staff', post.staffId);
+  const salonName = displaySalonName(post);
+  const staffName = displayStaffName(post);
   const creator = getById('users', post.createdByUserId);
   const canEdit = canManagePost(post);
   el.detailView.innerHTML = `
@@ -569,8 +646,8 @@ function showDetail(postId) {
           <div><dt>使用色</dt><dd>${colorLabels(post).map(label => `<button data-action="filter-label" data-kind="color" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('')}</dd></div>
           <div><dt>施術スタイル</dt><dd>${typeLabels(post).map(label => `<button data-action="filter-label" data-kind="type" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('')}</dd></div>
           <div><dt>使用本数</dt><dd>${post.extensionCount}本</dd></div>
-          <div><dt>店舗</dt><dd><button data-action="filter-shop" data-id="${post.shopId}">${escapeHtml(shop?.name || '')}</button></dd></div>
-          <div><dt>担当者</dt><dd><button data-action="filter-staff" data-id="${post.staffId}">${escapeHtml(person?.name || '')}</button></dd></div>
+          <div><dt>サロン</dt><dd>${post.shopId ? `<button data-action="filter-shop" data-id="${post.shopId}">${escapeHtml(salonName)}</button>` : escapeHtml(salonName)}</dd></div>
+          <div><dt>担当者</dt><dd>${post.staffId ? `<button data-action="filter-staff" data-id="${post.staffId}">${escapeHtml(staffName)}</button>` : escapeHtml(staffName)}</dd></div>
           <div><dt>投稿日</dt><dd>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</dd></div>
           <div><dt>保存数</dt><dd>${post.saveCount}</dd></div>
           <div><dt>投稿者</dt><dd>${escapeHtml(creator?.name || '')}</dd></div>
@@ -716,6 +793,10 @@ function clearPostForm() {
   el.postForm.reset();
   el.postId.value = '';
   el.additionalImagesInput.value = '';
+  el.salonNameInput.value = '';
+  el.staffNameInput.value = '';
+  el.shopSelect.value = '';
+  el.staffSelect.value = '';
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
@@ -733,10 +814,13 @@ function fillPostForm(post) {
   state.currentAdditionalImageData = [];
   el.extensionCountInput.value = post.extensionCount;
   el.statusInput.value = post.status;
-  el.shopSelect.value = post.shopId;
+  el.salonNameInput.value = displaySalonName(post);
+  el.staffNameInput.value = displayStaffName(post);
+  el.shopSelect.value = post.shopId || '';
   renderStaffSelectForForm();
-  el.staffSelect.value = post.staffId;
+  el.staffSelect.value = post.staffId || '';
   Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
+  renderColorChoiceList();
   Array.from(el.styleTypeSelect.options).forEach(option => { option.selected = post.styleTypeIds.includes(option.value); });
   el.imagePreview.innerHTML = imageTag(post.imageUrl, post.title || '写真プレビュー');
   el.cancelEditButton.hidden = false;
@@ -780,6 +864,10 @@ async function submitPost(event) {
     ...el.additionalImagesInput.value.split(',').map(value => value.trim()).filter(Boolean),
     ...state.currentAdditionalImageData,
   ].filter(Boolean);
+  const salonName = el.salonNameInput.value.trim();
+  const matchedShop = findShopByName(salonName);
+  const staffName = el.staffNameInput.value.trim();
+  const matchedStaff = findStaffByName(staffName, matchedShop?.id || '');
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
@@ -789,8 +877,10 @@ async function submitPost(event) {
     extensionColorIds: selectedValues(el.colorSelect),
     styleTypeIds: selectedValues(el.styleTypeSelect),
     extensionCount: Number(el.extensionCountInput.value || 0),
-    shopId: el.shopSelect.value,
-    staffId: el.staffSelect.value,
+    shopId: matchedShop?.id || '',
+    staffId: matchedStaff?.id || '',
+    salonName,
+    staffName,
     createdByUserId: editing?.createdByUserId || currentUser().id,
     createdAt: editing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -801,8 +891,8 @@ async function submitPost(event) {
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
   };
-  if (requestedStatus === 'published' && (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.shopId || !post.staffId)) {
-    el.formMessage.textContent = '公開するには、写真、色、本数、施術、店舗、担当者を入力してください。';
+  if (requestedStatus === 'published' && (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.salonName || !post.staffName)) {
+    el.formMessage.textContent = '公開するには、写真、色、本数、施術、サロン名、担当者名を入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -940,10 +1030,10 @@ function renderAdminStats() {
 function adminRowsFor(tab) {
   if (tab === 'posts') {
     return activePosts({ includePrivate: true }).map(post => {
-      const shop = getById('shops', post.shopId);
-      const person = getById('staff', post.staffId);
+      const salonName = displaySalonName(post);
+      const staffName = displayStaffName(post);
       const creator = getById('users', post.createdByUserId);
-      return `<tr><td>${imageTag(post.imageUrl, post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(shop?.name || '')}</td><td>${escapeHtml(person?.name || '')}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button><button data-action="delete" data-id="${post.id}">削除</button></td></tr>`;
+      return `<tr><td>${imageTag(post.imageUrl, post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(salonName)}</td><td>${escapeHtml(staffName)}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button><button data-action="delete" data-id="${post.id}">削除</button></td></tr>`;
     }).join('');
   }
   if (tab === 'colors') {
@@ -1037,6 +1127,7 @@ function bindEvents() {
   el.sortSelect.addEventListener('change', event => { state.sort = event.target.value; renderGallery(); });
   el.savedOnlyToggle.addEventListener('change', event => { state.savedOnly = event.target.checked; renderGallery(); });
   el.clearFiltersButton.addEventListener('click', clearFilters);
+  el.colorSearchInput.addEventListener('input', renderColorChoiceList);
   el.shopFilter.addEventListener('change', () => {
     state.selectedShopIds = new Set(selectedValues(el.shopFilter));
     state.selectedStaffIds.clear();
@@ -1092,6 +1183,16 @@ function bindEvents() {
       if (chipType === 'staff') state.selectedStaffIds.delete(chipId);
       if (chipType === 'saved') { state.savedOnly = false; el.savedOnlyToggle.checked = false; }
       renderGallery();
+      return;
+    }
+    const colorChoice = event.target.closest('[data-color-choice]');
+    if (colorChoice) {
+      const id = colorChoice.dataset.colorChoice;
+      const option = Array.from(el.colorSelect.options).find(item => item.value === id);
+      if (option) {
+        option.selected = !option.selected;
+        renderColorChoiceList();
+      }
       return;
     }
     const action = event.target.closest('[data-action]');

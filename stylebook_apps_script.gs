@@ -17,7 +17,8 @@
 const KC_STYLEBOOK = {
   POSTS: 'style_posts',
   SAVES: 'style_saves',
-  COLORS: 'style_colors',
+  COLORS: 'Colors',
+  LEGACY_COLORS: 'style_colors',
   TYPES: 'style_types',
   SHOPS: 'style_shops',
   STAFF: 'style_staff',
@@ -38,6 +39,8 @@ const KC_POST_HEADERS = [
   'extensionCount',
   'shopId',
   'staffId',
+  'salonName',
+  'staffName',
   'createdByUserId',
   'createdAt',
   'updatedAt',
@@ -86,7 +89,7 @@ function setupKimikeaStylebook() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), KC_POST_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
-  setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS), KC_COLOR_HEADERS);
+  setHeaders_(getColorsSheet_(ss), KC_COLOR_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF), KC_STAFF_HEADERS);
@@ -100,7 +103,7 @@ function getStylebookDatabase_(userId) {
   setupSheetsIfNeeded_(ss);
   const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
   const saves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES));
-  const colors = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS)).map(normalizeBooleans_);
+  const colors = rowsToObjects_(getColorsSheet_(ss)).map(normalizeBooleans_);
   const types = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES)).map(normalizeBooleans_);
   const shops = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS)).map(normalizeBooleans_);
   const staff = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF)).map(normalizeBooleans_);
@@ -144,8 +147,10 @@ function savePost_(post, userId) {
     extensionColorIds: arrayString_(post.extensionColorIds),
     styleTypeIds: arrayString_(post.styleTypeIds),
     extensionCount: Number(post.extensionCount || 0),
-    shopId: post.shopId || user.shopId || '',
-    staffId: post.staffId || user.staffId || '',
+    shopId: post.shopId || '',
+    staffId: post.staffId || '',
+    salonName: post.salonName || getShopName_(post.shopId) || '',
+    staffName: post.staffName || getStaffName_(post.staffId) || '',
     createdByUserId: existing ? existing.object.createdByUserId : user.id,
     createdAt: existing ? existing.object.createdAt : now,
     updatedAt: now,
@@ -235,7 +240,7 @@ function toggleSave_(postId, userId) {
 function setupSheetsIfNeeded_(ss) {
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), KC_POST_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
-  setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS), KC_COLOR_HEADERS);
+  setHeaders_(getColorsSheet_(ss), KC_COLOR_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF), KC_STAFF_HEADERS);
@@ -244,7 +249,8 @@ function setupSheetsIfNeeded_(ss) {
 }
 
 function seedMastersIfEmpty_(ss) {
-  seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS), KC_COLOR_HEADERS, defaultColors_());
+  migrateLegacyColorsIfNeeded_(ss);
+  seedSheetIfEmpty_(getColorsSheet_(ss), KC_COLOR_HEADERS, defaultColors_());
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS, defaultTypes_());
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS, [
     ['shop-team', 'TEAM hair', '静岡県富士市横割2丁目2-27', '', true],
@@ -306,6 +312,33 @@ function getUser_(userId) {
   return rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.USERS)).find(user => user.id === userId) || null;
 }
 
+function getShopName_(shopId) {
+  if (!shopId) return '';
+  const shop = rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.SHOPS)).find(item => item.id === shopId);
+  return shop ? shop.name : '';
+}
+
+function getStaffName_(staffId) {
+  if (!staffId) return '';
+  const staff = rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.STAFF)).find(item => item.id === staffId);
+  return staff ? staff.name : '';
+}
+
+function getColorsSheet_(ss) {
+  return getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS);
+}
+
+function migrateLegacyColorsIfNeeded_(ss) {
+  const colorsSheet = getColorsSheet_(ss);
+  const legacySheet = ss.getSheetByName(KC_STYLEBOOK.LEGACY_COLORS);
+  if (!legacySheet || colorsSheet.getLastRow() > 1 || legacySheet.getLastRow() < 2) return;
+  setHeaders_(colorsSheet, KC_COLOR_HEADERS);
+  const legacyRows = rowsToObjects_(legacySheet);
+  if (!legacyRows.length) return;
+  const rows = legacyRows.map(row => KC_COLOR_HEADERS.map(header => row[header] == null ? '' : row[header]));
+  colorsSheet.getRange(2, 1, rows.length, KC_COLOR_HEADERS.length).setValues(rows);
+}
+
 function normalizePost_(row) {
   return {
     id: row.id,
@@ -318,6 +351,8 @@ function normalizePost_(row) {
     extensionCount: Number(row.extensionCount || 0),
     shopId: row.shopId || '',
     staffId: row.staffId || '',
+    salonName: row.salonName || getShopName_(row.shopId) || '',
+    staffName: row.staffName || getStaffName_(row.staffId) || '',
     createdByUserId: row.createdByUserId || '',
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',
