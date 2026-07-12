@@ -411,6 +411,12 @@
       pointer-events: none;
       filter: drop-shadow(0 24px 28px rgba(37, 43, 48, 0.16));
     }
+    .home-orbit-item[data-menu-key="order"] .home-orbit-image,
+    .home-orbit-item[data-menu-key="popular"] .home-orbit-image,
+    .home-orbit-item[data-menu-key="ai"] .home-orbit-image {
+      transform: scale(0.88);
+      transform-origin: center center;
+    }
     .home-orbit-fallback {
       position: absolute;
       z-index: 0;
@@ -612,6 +618,79 @@
       width: auto;
       min-height: 42px;
       padding-inline: 14px;
+    }
+
+    .app-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.72), rgba(250, 248, 242, 0.36) 34%, transparent 62%),
+        linear-gradient(145deg, #faf8f2 0%, #f4eddf 48%, #faf8f2 100%);
+      opacity: 1;
+      transition: opacity 360ms ease, visibility 360ms ease;
+    }
+    .app-splash.is-hiding {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .app-splash-inner {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      text-align: center;
+      animation: splashLogoIn 1180ms cubic-bezier(.18, .92, .24, 1) both;
+    }
+    .app-splash-logo {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      object-fit: cover;
+      box-shadow: 0 18px 42px rgba(82, 63, 31, 0.16);
+      filter: drop-shadow(0 12px 18px rgba(189, 147, 64, 0.18));
+    }
+    .app-splash-title {
+      margin: 8px 0 0;
+      color: #1f1b16;
+      font-size: clamp(22px, 7vw, 34px);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .app-splash-subtitle {
+      margin: 0;
+      color: #8c7350;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    @keyframes splashLogoIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.92) translateY(8px);
+        filter: blur(6px);
+      }
+      46% {
+        opacity: 1;
+        transform: scale(1.045) translateY(0);
+        filter: blur(0);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app-splash,
+      .app-splash-inner {
+        transition: none;
+        animation: none;
+      }
     }
 
     .notice-list { display: grid; gap: 12px; }
@@ -949,6 +1028,14 @@
   </style>
 </head>
 <body>
+  <div id="appSplash" class="app-splash" aria-hidden="true">
+    <div class="app-splash-inner">
+      <img class="app-splash-logo" src="icon-192.png" alt="">
+      <h1 class="app-splash-title">Kimikea Connect</h1>
+      <p class="app-splash-subtitle">Connecting Beauty Professionals</p>
+    </div>
+  </div>
+
   <section id="loginView" class="login-shell">
     <form id="loginForm" class="login-panel" onsubmit="handleLogin(event)">
       <h1 class="brand">Kimikea Connect</h1>
@@ -2252,6 +2339,15 @@
         .getInvoicePdfData(state.sessionToken, orderNo);
     }
 
+    function runOpeningSplash() {
+      const splash = document.getElementById('appSplash');
+      if (!splash) return;
+      window.setTimeout(() => {
+        splash.classList.add('is-hiding');
+        window.setTimeout(() => splash.remove(), 420);
+      }, 1220);
+    }
+
     loadAppAppearance();
     if (state.sessionToken && !String(state.sessionToken).startsWith('public-')) {
       loadPortal();
@@ -2259,6 +2355,7 @@
       state.sessionToken = '';
       showDashboard();
     }
+    runOpeningSplash();
   </script>
   <script src="./shared-nav.js?v=20260712-1"></script>
 </body>
