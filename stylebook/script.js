@@ -103,6 +103,37 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function driveFileIdFromUrl(url) {
+  const value = String(url || '');
+  const patterns = [
+    /[?&]id=([^&]+)/,
+    /\/d\/([^/=]+)/,
+    /\/file\/d\/([^/]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+  }
+  return '';
+}
+
+function normalizeImageUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  if (value.startsWith('data:image/')) return value;
+  if (value.includes('drive.google.com') || value.includes('drive.usercontent.google.com') || value.includes('googleusercontent.com/d/')) {
+    const fileId = driveFileIdFromUrl(value);
+    if (fileId) return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
+  }
+  return value;
+}
+
+function imageTag(url, alt, className = '') {
+  const src = normalizeImageUrl(url);
+  const classAttr = className ? ` class="${escapeHtml(className)}"` : '';
+  return `<img${classAttr} src="${escapeHtml(src)}" alt="${escapeHtml(alt || 'スタイル写真')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.gallery-item,.manage-card,.detail-card,td')?.classList.add('image-load-error'); this.alt='画像を読み込めません';">`;
+}
+
 function buildImageSvg(seed, title, a, b, c) {
   const safeTitle = escapeHtml(title).slice(0, 18);
   const wave = 80 + (seed % 30);
@@ -425,7 +456,7 @@ function renderGalleryItem(post) {
   return `
     <article class="gallery-item" data-id="${post.id}">
       <button class="photo-button" type="button" data-action="detail" data-id="${post.id}">
-        <img src="${post.imageUrl}" alt="${escapeHtml(post.title || 'スタイル写真')}" loading="lazy">
+        ${imageTag(post.imageUrl, post.title || 'スタイル写真')}
         <span class="photo-meta">${escapeHtml(shop?.name || '')}<br>${escapeHtml(person?.name || '')}</span>
       </button>
       <button class="save-button ${isSaved(post.id) ? 'saved' : ''}" type="button" data-action="save" data-id="${post.id}" aria-label="保存">
@@ -443,7 +474,7 @@ function renderManageItem(post, mode = 'mine') {
   return `
     <article class="manage-card">
       <button type="button" class="manage-thumb" data-action="detail" data-id="${post.id}">
-        <img src="${post.imageUrl}" alt="${escapeHtml(title)}">
+        ${imageTag(post.imageUrl, title)}
       </button>
       <div class="manage-body">
         <span class="manage-status ${isDraft ? 'draft' : 'published'}">${isDraft ? '下書き' : '公開中'}</span>
@@ -523,9 +554,9 @@ function showDetail(postId) {
     <button class="text-button" type="button" data-action="show-gallery">写真一覧へ戻る</button>
     <article class="detail-card">
       <div class="detail-photo-wrap">
-        <img class="detail-photo" src="${post.imageUrl}" alt="${escapeHtml(post.title)}">
+        ${imageTag(post.imageUrl, post.title, 'detail-photo')}
       </div>
-      ${(post.additionalImages || []).length ? `<div class="detail-subphotos">${post.additionalImages.map((url, index) => `<img src="${escapeHtml(url)}" alt="${escapeHtml(post.title || '追加写真')} ${index + 1}">`).join('')}</div>` : ''}
+      ${(post.additionalImages || []).length ? `<div class="detail-subphotos">${post.additionalImages.map((url, index) => imageTag(url, `${post.title || '追加写真'} ${index + 1}`)).join('')}</div>` : ''}
       <div class="detail-body">
         <div class="detail-title-row">
           <h2>${escapeHtml(post.title)}</h2>
@@ -707,7 +738,7 @@ function fillPostForm(post) {
   el.staffSelect.value = post.staffId;
   Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
   Array.from(el.styleTypeSelect.options).forEach(option => { option.selected = post.styleTypeIds.includes(option.value); });
-  el.imagePreview.innerHTML = `<img src="${post.imageUrl}" alt="">`;
+  el.imagePreview.innerHTML = imageTag(post.imageUrl, post.title || '写真プレビュー');
   el.cancelEditButton.hidden = false;
 }
 
@@ -912,7 +943,7 @@ function adminRowsFor(tab) {
       const shop = getById('shops', post.shopId);
       const person = getById('staff', post.staffId);
       const creator = getById('users', post.createdByUserId);
-      return `<tr><td><img src="${post.imageUrl}" alt=""></td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(shop?.name || '')}</td><td>${escapeHtml(person?.name || '')}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button><button data-action="delete" data-id="${post.id}">削除</button></td></tr>`;
+      return `<tr><td>${imageTag(post.imageUrl, post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(shop?.name || '')}</td><td>${escapeHtml(person?.name || '')}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button><button data-action="delete" data-id="${post.id}">削除</button></td></tr>`;
     }).join('');
   }
   if (tab === 'colors') {
@@ -926,7 +957,7 @@ function adminRowsFor(tab) {
       ${Object.values(roles).map(role => `<option value="${role}" ${user.role === role ? 'selected' : ''}>${role}</option>`).join('')}
     </select>
   </td><td>${escapeHtml(getById('shops', user.shopId)?.name || '')}</td></tr>`).join('');
-  if (tab === 'deleted') return state.db.stylePosts.filter(post => post.deletedAt).map(post => `<tr><td><img src="${post.imageUrl}" alt=""></td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(post.deleteReason || '')}</td><td>${new Date(post.deletedAt).toLocaleString('ja-JP')}</td><td><button data-action="restore" data-id="${post.id}">復元</button><button data-action="hard-delete" data-id="${post.id}">完全削除</button></td></tr>`).join('');
+  if (tab === 'deleted') return state.db.stylePosts.filter(post => post.deletedAt).map(post => `<tr><td>${imageTag(post.imageUrl, post.title || '削除済み投稿')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(post.deleteReason || '')}</td><td>${new Date(post.deletedAt).toLocaleString('ja-JP')}</td><td><button data-action="restore" data-id="${post.id}">復元</button><button data-action="hard-delete" data-id="${post.id}">完全削除</button></td></tr>`).join('');
   return '';
 }
 
@@ -1020,7 +1051,7 @@ function bindEvents() {
     const file = event.target.files?.[0];
     if (!file) return;
     state.currentImageData = await resizeImage(file);
-    el.imagePreview.innerHTML = `<img src="${state.currentImageData}" alt="">`;
+    el.imagePreview.innerHTML = imageTag(state.currentImageData, '写真プレビュー');
   });
   el.additionalImageFiles.addEventListener('change', async event => {
     const files = event.target.files;

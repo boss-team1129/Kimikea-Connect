@@ -223,6 +223,23 @@ img { display: block; max-width: 100%; }
   opacity: 0;
   animation: photoIn .35s ease forwards;
 }
+.image-load-error {
+  position: relative;
+  background: repeating-linear-gradient(135deg, #f4ede1, #f4ede1 8px, #fff8ef 8px, #fff8ef 16px);
+}
+.image-load-error::after {
+  position: absolute;
+  inset: auto 8px 8px;
+  z-index: 3;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  color: #8b5a3c;
+  content: "画像を確認中";
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
 @keyframes photoIn { to { opacity: 1; } }
 .photo-meta {
   position: absolute;

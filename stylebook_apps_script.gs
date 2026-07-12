@@ -383,7 +383,7 @@ function getFileUrl_(fileId) {
 }
 
 function driveViewUrl_(fileId) {
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
 }
 
 function getOrCreateImageFolder_() {
