@@ -1124,17 +1124,17 @@
     <form id="loginForm" class="login-panel" onsubmit="handleLogin(event)">
       <h1 class="brand">Kimikea Connect</h1>
       <div class="brand-accent"></div>
-      <p class="lead">会員専用注文ページに進みます。<br>登録済みのメールアドレスと電話番号でログインしてください。</p>
+      <p class="lead">会員専用注文ページに進みます。<br>登録済みのメールアドレスとパスワードでログインしてください。</p>
       <div class="field">
         <label for="loginEmail">メールアドレス</label>
         <input id="loginEmail" type="email" inputmode="email" autocomplete="username email" required>
       </div>
       <div class="field">
-        <label for="loginPhone">電話番号（ハイフンなし）</label>
-        <input id="loginPhone" type="password" inputmode="numeric" autocomplete="current-password" required>
+        <label for="loginPassword">パスワード</label>
+        <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required>
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
-      <p class="form-note">登録済みのメールアドレスと、ハイフンなしの電話番号を入力してください</p>
+      <p class="form-note">登録済みのメールアドレスと、初期パスワード「0000」を入力してください</p>
       <p id="loginMessage" class="message error" aria-live="polite"></p>
     </form>
   </section>
@@ -1490,19 +1490,13 @@
       return Boolean(window.google && google.script && google.script.run);
     }
 
-    function normalizePhoneInput(value) {
-      return String(value || '')
-        .normalize('NFKC')
-        .replace(/[^\d]/g, '');
-    }
-
     function handleLogin(event) {
       event.preventDefault();
       const email = document.getElementById('loginEmail').value.trim();
-      const phone = normalizePhoneInput(document.getElementById('loginPhone').value);
-      document.getElementById('loginPhone').value = phone;
-      if (!email || !phone) {
-        setMessage('loginMessage', 'メールアドレスと電話番号を入力してください。', true);
+      const password = document.getElementById('loginPassword').value.normalize('NFKC').replace(/\s/g, '');
+      document.getElementById('loginPassword').value = password;
+      if (!email || !password) {
+        setMessage('loginMessage', 'メールアドレスとパスワードを入力してください。', true);
         return;
       }
 
@@ -1529,10 +1523,10 @@
           const message = getErrorMessage(error);
           const safeMessage = message.includes('入力してください')
             ? message
-            : 'メールアドレスまたは電話番号が正しくありません。';
+            : 'メールアドレスまたはパスワードが正しくありません。';
           setMessage('loginMessage', safeMessage, true);
         })
-        .loginFranchise({ email, phone });
+        .loginFranchise({ email, password });
     }
 
     function loadPortal() {
@@ -2082,7 +2076,7 @@
       const isLoggedIn = Boolean(state.sessionToken && !String(state.sessionToken).startsWith('public-'));
       if (!isLoggedIn) {
         showOrderLogin();
-        setMessage('loginMessage', 'マイページを見るには登録済みメールアドレスと電話番号でログインしてください。', false);
+        setMessage('loginMessage', 'マイページを見るには登録済みメールアドレスとパスワードでログインしてください。', false);
         return;
       }
       const franchise = state.franchise || {};

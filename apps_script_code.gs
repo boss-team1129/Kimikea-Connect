@@ -94,6 +94,7 @@ const KCO_FRANCHISE_HEADERS = [
   'salonName',
   'email',
   'phone',
+  'initialPassword',
   'postalCode',
   'address',
   'contactName',
@@ -101,6 +102,7 @@ const KCO_FRANCHISE_HEADERS = [
   'createdAt',
   'updatedAt',
 ];
+const KCO_DEFAULT_INITIAL_PASSWORD = '0000';
 
 const KCO_DETAIL_HEADERS = [
   '注文番号',
@@ -183,24 +185,22 @@ function loginFranchise(credentials) {
     || credentials.loginEmail
     || credentials.franchiseId
   ));
-  const phone = normalizePhone_(credentials && (
-    credentials.phone
-    || credentials.loginPhone
-    || credentials.password
+  const password = normalizeLoginPassword_(credentials && (
+    credentials.password
+    || credentials.loginPassword
   ));
-  if (!email || !phone) {
-    throw new Error('メールアドレスと電話番号を入力してください。');
+  if (!email || !password) {
+    throw new Error('メールアドレスとパスワードを入力してください。');
   }
 
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible
     && item.email
-    && item.phone
     && normalizeEmail_(item.email) === email
-    && normalizePhone_(item.phone) === phone
+    && normalizeLoginPassword_(item.initialPassword || KCO_DEFAULT_INITIAL_PASSWORD) === password
   ));
   if (!franchise) {
-    throw new Error('メールアドレスまたは電話番号が正しくありません。');
+    throw new Error('メールアドレスまたはパスワードが正しくありません。');
   }
 
   const sessionToken = Utilities.getUuid();
@@ -436,7 +436,7 @@ function setupFranchiseMaster_(ss) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
     sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', 'active', new Date(), new Date()],
+      ['K-1', 'TEAM hair', '', '', '', '', '', '', 'active', new Date(), new Date()],
     ]);
   } else {
     ensureFranchiseMasterColumns_(sheet);
@@ -464,7 +464,7 @@ function migrateProductionFranchiseRows_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) {
     sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', 'active', new Date(), new Date()],
+      ['K-1', 'TEAM hair', '', '', '', '', '', '', 'active', new Date(), new Date()],
     ]);
     return;
   }
@@ -475,6 +475,7 @@ function migrateProductionFranchiseRows_(sheet) {
   const salonNameIndex = getIndex(['salonName', '加盟店名']);
   const emailIndex = getIndex(['email', 'メールアドレス']);
   const phoneIndex = getIndex(['phone', '電話', '電話番号']);
+  const passwordIndex = getIndex(['initialPassword', 'パスワード', 'password']);
   const statusIndex = getIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
   const visibleIndex = getIndex(['表示']);
   const updatedAtIndex = getIndex(['updatedAt', '更新日']);
@@ -1388,6 +1389,7 @@ function getFranchiseMasterRecords_() {
   const franchiseNameIndex = findHeaderIndex(['salonName', '加盟店名']);
   const emailIndex = findHeaderIndex(['email', 'メールアドレス']);
   const phoneIndex = findHeaderIndex(['phone', '電話', '電話番号']);
+  const passwordIndex = findHeaderIndex(['initialPassword', 'パスワード', 'password']);
   const postalCodeIndex = findHeaderIndex(['postalCode', '郵便番号']);
   const addressIndex = findHeaderIndex(['address', '住所']);
   const contactNameIndex = findHeaderIndex(['contactName', '担当者', '担当者名']);
@@ -1424,6 +1426,9 @@ function getFranchiseMasterRecords_() {
         contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
         email: String(row[emailIndex] || '').trim(),
         phone: normalizePhone_(row[phoneIndex]),
+        initialPassword: passwordIndex === -1
+          ? KCO_DEFAULT_INITIAL_PASSWORD
+          : normalizeLoginPassword_(row[passwordIndex] || KCO_DEFAULT_INITIAL_PASSWORD),
         postalCode,
         address,
         fullAddress: [postalCode, address].filter(Boolean).join(' '),
@@ -1483,6 +1488,12 @@ function normalizePhone_(value) {
   return String(value || '')
     .normalize('NFKC')
     .replace(/[^\d]/g, '');
+}
+
+function normalizeLoginPassword_(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/\s/g, '');
 }
 
 function normalizeMembershipStatus_(value, visible) {
