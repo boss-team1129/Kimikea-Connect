@@ -90,14 +90,16 @@ const KCO_DEFAULT_SETTINGS = [
 ];
 
 const KCO_FRANCHISE_HEADERS = [
-  '加盟店ID',
-  '加盟店名',
-  '担当者名',
-  'メールアドレス',
-  '電話番号',
-  '住所',
-  'パスワード',
-  '表示',
+  'memberId',
+  'salonName',
+  'email',
+  'phone',
+  'postalCode',
+  'address',
+  'contactName',
+  'membershipStatus',
+  'createdAt',
+  'updatedAt',
 ];
 
 const KCO_DETAIL_HEADERS = [
@@ -176,19 +178,29 @@ function getPublicOrderSettings(sessionToken) {
 }
 
 function loginFranchise(credentials) {
-  const franchiseId = String(credentials && credentials.franchiseId || '').trim();
-  const password = String(credentials && credentials.password || '');
-  if (!franchiseId || !password) {
-    throw new Error('加盟店IDとパスワードを入力してください。');
+  const email = normalizeEmail_(credentials && (
+    credentials.email
+    || credentials.loginEmail
+    || credentials.franchiseId
+  ));
+  const phone = normalizePhone_(credentials && (
+    credentials.phone
+    || credentials.loginPhone
+    || credentials.password
+  ));
+  if (!email || !phone) {
+    throw new Error('メールアドレスと電話番号を入力してください。');
   }
 
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible
-    && item.franchiseId === franchiseId
-    && item.password === password
+    && item.email
+    && item.phone
+    && normalizeEmail_(item.email) === email
+    && normalizePhone_(item.phone) === phone
   ));
   if (!franchise) {
-    throw new Error('加盟店IDまたはパスワードが正しくありません。');
+    throw new Error('メールアドレスまたは電話番号が正しくありません。');
   }
 
   const sessionToken = Utilities.getUuid();
@@ -424,30 +436,82 @@ function setupFranchiseMaster_(ss) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
     sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['KMI-001', 'テスト加盟店', '担当者名', 'test@example.com', '', '', 'test1234', true],
+      ['K-1', 'TEAM hair', '', '', '', '', '', 'active', new Date(), new Date()],
     ]);
   } else {
-    ensureFranchisePasswordColumn_(sheet);
+    ensureFranchiseMasterColumns_(sheet);
+    migrateProductionFranchiseRows_(sheet);
   }
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_FRANCHISE_HEADERS.length);
 }
 
-function ensureFranchisePasswordColumn_(sheet) {
-  const headers = sheet
-    .getRange(1, 1, 1, sheet.getLastColumn())
+function ensureFranchiseMasterColumns_(sheet) {
+  const existingHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
     .getValues()[0]
     .map(normalizeMasterHeader_);
-  if (headers.indexOf(normalizeMasterHeader_('パスワード')) !== -1) return;
 
-  const visibleIndex = headers.indexOf(normalizeMasterHeader_('表示'));
-  if (visibleIndex === -1) {
+  KCO_FRANCHISE_HEADERS.forEach((header) => {
+    if (existingHeaders.indexOf(normalizeMasterHeader_(header)) !== -1) return;
     sheet.insertColumnAfter(sheet.getLastColumn());
-    sheet.getRange(1, sheet.getLastColumn()).setValue('パスワード');
-  } else {
-    const insertBefore = visibleIndex + 1;
-    sheet.insertColumnBefore(insertBefore);
-    sheet.getRange(1, insertBefore).setValue('パスワード');
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    existingHeaders.push(normalizeMasterHeader_(header));
+  });
+}
+
+function migrateProductionFranchiseRows_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
+      ['K-1', 'TEAM hair', '', '', '', '', '', 'active', new Date(), new Date()],
+    ]);
+    return;
+  }
+
+  const headers = values[0].map(normalizeMasterHeader_);
+  const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
+  const memberIdIndex = getIndex(['memberId', '加盟店ID']);
+  const salonNameIndex = getIndex(['salonName', '加盟店名']);
+  const emailIndex = getIndex(['email', 'メールアドレス']);
+  const phoneIndex = getIndex(['phone', '電話', '電話番号']);
+  const statusIndex = getIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
+  const visibleIndex = getIndex(['表示']);
+  const updatedAtIndex = getIndex(['updatedAt', '更新日']);
+
+  let hasTeamHair = false;
+  values.slice(1).forEach((row, offset) => {
+    const rowNumber = offset + 2;
+    const memberId = memberIdIndex === -1 ? '' : String(row[memberIdIndex] || '').trim();
+    const salonName = salonNameIndex === -1 ? '' : String(row[salonNameIndex] || '').trim();
+    const email = emailIndex === -1 ? '' : String(row[emailIndex] || '').trim();
+    const isTestRow = salonName === 'テスト加盟店' || email === 'test@example.com';
+
+    if (memberId === 'K-1') {
+      hasTeamHair = true;
+      if (salonNameIndex !== -1) sheet.getRange(rowNumber, salonNameIndex + 1).setValue('TEAM hair');
+      if (statusIndex !== -1) sheet.getRange(rowNumber, statusIndex + 1).setValue('active');
+      if (visibleIndex !== -1) sheet.getRange(rowNumber, visibleIndex + 1).setValue(true);
+      if (updatedAtIndex !== -1) sheet.getRange(rowNumber, updatedAtIndex + 1).setValue(new Date());
+    }
+
+    if (isTestRow) {
+      if (statusIndex !== -1) sheet.getRange(rowNumber, statusIndex + 1).setValue('inactive');
+      if (visibleIndex !== -1) sheet.getRange(rowNumber, visibleIndex + 1).setValue(false);
+      if (updatedAtIndex !== -1) sheet.getRange(rowNumber, updatedAtIndex + 1).setValue(new Date());
+    }
+  });
+
+  if (!hasTeamHair) {
+    const newRow = new Array(sheet.getLastColumn()).fill('');
+    if (memberIdIndex !== -1) newRow[memberIdIndex] = 'K-1';
+    if (salonNameIndex !== -1) newRow[salonNameIndex] = 'TEAM hair';
+    if (statusIndex !== -1) newRow[statusIndex] = 'active';
+    if (visibleIndex !== -1) newRow[visibleIndex] = true;
+    const createdAtIndex = getIndex(['createdAt', '作成日', '登録日']);
+    if (createdAtIndex !== -1) newRow[createdAtIndex] = new Date();
+    if (updatedAtIndex !== -1) newRow[updatedAtIndex] = new Date();
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, newRow.length).setValues([newRow]);
   }
 }
 
@@ -1320,22 +1384,23 @@ function getFranchiseMasterRecords_() {
 
   const headers = values[0].map(normalizeMasterHeader_);
   const findHeaderIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
-  const franchiseIdIndex = findHeaderIndex(['加盟店ID']);
-  const franchiseNameIndex = findHeaderIndex(['加盟店名']);
-  const contactNameIndex = findHeaderIndex(['担当者', '担当者名']);
-  const emailIndex = findHeaderIndex(['メールアドレス']);
-  const phoneIndex = findHeaderIndex(['電話', '電話番号']);
-  const addressIndex = findHeaderIndex(['住所']);
-  const passwordIndex = findHeaderIndex(['パスワード', 'password']);
+  const franchiseIdIndex = findHeaderIndex(['memberId', '加盟店ID']);
+  const franchiseNameIndex = findHeaderIndex(['salonName', '加盟店名']);
+  const emailIndex = findHeaderIndex(['email', 'メールアドレス']);
+  const phoneIndex = findHeaderIndex(['phone', '電話', '電話番号']);
+  const postalCodeIndex = findHeaderIndex(['postalCode', '郵便番号']);
+  const addressIndex = findHeaderIndex(['address', '住所']);
+  const contactNameIndex = findHeaderIndex(['contactName', '担当者', '担当者名']);
+  const membershipStatusIndex = findHeaderIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
+  const createdAtIndex = findHeaderIndex(['createdAt', '作成日', '登録日']);
+  const updatedAtIndex = findHeaderIndex(['updatedAt', '更新日']);
   const visibleIndex = findHeaderIndex(['表示']);
 
   const requiredHeaders = [
-    ['加盟店ID', franchiseIdIndex],
-    ['加盟店名', franchiseNameIndex],
-    ['担当者', contactNameIndex],
-    ['メールアドレス', emailIndex],
-    ['パスワード', passwordIndex],
-    ['表示', visibleIndex],
+    ['memberId', franchiseIdIndex],
+    ['salonName', franchiseNameIndex],
+    ['email', emailIndex],
+    ['phone', phoneIndex],
   ];
   const missingHeaders = requiredHeaders
     .filter((item) => item[1] === -1)
@@ -1345,17 +1410,30 @@ function getFranchiseMasterRecords_() {
   }
 
   return values.slice(1)
-    .filter((row) => isVisible_(row[visibleIndex]))
-    .map((row) => ({
-      franchiseId: String(row[franchiseIdIndex] || '').trim(),
-      franchiseName: String(row[franchiseNameIndex] || '').trim(),
-      contactName: String(row[contactNameIndex] || '').trim(),
-      email: String(row[emailIndex] || '').trim(),
-      phone: phoneIndex === -1 ? '' : String(row[phoneIndex] || '').trim(),
-      address: addressIndex === -1 ? '' : String(row[addressIndex] || '').trim(),
-      password: String(row[passwordIndex] || ''),
-      visible: isVisible_(row[visibleIndex]),
-    }))
+    .map((row) => {
+      const rawStatus = membershipStatusIndex === -1 ? '' : String(row[membershipStatusIndex] || '').trim();
+      const visible = visibleIndex === -1 ? true : isVisible_(row[visibleIndex]);
+      const membershipStatus = normalizeMembershipStatus_(rawStatus, visible);
+      const postalCode = postalCodeIndex === -1 ? '' : String(row[postalCodeIndex] || '').trim();
+      const address = addressIndex === -1 ? '' : String(row[addressIndex] || '').trim();
+      return {
+        franchiseId: String(row[franchiseIdIndex] || '').trim(),
+        memberId: String(row[franchiseIdIndex] || '').trim(),
+        franchiseName: String(row[franchiseNameIndex] || '').trim(),
+        salonName: String(row[franchiseNameIndex] || '').trim(),
+        contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
+        email: String(row[emailIndex] || '').trim(),
+        phone: normalizePhone_(row[phoneIndex]),
+        postalCode,
+        address,
+        fullAddress: [postalCode, address].filter(Boolean).join(' '),
+        membershipStatus,
+        createdAt: createdAtIndex === -1 ? '' : row[createdAtIndex],
+        updatedAt: updatedAtIndex === -1 ? '' : row[updatedAtIndex],
+        visible: membershipStatus === 'active',
+      };
+    })
+    .filter((franchise) => franchise.visible)
     .filter((franchise) => franchise.franchiseId && franchise.franchiseName);
 }
 
@@ -1397,14 +1475,36 @@ function findMasterHeaderIndex_(headers, candidates) {
   ));
 }
 
+function normalizeEmail_(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizePhone_(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[^\d]/g, '');
+}
+
+function normalizeMembershipStatus_(value, visible) {
+  const text = String(value || '').normalize('NFKC').trim().toLowerCase();
+  if (['active', '有効', '利用中', '加盟中', 'true', '1'].includes(text)) return 'active';
+  if (['inactive', '停止', '停止中', '無効', '退会', 'false', '0'].includes(text)) return 'inactive';
+  return visible ? 'active' : 'inactive';
+}
+
 function sanitizeFranchise_(franchise) {
   return {
     franchiseId: franchise.franchiseId,
+    memberId: franchise.memberId || franchise.franchiseId,
     franchiseName: franchise.franchiseName,
+    salonName: franchise.salonName || franchise.franchiseName,
     contactName: franchise.contactName,
     email: franchise.email,
     phone: franchise.phone,
+    postalCode: franchise.postalCode || '',
     address: franchise.address,
+    fullAddress: franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' '),
+    membershipStatus: franchise.membershipStatus || 'active',
   };
 }
 

@@ -966,6 +966,12 @@
 
     .message { margin: 12px 0 0; color: var(--success); font-weight: 750; overflow-wrap: anywhere; }
     .error { color: var(--danger); }
+    .form-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
     @media (max-width: 720px) {
       .login-shell {
         min-height: 100vh;
@@ -1118,16 +1124,17 @@
     <form id="loginForm" class="login-panel" onsubmit="handleLogin(event)">
       <h1 class="brand">Kimikea Connect</h1>
       <div class="brand-accent"></div>
-      <p class="lead">会員専用注文ページに進みます。<br>加盟店IDとパスワードでログインしてください。</p>
+      <p class="lead">会員専用注文ページに進みます。<br>登録済みのメールアドレスと電話番号でログインしてください。</p>
       <div class="field">
-        <label for="loginFranchiseId">加盟店ID</label>
-        <input id="loginFranchiseId" autocomplete="username" required>
+        <label for="loginEmail">メールアドレス</label>
+        <input id="loginEmail" type="email" inputmode="email" autocomplete="username email" required>
       </div>
       <div class="field">
-        <label for="loginPassword">パスワード</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" required>
+        <label for="loginPhone">電話番号（ハイフンなし）</label>
+        <input id="loginPhone" type="password" inputmode="numeric" autocomplete="current-password" required>
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
+      <p class="form-note">登録済みのメールアドレスと、ハイフンなしの電話番号を入力してください</p>
       <p id="loginMessage" class="message error" aria-live="polite"></p>
     </form>
   </section>
@@ -1256,6 +1263,7 @@
         <div><span class="summary-label">メール</span><span id="profileEmail" class="summary-value"></span></div>
         <div><span class="summary-label">電話番号</span><span id="profilePhone" class="summary-value"></span></div>
         <div><span class="summary-label">住所</span><span id="profileAddress" class="summary-value"></span></div>
+        <div><span class="summary-label">加盟店ステータス</span><span id="profileStatus" class="summary-value"></span></div>
       </section>
 
       <nav class="tabs" aria-label="加盟店メニュー">
@@ -1482,55 +1490,33 @@
       return Boolean(window.google && google.script && google.script.run);
     }
 
+    function normalizePhoneInput(value) {
+      return String(value || '')
+        .normalize('NFKC')
+        .replace(/[^\d]/g, '');
+    }
+
     function handleLogin(event) {
       event.preventDefault();
-      const franchiseId = document.getElementById('loginFranchiseId').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      if (!franchiseId || !password) {
-        setMessage('loginMessage', '加盟店IDとパスワードを入力してください。', true);
+      const email = document.getElementById('loginEmail').value.trim();
+      const phone = normalizePhoneInput(document.getElementById('loginPhone').value);
+      document.getElementById('loginPhone').value = phone;
+      if (!email || !phone) {
+        setMessage('loginMessage', 'メールアドレスと電話番号を入力してください。', true);
         return;
       }
 
       setBusy('loginButton', true);
       setMessage('loginMessage', 'ログインしています...', false);
 
-      const safetyTimer = window.setTimeout(() => {
-        if (!document.getElementById('loginView').hidden) {
-          state.sessionToken = state.sessionToken || `pages-${Date.now()}`;
-          localStorage.setItem('kimikeaSessionToken', state.sessionToken);
-          state.franchise = state.franchise || {
-            franchiseName: 'Kimikea加盟店',
-            contactName: '',
-            email: '',
-            phone: '',
-            address: '',
-          };
-          showDashboard();
-          openOrderPage();
-        }
-      }, 1800);
-
       if (!canUseAppsScript()) {
-        window.setTimeout(() => {
-          window.clearTimeout(safetyTimer);
-          state.sessionToken = `pages-${Date.now()}`;
-          localStorage.setItem('kimikeaSessionToken', state.sessionToken);
-          state.franchise = {
-            franchiseName: 'Kimikea加盟店',
-            contactName: '',
-            email: '',
-            phone: '',
-            address: '',
-          };
-          showDashboard();
-          openOrderPage();
-        }, 250);
+        setBusy('loginButton', false);
+        setMessage('loginMessage', '会員注文ページは本番のKimikea Connect URLからログインしてください。', true);
         return;
       }
 
       google.script.run
         .withSuccessHandler((response) => {
-          window.clearTimeout(safetyTimer);
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
           state.franchise = response.franchise || state.franchise;
@@ -1539,11 +1525,14 @@
           loadPortalData();
         })
         .withFailureHandler((error) => {
-          window.clearTimeout(safetyTimer);
           setBusy('loginButton', false);
-          setMessage('loginMessage', getErrorMessage(error), true);
+          const message = getErrorMessage(error);
+          const safeMessage = message.includes('入力してください')
+            ? message
+            : 'メールアドレスまたは電話番号が正しくありません。';
+          setMessage('loginMessage', safeMessage, true);
         })
-        .loginFranchise({ franchiseId, password });
+        .loginFranchise({ email, phone });
     }
 
     function loadPortal() {
@@ -1552,13 +1541,6 @@
         return;
       }
       if (!canUseAppsScript()) {
-        state.franchise = state.franchise || {
-          franchiseName: 'Kimikea加盟店',
-          contactName: '',
-          email: '',
-          phone: '',
-          address: '',
-        };
         showDashboard();
         return;
       }
@@ -2100,7 +2082,7 @@
       const isLoggedIn = Boolean(state.sessionToken && !String(state.sessionToken).startsWith('public-'));
       if (!isLoggedIn) {
         showOrderLogin();
-        setMessage('loginMessage', 'マイページを見るには加盟店IDでログインしてください。', false);
+        setMessage('loginMessage', 'マイページを見るには登録済みメールアドレスと電話番号でログインしてください。', false);
         return;
       }
       const franchise = state.franchise || {};
@@ -2174,14 +2156,18 @@
 
     function renderProfile() {
       const franchise = state.franchise || {};
-      document.getElementById('headerMemberName').textContent = franchise.franchiseName || '';
-      document.getElementById('profileName').textContent = franchise.franchiseName || '';
-      document.getElementById('profileContact').textContent = franchise.contactName || '';
-      document.getElementById('profileEmail').textContent = franchise.email || '';
-      document.getElementById('profilePhone').textContent = franchise.phone || '未登録';
-      document.getElementById('profileAddress').textContent = franchise.address || '未登録';
-      document.getElementById('homeWelcome').textContent = franchise.franchiseName
-        ? `${franchise.franchiseName} 様、ようこそ。今日使う機能を選んでください。`
+      const salonName = franchise.salonName || franchise.franchiseName || '';
+      const registrationLead = 'マイページまたは管理画面で登録してください';
+      const address = franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' ');
+      document.getElementById('headerMemberName').textContent = salonName;
+      document.getElementById('profileName').textContent = salonName || registrationLead;
+      document.getElementById('profileContact').textContent = franchise.contactName || registrationLead;
+      document.getElementById('profileEmail').textContent = franchise.email || registrationLead;
+      document.getElementById('profilePhone').textContent = franchise.phone || registrationLead;
+      document.getElementById('profileAddress').textContent = address || registrationLead;
+      document.getElementById('profileStatus').textContent = franchise.membershipStatus === 'active' ? '利用中' : '管理画面で確認してください';
+      document.getElementById('homeWelcome').textContent = salonName
+        ? `${salonName} 様、ようこそ。今日使う機能を選んでください。`
         : 'ようこそ。今日使う機能を選んでください。';
     }
 
