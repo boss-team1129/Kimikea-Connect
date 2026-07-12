@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
   <link rel="stylesheet" href="../shared-nav.css?v=20260712-1">
-  <link rel="stylesheet" href="./style.css?v=20260712-gallery-2">
+  <link rel="stylesheet" href="./style.css?v=20260712-menu-1">
 </head>
 <body>
   <main class="stylebook-app">
@@ -37,7 +37,42 @@
       <p id="roleHelp">権限ごとの表示確認用です。本番ではKimikeaログインと連携します。</p>
     </section>
 
-    <section id="galleryView" class="view-section">
+    <section id="menuView" class="view-section stylebook-menu-view">
+      <div class="menu-hero">
+        <p>Kimikea Recipe Book</p>
+        <h2>美容師専用レシピ図鑑</h2>
+        <span>写真、使用色、本数をすばやく確認できます。</span>
+      </div>
+      <section class="menu-card-grid" aria-label="スタイル図鑑メニュー">
+        <button class="menu-card primary" type="button" data-action="show-gallery">
+          <span class="menu-card-icon">📖</span>
+          <strong>図鑑を見る</strong>
+          <small>写真一覧へ</small>
+        </button>
+        <button class="menu-card" type="button" data-action="show-post">
+          <span class="menu-card-icon">＋</span>
+          <strong>投稿する</strong>
+          <small>新規投稿画面へ</small>
+        </button>
+        <button class="menu-card" type="button" data-action="show-drafts">
+          <span class="menu-card-icon">□</span>
+          <strong>下書き</strong>
+          <small>自分の下書き一覧</small>
+        </button>
+        <button class="menu-card" type="button" data-action="show-saved">
+          <span class="menu-card-icon">♡</span>
+          <strong>保存したスタイル</strong>
+          <small>お気に入り一覧</small>
+        </button>
+        <button id="menuAdminCard" class="menu-card admin-only" type="button" data-action="show-admin" hidden>
+          <span class="menu-card-icon">⚙</span>
+          <strong>管理</strong>
+          <small>本部管理者のみ</small>
+        </button>
+      </section>
+    </section>
+
+    <section id="galleryView" class="view-section" hidden>
       <div class="compact-search">
         <label class="search-input">
           <span aria-hidden="true">⌕</span>
@@ -93,7 +128,7 @@
 
     <section id="postView" class="view-section form-view" hidden>
       <div class="view-head">
-        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <button class="text-button" type="button" data-action="show-menu">メニューへ</button>
         <h2 id="postFormTitle">スタイル投稿</h2>
       </div>
       <form id="postForm" class="post-form">
@@ -163,15 +198,23 @@
 
     <section id="savedView" class="view-section" hidden>
       <div class="view-head">
-        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <button class="text-button" type="button" data-action="show-menu">メニューへ</button>
         <h2>保存したスタイル</h2>
       </div>
       <section id="savedGrid" class="gallery-grid"></section>
     </section>
 
+    <section id="draftsView" class="view-section" hidden>
+      <div class="view-head">
+        <button class="text-button" type="button" data-action="show-menu">メニューへ</button>
+        <h2>下書き</h2>
+      </div>
+      <section id="draftsGrid" class="gallery-grid"></section>
+    </section>
+
     <section id="adminView" class="view-section admin-view" hidden>
       <div class="view-head">
-        <button class="text-button" type="button" data-action="back-gallery">写真一覧へ戻る</button>
+        <button class="text-button" type="button" data-action="show-menu">メニューへ</button>
         <h2>本部管理ダッシュボード</h2>
       </div>
       <div id="adminDenied" class="admin-denied" hidden>本部管理者のみアクセスできます。</div>
@@ -190,15 +233,9 @@
       </div>
     </section>
 
-    <nav class="quick-actions" aria-label="スタイル図鑑メニュー">
-      <button type="button" data-action="show-gallery">図鑑</button>
-      <button type="button" data-action="show-post">投稿</button>
-      <button type="button" data-action="show-saved">保存</button>
-      <button type="button" data-action="show-admin">管理</button>
-    </nav>
   </main>
 
-  <script src="./script.js?v=20260712-gallery-2"></script>
+  <script src="./script.js?v=20260712-menu-1"></script>
   <script src="../shared-nav.js?v=20260712-1"></script>
 </body>
 </html>

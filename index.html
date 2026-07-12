@@ -1412,6 +1412,8 @@
       products: [],
       orders: [],
       cart: [],
+      orderUnlocked: false,
+      pendingOpenOrder: false,
       orderSettings: { shippingFee: 1000, freeShippingBags: 5 },
     };
     let manifestObjectUrl = '';
@@ -1492,6 +1494,8 @@
       state.products = [];
       state.orders = [];
       state.cart = [];
+      state.orderUnlocked = false;
+      state.pendingOpenOrder = false;
     }
 
     function handleSessionError(error) {
@@ -1564,6 +1568,8 @@
             showPasswordSetup();
             return;
           }
+          state.orderUnlocked = true;
+          state.pendingOpenOrder = true;
           showDashboard();
           openOrderPage();
           loadPortalData();
@@ -1606,6 +1612,8 @@
           state.franchise = response.franchise || state.franchise;
           document.getElementById('newPassword').value = '';
           document.getElementById('confirmPassword').value = '';
+          state.orderUnlocked = true;
+          state.pendingOpenOrder = true;
           showDashboard();
           openOrderPage();
           loadPortalData();
@@ -1647,8 +1655,13 @@
           populateProductSelect();
           renderCart();
           renderHistory();
-          showHomePage();
-          applyInitialRoute();
+          if (state.pendingOpenOrder) {
+            state.pendingOpenOrder = false;
+            openOrderPage();
+          } else {
+            showHomePage();
+            applyInitialRoute();
+          }
         })
         .withFailureHandler((error) => {
           console.warn('Kimikea Connect portal data error:', getErrorMessage(error));
@@ -2000,7 +2013,7 @@
     }
 
     function openOrderPage() {
-      if (!state.sessionToken || String(state.sessionToken).startsWith('public-')) {
+      if (!state.orderUnlocked || !state.sessionToken || String(state.sessionToken).startsWith('public-')) {
         showOrderLogin();
         return;
       }
@@ -2182,21 +2195,38 @@
       document.getElementById('publicPageView').hidden = false;
       document.getElementById('publicPageTitle').textContent = 'マイページ';
       document.getElementById('publicPageLead').textContent = `${franchise.franchiseName || '加盟店'} 様の会員ページです。注文履歴、お気に入り、投稿履歴、下書きをここに集約していきます。`;
-      document.getElementById('publicPageList').innerHTML = [
-        '注文履歴：会員注文ページで確認できます',
-        'お気に入り：準備中',
-        '投稿履歴：準備中',
-        '下書き：スタイル図鑑の下書き画面で確認できます'
-      ].map(item => `<li>${escapeHtml(item)}</li>`).join('');
+      document.getElementById('publicPageList').innerHTML = '';
       document.getElementById('publicPageActions').innerHTML = `
-        <div class="public-card-grid">
-          <button type="button" class="home-card compact-card" onclick="openOrderPage()">
-            <strong>会員専用 注文ページ</strong>
-            <span>注文と注文履歴を確認します。</span>
+        <div class="mypage-section-grid">
+          <section class="mypage-card">
+            <span>プロフィール</span>
+            <strong>${escapeHtml(franchise.franchiseName || franchise.salonName || '加盟店')}</strong>
+            <small>${escapeHtml(franchise.email || 'メール未登録')}</small>
+          </section>
+          <button type="button" class="mypage-card" onclick="openStylebook()">
+            <span>保存したスタイル</span>
+            <strong>お気に入り</strong>
+            <small>スタイル図鑑で保存したレシピを確認</small>
           </button>
-          <button type="button" class="home-card compact-card" onclick="openStylebook()">
-            <strong>スタイル図鑑</strong>
-            <span>投稿、下書き、図鑑を開きます。</span>
+          <button type="button" class="mypage-card" onclick="openStylebook()">
+            <span>自分の投稿</span>
+            <strong>投稿履歴</strong>
+            <small>投稿した写真とレシピを管理</small>
+          </button>
+          <button type="button" class="mypage-card" onclick="openStylebook()">
+            <span>下書き</span>
+            <strong>作成途中</strong>
+            <small>下書き保存したスタイルを編集</small>
+          </button>
+          <button type="button" class="mypage-card" onclick="openOrderPage()">
+            <span>注文履歴</span>
+            <strong>会員注文</strong>
+            <small>過去の注文と請求書を確認</small>
+          </button>
+          <button type="button" class="mypage-card" onclick="openStylebook()">
+            <span>お気に入り</span>
+            <strong>保存一覧</strong>
+            <small>提案に使うレシピをまとめる</small>
           </button>
         </div>
         <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">

@@ -21,7 +21,7 @@ const state = {
   savedOnly: false,
   sort: 'recommended',
   visibleCount: PAGE_SIZE,
-  currentView: 'gallery',
+  currentView: 'menu',
   currentDetailId: '',
   currentEditId: '',
   currentImageData: '',
@@ -44,6 +44,8 @@ const el = {
   resultCount: document.getElementById('resultCount'),
   galleryGrid: document.getElementById('galleryGrid'),
   savedGrid: document.getElementById('savedGrid'),
+  draftsGrid: document.getElementById('draftsGrid'),
+  menuAdminCard: document.getElementById('menuAdminCard'),
   infiniteSentinel: document.getElementById('infiniteSentinel'),
   galleryView: document.getElementById('galleryView'),
   detailView: document.getElementById('detailView'),
@@ -240,7 +242,7 @@ function currentUser() {
 }
 
 function canPost() {
-  return [roles.contributor, roles.shop_admin, roles.headquarters_admin].includes(currentUser().role);
+  return Boolean(currentUser());
 }
 
 function canManageAll() {
@@ -250,8 +252,8 @@ function canManageAll() {
 function canManagePost(post) {
   const user = currentUser();
   if (user.role === roles.headquarters_admin) return true;
-  if (user.role === roles.shop_admin && post.shopId === user.shopId) return true;
-  if (user.role === roles.contributor && post.createdByUserId === user.id) return true;
+  if (post.createdByUserId === user.id) return true;
+  // 店舗管理者の店舗内管理は将来拡張用。現時点では本人投稿のみ編集できます。
   return false;
 }
 
@@ -315,6 +317,13 @@ function renderUserSelect() {
   el.userSelect.innerHTML = state.db.users.map(user => (
     `<option value="${user.id}" ${user.id === currentUser().id ? 'selected' : ''}>${escapeHtml(user.name)} / ${user.role}</option>`
   )).join('');
+  updateRoleVisibility();
+}
+
+function updateRoleVisibility() {
+  const isAdmin = canManageAll();
+  if (el.openAdminButton) el.openAdminButton.hidden = !isAdmin;
+  if (el.menuAdminCard) el.menuAdminCard.hidden = !isAdmin;
 }
 
 function renderFilterControls() {
@@ -430,9 +439,11 @@ function renderGallery() {
 
 function showView(name) {
   state.currentView = name;
-  ['galleryView', 'detailView', 'postView', 'savedView', 'adminView'].forEach(key => {
-    el[key].hidden = key !== `${name}View`;
+  ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'adminView'].forEach(key => {
+    const view = document.getElementById(key);
+    if (view) view.hidden = key !== `${name}View`;
   });
+  updateRoleVisibility();
   if (name === 'gallery') {
     renderGallery();
     window.requestAnimationFrame(() => window.scrollTo(0, Number(sessionStorage.getItem(SCROLL_KEY) || 0)));
@@ -517,6 +528,21 @@ function showSaved() {
   showView('saved');
 }
 
+function renderDrafts() {
+  const user = currentUser();
+  const posts = state.db.stylePosts.filter(post => (
+    !post.deletedAt
+    && post.createdByUserId === user.id
+    && (post.status === 'private' || post.status === 'draft' || !post.isPublished)
+  ));
+  el.draftsGrid.innerHTML = posts.length ? posts.map(renderGalleryItem).join('') : '<p class="empty-state">下書きはまだありません。</p>';
+}
+
+function showDrafts() {
+  renderDrafts();
+  showView('drafts');
+}
+
 function selectedValues(select) {
   return Array.from(select.selectedOptions).map(option => option.value);
 }
@@ -575,7 +601,7 @@ function fillPostForm(post) {
 
 function showPostForm(postId = '') {
   if (!canPost()) {
-    alert('投稿には contributor 以上の権限が必要です。');
+    alert('ログイン中のユーザーは投稿できます。ユーザーを選択してください。');
     return;
   }
   clearPostForm();
@@ -842,9 +868,11 @@ function bindEvents() {
     if (actionName === 'delete') logicalDeletePost(id);
     if (actionName === 'restore') restorePost(id);
     if (actionName === 'hard-delete') hardDeletePost(id);
+    if (actionName === 'show-menu') showView('menu');
     if (actionName === 'show-gallery' || actionName === 'back-gallery') showView('gallery');
     if (actionName === 'show-post') showPostForm();
     if (actionName === 'show-saved') showSaved();
+    if (actionName === 'show-drafts') showDrafts();
     if (actionName === 'show-admin') renderAdmin();
     if (actionName === 'share') navigator.share?.({ title: document.title, url: location.href }).catch(() => {});
     if (actionName === 'similar') {
@@ -919,7 +947,7 @@ function init() {
   renderSelectOptions();
   bindEvents();
   renderGallery();
-  showView('gallery');
+  showView('menu');
 }
 
 init();
