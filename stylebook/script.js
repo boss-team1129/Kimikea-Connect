@@ -1667,7 +1667,6 @@ function bindEvents() {
 
 async function init() {
   if (!state.db) {
-    state.db = seedData();
     state.backendMode = hasRemoteApi() ? 'loading' : 'local';
   }
   bindEvents();
