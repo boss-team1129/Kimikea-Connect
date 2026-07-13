@@ -146,6 +146,7 @@ function handleJsonpApi_(event) {
     submitCartOrder,
     getInvoicePdfData,
     logoutFranchise,
+    resetMemberPasswordToInitial,
   };
 
   let payload;
@@ -248,18 +249,16 @@ function loginFranchise(credentials) {
     throw new Error('メールアドレスまたはパスワードが正しくありません。');
   }
 
-  const passwordChangeRequired = isInitialPasswordLogin_(franchise, password);
-
   const sessionToken = Utilities.getUuid();
   CacheService.getScriptCache().put(
     createSessionKey_(sessionToken),
-    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired }),
+    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired: false }),
     KCO_CONFIG.SESSION_SECONDS
   );
   return {
     sessionToken,
     franchise: sanitizeFranchise_(franchise),
-    passwordChangeRequired,
+    passwordChangeRequired: false,
   };
 }
 
@@ -310,6 +309,15 @@ function changeMemberPassword(sessionToken, currentPassword, newPassword, confir
   }
   validateNewPassword_(newPassword, confirmPassword);
   updateFranchisePassword_(franchise.franchiseId, newPassword);
+  return true;
+}
+
+function resetMemberPasswordToInitial(sessionToken, targetMemberId) {
+  const admin = getSessionFranchise_(sessionToken);
+  if (!isHeadquartersAdmin_(admin)) {
+    throw new Error('本部管理者のみパスワードをリセットできます。');
+  }
+  resetFranchisePasswordToInitial_(targetMemberId);
   return true;
 }
 
@@ -1414,9 +1422,6 @@ function getSessionFranchise_(sessionToken, options) {
   }
 
   const session = JSON.parse(sessionJson);
-  if (session.passwordChangeRequired && !(options && options.allowPasswordChange)) {
-    throw new Error('新しいパスワード設定が必要です。');
-  }
 
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible && item.franchiseId === session.franchiseId
@@ -1430,7 +1435,7 @@ function getSessionFranchise_(sessionToken, options) {
     createSessionKey_(token),
     JSON.stringify({
       franchiseId: franchise.franchiseId,
-      passwordChangeRequired: Boolean(session.passwordChangeRequired),
+      passwordChangeRequired: false,
     }),
     KCO_CONFIG.SESSION_SECONDS
   );
@@ -1699,9 +1704,6 @@ function validateNewPassword_(newPassword, confirmPassword) {
   if (password.length < 4) {
     throw new Error('新しいパスワードは4文字以上で設定してください。');
   }
-  if (password === KCO_DEFAULT_INITIAL_PASSWORD) {
-    throw new Error('初期パスワード0000は使用できません。');
-  }
   if (password !== confirmation) {
     throw new Error('新しいパスワードと確認用パスワードが一致しません。');
   }
@@ -1736,6 +1738,35 @@ function updateFranchisePassword_(franchiseId, newPassword) {
   if (indexes.initialPassword !== -1) sheet.getRange(franchise.rowNumber, indexes.initialPassword + 1).setValue('');
   if (indexes.passwordChangedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.passwordChangedAt + 1).setValue(now);
   if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(now);
+}
+
+function resetFranchisePasswordToInitial_(franchiseId) {
+  const franchise = findFranchiseById_(franchiseId);
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const indexes = getFranchiseMasterColumnIndexes_(sheet);
+  const now = new Date();
+  if (indexes.initialPassword !== -1) {
+    sheet.getRange(franchise.rowNumber, indexes.initialPassword + 1).setValue(KCO_DEFAULT_INITIAL_PASSWORD);
+  }
+  if (indexes.passwordHash !== -1) {
+    sheet.getRange(franchise.rowNumber, indexes.passwordHash + 1).setValue('');
+  }
+  if (indexes.passwordChangedAt !== -1) {
+    sheet.getRange(franchise.rowNumber, indexes.passwordChangedAt + 1).setValue('');
+  }
+  if (indexes.updatedAt !== -1) {
+    sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(now);
+  }
+}
+
+function isHeadquartersAdmin_(franchise) {
+  if (!franchise) return false;
+  const status = String(franchise.membershipStatus || '').normalize('NFKC').trim().toLowerCase();
+  if (['headquarters_admin', 'admin', '本部管理者', '管理者'].includes(status)) return true;
+  const settings = getNotificationSettings_(SpreadsheetApp.getActiveSpreadsheet());
+  const adminEmails = settings.adminEmails.map(normalizeEmail_);
+  return Boolean(franchise.email && adminEmails.includes(normalizeEmail_(franchise.email)));
 }
 
 function normalizeMembershipStatus_(value, visible) {

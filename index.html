@@ -1149,7 +1149,7 @@
       <div class="brand-accent"></div>
       <p class="lead">会員専用注文ページに進みます。<br>登録済みのメールアドレスとパスワードでログインしてください。</p>
       <div class="field">
-        <label for="loginEmail">会員IDまたはメールアドレス</label>
+        <label for="loginEmail">メールアドレス</label>
         <input id="loginEmail" type="email" inputmode="email" autocomplete="username email" required>
       </div>
       <div class="field">
@@ -1157,7 +1157,7 @@
         <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required>
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
-      <p class="form-note">登録済みのメールアドレスと、初期パスワード「0000」を入力してください</p>
+      <p class="form-note">初期パスワードは0000です。<br>変更したい場合は、ログイン後にマイページから変更できます。</p>
       <button class="link-button" type="button" onclick="showForgotPasswordHelp()">パスワードを忘れた方はこちら</button>
       <button class="link-button" type="button" onclick="openRegistrationGuide()">新規登録・会員登録案内</button>
       <p id="loginMessage" class="message error" aria-live="polite"></p>
@@ -1166,9 +1166,9 @@
 
   <section id="passwordSetupView" class="login-shell" hidden>
     <form id="passwordSetupForm" class="login-panel" onsubmit="handleInitialPasswordSetup(event)">
-      <h1 class="brand">新しいパスワード設定</h1>
+      <h1 class="brand">パスワード変更</h1>
       <div class="brand-accent"></div>
-      <p class="lead">初回ログインが完了しました。<br>今後使用するパスワードを設定してください。</p>
+      <p class="lead">パスワード変更は任意です。<br>変更する場合のみ新しいパスワードを設定してください。</p>
       <div class="field">
         <label for="newPassword">新しいパスワード</label>
         <input id="newPassword" type="password" autocomplete="new-password" required>
@@ -1178,7 +1178,7 @@
         <input id="confirmPassword" type="password" autocomplete="new-password" required>
       </div>
       <button id="passwordSetupButton" class="button button-gold" type="submit">保存して進む</button>
-      <p class="form-note">保存後は初期パスワード「0000」ではログインできなくなります。</p>
+      <p class="form-note">変更しない場合は初期パスワード「0000」をそのまま利用できます。</p>
       <p id="passwordSetupMessage" class="message error" aria-live="polite"></p>
     </form>
   </section>
@@ -1642,10 +1642,6 @@
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
           state.franchise = response.franchise || state.franchise;
-          if (response.passwordChangeRequired) {
-            showPasswordSetup();
-            return;
-          }
           state.orderUnlocked = true;
           state.pendingOpenOrder = true;
           showDashboard();
@@ -1673,12 +1669,12 @@
         setMessage('passwordSetupMessage', '新しいパスワードと確認用パスワードを入力してください。', true);
         return;
       }
-      if (newPassword !== confirmPassword) {
-        setMessage('passwordSetupMessage', '新しいパスワードと確認用パスワードが一致しません。', true);
+      if (newPassword.length < 4) {
+        setMessage('passwordSetupMessage', '新しいパスワードは4文字以上で設定してください。', true);
         return;
       }
-      if (newPassword === '0000') {
-        setMessage('passwordSetupMessage', '初期パスワード0000は使用できません。', true);
+      if (newPassword !== confirmPassword) {
+        setMessage('passwordSetupMessage', '新しいパスワードと確認用パスワードが一致しません。', true);
         return;
       }
 
@@ -2355,8 +2351,21 @@
             <span>確認用パスワード</span>
             <input id="mypageConfirmPassword" type="password" autocomplete="new-password" required>
           </label>
-          <button type="submit" class="button button-gold">パスワードを保存</button>
+          <p class="form-note">新しいパスワードは4文字以上で設定してください。変更しない場合は初期パスワード「0000」をそのまま使えます。</p>
+          <button type="submit" class="button button-gold">パスワードを変更</button>
         </form>
+        <details class="coordinator-form">
+          <summary>本部管理者用 ユーザー管理</summary>
+          <form onsubmit="handleAdminPasswordReset(event)">
+            <h3>パスワードを0000へリセット</h3>
+            <label class="field">
+              <span>加盟店ID / memberId</span>
+              <input id="adminResetMemberId" type="text" autocomplete="off" placeholder="例：K-1" required>
+            </label>
+            <p class="form-note">本部管理者のみ実行できます。パスワードは画面上に表示されません。</p>
+            <button type="submit" class="button button-outline">0000へリセット</button>
+          </form>
+        </details>
         <button type="button" class="button button-outline" onclick="handleLogout()">ログアウト</button>
         <p id="mypageMessage" class="message" aria-live="polite"></p>
       `;
@@ -2383,6 +2392,14 @@
       const currentPassword = document.getElementById('mypageCurrentPassword').value.normalize('NFKC').replace(/\s/g, '');
       const newPassword = document.getElementById('mypageNewPassword').value.normalize('NFKC').replace(/\s/g, '');
       const confirmPassword = document.getElementById('mypageConfirmPassword').value.normalize('NFKC').replace(/\s/g, '');
+      if (newPassword.length < 4) {
+        setMessage('mypageMessage', '新しいパスワードは4文字以上で設定してください。', true);
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setMessage('mypageMessage', '新しいパスワードと確認用パスワードが一致しません。', true);
+        return;
+      }
       setMessage('mypageMessage', '保存しています...', false);
       callServer('changeMemberPassword', state.sessionToken, currentPassword, newPassword, confirmPassword)
         .then(() => {
@@ -2390,6 +2407,25 @@
           document.getElementById('mypageNewPassword').value = '';
           document.getElementById('mypageConfirmPassword').value = '';
           setMessage('mypageMessage', 'パスワードを更新しました。', false);
+        })
+        .catch((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        });
+    }
+
+    function handleAdminPasswordReset(event) {
+      event.preventDefault();
+      const targetMemberId = document.getElementById('adminResetMemberId').value.trim();
+      if (!targetMemberId) {
+        setMessage('mypageMessage', 'リセットする加盟店IDを入力してください。', true);
+        return;
+      }
+      if (!window.confirm(`${targetMemberId} のパスワードを0000へリセットします。よろしいですか？`)) return;
+      setMessage('mypageMessage', 'リセットしています...', false);
+      callServer('resetMemberPasswordToInitial', state.sessionToken, targetMemberId)
+        .then(() => {
+          document.getElementById('adminResetMemberId').value = '';
+          setMessage('mypageMessage', 'パスワードを0000へリセットしました。', false);
         })
         .catch((error) => {
           setMessage('mypageMessage', getErrorMessage(error), true);
