@@ -1990,7 +1990,9 @@
         : '公開アプリ';
     }
 
-    const HOME_GALLERY_PLACEHOLDER = 'assets/home-gallery/placeholder.svg';
+    const HOME_GALLERY_IMAGE_VERSION = '20260714-2';
+    const HOME_GALLERY_PLACEHOLDER = `./assets/home-gallery/placeholder.svg?v=${HOME_GALLERY_IMAGE_VERSION}`;
+    const homeGalleryImage = (fileName) => `./assets/home-gallery/${fileName}?v=${HOME_GALLERY_IMAGE_VERSION}`;
 
     const HOME_GALLERY_CARDS = [
       {
@@ -1998,7 +2000,7 @@
         label: 'STYLE BOOK',
         title: 'スタイル図鑑',
         subtitle: '最新スタイルを探す・保存する',
-        imageUrl: 'assets/home-gallery/stylebook.jpg',
+        imageUrl: homeGalleryImage('stylebook.jpg'),
         imagePosition: 'center center',
         sortOrder: 10,
         isVisible: true,
@@ -2008,7 +2010,7 @@
         label: 'MEMBERS ONLY',
         title: 'エクステ注文',
         subtitle: '会員専用の注文ページ',
-        imageUrl: 'assets/home-gallery/order.jpg',
+        imageUrl: homeGalleryImage('order.jpg'),
         imagePosition: 'center center',
         sortOrder: 20,
         isVisible: true,
@@ -2018,7 +2020,7 @@
         label: 'ACADEMY',
         title: '講習案内',
         subtitle: '講習情報・動画でスキルアップ',
-        imageUrl: 'assets/home-gallery/academy.jpg',
+        imageUrl: homeGalleryImage('academy.jpg'),
         imagePosition: 'center center',
         sortOrder: 30,
         isVisible: true,
@@ -2028,7 +2030,7 @@
         label: 'SALON MAP',
         title: '加盟店マップ',
         subtitle: '加盟店・コーディネーターを探す',
-        imageUrl: 'assets/home-gallery/map.jpg',
+        imageUrl: homeGalleryImage('map.jpg'),
         imagePosition: 'center center',
         sortOrder: 40,
         isVisible: true,
@@ -2038,7 +2040,7 @@
         label: 'NEWS',
         title: 'お知らせ',
         subtitle: 'お知らせ・最新情報',
-        imageUrl: 'assets/home-gallery/news.jpg',
+        imageUrl: homeGalleryImage('news.jpg'),
         imagePosition: 'center center',
         sortOrder: 50,
         isVisible: true,
@@ -2048,7 +2050,7 @@
         label: 'RANKING',
         title: '人気ランキング',
         subtitle: '人気ランキングを見る',
-        imageUrl: 'assets/home-gallery/ranking.jpg',
+        imageUrl: homeGalleryImage('ranking.jpg'),
         imagePosition: 'center center',
         sortOrder: 60,
         isVisible: true,
@@ -2058,7 +2060,7 @@
         label: 'AI ASSISTANT',
         title: 'あなたのピッタリを探す',
         subtitle: '似合う色やスタイルを提案',
-        imageUrl: 'assets/home-gallery/ai.jpg',
+        imageUrl: homeGalleryImage('ai.jpg'),
         imagePosition: 'center center',
         sortOrder: 70,
         isVisible: true,
