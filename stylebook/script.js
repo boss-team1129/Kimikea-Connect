@@ -35,6 +35,7 @@ const state = {
   isLoading: false,
   adminTab: 'posts',
   actionEventCount: 0,
+  pendingActionName: '',
 };
 
 const el = {
@@ -861,6 +862,11 @@ function handleActionElement(action) {
     currentView: state.currentView,
     actionEventCount: state.actionEventCount,
   });
+  if (!state.db && ['open-gallery', 'show-post', 'show-saved', 'show-drafts', 'show-mine', 'show-admin'].includes(actionName)) {
+    state.pendingActionName = actionName;
+    debugStylebook('action queued while database loading', { actionName });
+    return true;
+  }
 
   if (actionName === 'detail') showDetail(id);
   else if (actionName === 'save') toggleSave(id);
@@ -1423,14 +1429,20 @@ function bindEvents() {
 }
 
 async function init() {
+  bindEvents();
+  showView('menu');
   await loadDb();
   if (!currentUser()) state.currentUserId = state.db.users[0]?.id || '';
   renderUserSelect();
   renderFilterControls();
   renderSelectOptions();
-  bindEvents();
   renderGallery();
-  showView('menu');
+  if (state.pendingActionName) {
+    const queuedAction = state.pendingActionName;
+    state.pendingActionName = '';
+    debugStylebook('running queued action after database load', { queuedAction });
+    handleActionElement({ dataset: { action: queuedAction } });
+  }
 }
 
 init();
