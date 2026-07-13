@@ -27,7 +27,11 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
 img { display: block; max-width: 100%; }
 
 .stylebook-app {
@@ -106,6 +110,20 @@ img { display: block; max-width: 100%; }
 
 .view-section { animation: fadeIn .22s ease both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
+
+.stylebook-menu-view,
+.menu-card-grid {
+  position: relative;
+  z-index: 5;
+}
+
+[data-action] {
+  touch-action: manipulation;
+}
+
+[data-action].is-pressing {
+  transform: scale(0.985);
+}
 
 .compact-search {
   position: sticky;

@@ -2,7 +2,7 @@ const DB_KEY = 'kimikea_stylebook_gallery_db_v1';
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
-const DEBUG_STYLEBOOK = true;
+const DEBUG_STYLEBOOK = false;
 
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
@@ -36,6 +36,7 @@ const state = {
   adminTab: 'posts',
   actionEventCount: 0,
   pendingActionName: '',
+  historyReady: false,
 };
 
 const el = {
@@ -691,13 +692,44 @@ function renderGallery() {
   renderFilterControls();
 }
 
-function showView(name) {
+function stylebookUrlFor(name, id = '') {
+  const url = new URL(window.location.href);
+  if (name === 'menu') {
+    url.searchParams.delete('view');
+    url.searchParams.delete('id');
+  } else {
+    url.searchParams.set('view', name);
+    if (id) url.searchParams.set('id', id);
+    else url.searchParams.delete('id');
+  }
+  return url;
+}
+
+function replaceStylebookHistory(name = state.currentView, id = state.currentDetailId || '') {
+  if (!window.history?.replaceState) return;
+  const url = stylebookUrlFor(name, id);
+  window.history.replaceState({ kimikeaStylebook: true, view: name, id }, '', url);
+  state.historyReady = true;
+}
+
+function pushStylebookHistory(name, id = '') {
+  if (!window.history?.pushState) return;
+  const current = window.history.state;
+  const normalizedId = id || '';
+  if (current?.kimikeaStylebook && current.view === name && (current.id || '') === normalizedId) return;
+  const url = stylebookUrlFor(name, normalizedId);
+  window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId }, '', url);
+}
+
+function showView(name, options = {}) {
+  const { push = true, id = '' } = options;
   state.currentView = name;
   ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'mineView', 'adminView'].forEach(key => {
     const view = document.getElementById(key);
     if (view) view.hidden = key !== `${name}View`;
   });
   updateRoleVisibility();
+  if (push && state.historyReady) pushStylebookHistory(name, id);
   if (name === 'gallery') {
     renderGallery();
     window.requestAnimationFrame(() => window.scrollTo(0, Number(sessionStorage.getItem(SCROLL_KEY) || 0)));
@@ -706,7 +738,8 @@ function showView(name) {
   }
 }
 
-function showDetail(postId) {
+function showDetail(postId, options = {}) {
+  const { push = true } = options;
   sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post || post.deletedAt) return;
@@ -748,7 +781,7 @@ function showDetail(postId) {
         </div>
       </div>
     </article>`;
-  showView('detail');
+  showView('detail', { id: postId, push });
 }
 
 async function toggleSave(postId) {
@@ -817,9 +850,10 @@ function renderDrafts() {
   el.draftsGrid.innerHTML = posts.length ? posts.map(post => renderManageItem(post, 'drafts')).join('') : '<p class="empty-state">下書きはまだありません。</p>';
 }
 
-function showDrafts() {
+function showDrafts(options = {}) {
+  const { push = true } = options;
   renderDrafts();
-  showView('drafts');
+  showView('drafts', { push });
 }
 
 function renderMine() {
@@ -834,9 +868,10 @@ function renderMine() {
   ` : '<p class="empty-state">自分の投稿はまだありません。</p>';
 }
 
-function showMine() {
+function showMine(options = {}) {
+  const { push = true } = options;
   renderMine();
-  showView('mine');
+  showView('mine', { push });
 }
 
 function selectedValues(select) {
@@ -849,6 +884,36 @@ function resetGalleryViewState() {
   state.visibleCount = PAGE_SIZE;
   if (el.savedOnlyToggle) el.savedOnlyToggle.checked = false;
   if (el.sortSelect) el.sortSelect.value = 'recommended';
+}
+
+function restoreViewFromHistory(historyState) {
+  const view = historyState?.view || 'menu';
+  const id = historyState?.id || '';
+  if (view === 'detail' && id) {
+    showDetail(id, { push: false });
+    return;
+  }
+  if (view === 'gallery') {
+    showView('gallery', { push: false });
+    return;
+  }
+  if (view === 'post') {
+    showPostForm('', { push: false });
+    return;
+  }
+  if (view === 'drafts') {
+    showDrafts({ push: false });
+    return;
+  }
+  if (view === 'mine') {
+    showMine({ push: false });
+    return;
+  }
+  if (view === 'admin') {
+    renderAdmin({ push: false });
+    return;
+  }
+  showView('menu', { push: false });
 }
 
 function handleActionElement(action) {
@@ -919,6 +984,10 @@ function handleActionElement(action) {
   }
   return true;
 }
+
+window.__kimikeaStylebookRunAction = function runStylebookAction(actionName, id = '') {
+  return handleActionElement({ dataset: { action: actionName, id } });
+};
 
 async function resizeImage(file) {
   const dataUrl = await new Promise((resolve, reject) => {
@@ -991,7 +1060,8 @@ function fillPostForm(post) {
   el.cancelEditButton.hidden = false;
 }
 
-function showPostForm(postId = '') {
+function showPostForm(postId = '', options = {}) {
+  const { push = true } = options;
   if (!canPost()) {
     alert('ログイン中のユーザーは投稿できます。ユーザーを選択してください。');
     return;
@@ -1002,7 +1072,7 @@ function showPostForm(postId = '') {
     if (!post || !canManagePost(post)) return;
     fillPostForm(post);
   }
-  showView('post');
+  showView('post', { push });
 }
 
 async function submitPost(event) {
@@ -1229,11 +1299,12 @@ function adminHeaders(tab) {
   return headers[tab] || [];
 }
 
-function renderAdmin() {
+function renderAdmin(options = {}) {
+  const { push = true } = options;
   if (!canManageAll()) {
     el.adminDenied.hidden = false;
     el.adminContent.hidden = true;
-    showView('admin');
+    showView('admin', { push });
     return;
   }
   el.adminDenied.hidden = true;
@@ -1242,7 +1313,7 @@ function renderAdmin() {
   document.querySelectorAll('[data-admin-tab]').forEach(button => button.classList.toggle('active', button.dataset.adminTab === state.adminTab));
   const headers = adminHeaders(state.adminTab).map(header => `<th>${header}</th>`).join('');
   el.adminTable.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${adminRowsFor(state.adminTab) || '<tr><td colspan="9">データがありません。</td></tr>'}</tbody></table>`;
-  showView('admin');
+  showView('admin', { push });
 }
 
 function toggleAdminActive(collection, id) {
@@ -1337,6 +1408,16 @@ function bindEvents() {
   el.postForm.addEventListener('submit', submitPost);
   el.cancelEditButton.addEventListener('click', clearPostForm);
   el.openAdminButton.addEventListener('click', renderAdmin);
+  document.addEventListener('pointerdown', event => {
+    const action = event.target.closest('[data-action]');
+    if (action) action.classList.add('is-pressing');
+  }, { passive: true });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(eventName => {
+    document.addEventListener(eventName, event => {
+      const action = event.target.closest('[data-action]');
+      if (action) action.classList.remove('is-pressing');
+    }, { passive: true });
+  });
   document.addEventListener('click', event => {
     state.actionEventCount += 1;
     const actionCandidate = event.target.closest('[data-action]');
@@ -1391,6 +1472,8 @@ function bindEvents() {
     const action = event.target.closest('[data-action]');
     if (!action) return;
     event.preventDefault();
+    action.classList.add('is-pressing');
+    window.setTimeout(() => action.classList.remove('is-pressing'), 140);
     handleActionElement(action);
   });
   document.querySelectorAll('[data-admin-tab]').forEach(button => {
@@ -1426,11 +1509,23 @@ function bindEvents() {
   window.addEventListener('beforeunload', () => {
     if (state.currentView === 'gallery') sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
   });
+  window.addEventListener('popstate', event => {
+    if (event.state?.kimikeaStylebook) restoreViewFromHistory(event.state);
+  });
 }
 
 async function init() {
+  if (!state.db) {
+    state.db = seedData();
+    state.backendMode = hasRemoteApi() ? 'loading' : 'local';
+  }
   bindEvents();
-  showView('menu');
+  showView('menu', { push: false });
+  replaceStylebookHistory('menu');
+  if (window.__kimikeaStylebookQueuedAction) {
+    state.pendingActionName = window.__kimikeaStylebookQueuedAction;
+    window.__kimikeaStylebookQueuedAction = '';
+  }
   await loadDb();
   if (!currentUser()) state.currentUserId = state.db.users[0]?.id || '';
   renderUserSelect();

@@ -17,7 +17,7 @@
   <link id="manifestLink" rel="manifest">
   <link rel="canonical" href="https://boss-team1129.github.io/Kimikea-Connect/">
   <title>Kimikea Connect</title>
-  <link rel="stylesheet" href="./shared-nav.css?v=20260712-2">
+  <link rel="stylesheet" href="./shared-nav.css?v=20260713-gallery-1">
   <style>
     :root {
       --black: #111111;
@@ -536,9 +536,216 @@
       58% { transform: scale(1.035) translateY(-6px); }
       100% { transform: scale(1) translateY(0); }
     }
+    .home-gallery {
+      position: relative;
+      display: grid;
+      gap: 0;
+      padding: 2px 0 24px;
+      isolation: isolate;
+    }
+    .home-gallery::before {
+      position: absolute;
+      inset: 16px 0 auto;
+      z-index: -1;
+      height: 280px;
+      content: "";
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(221, 196, 135, 0.24), transparent 36%),
+        radial-gradient(circle at 82% 28%, rgba(158, 182, 191, 0.22), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.66), transparent);
+      filter: blur(18px);
+      pointer-events: none;
+    }
+    .home-gallery-head {
+      display: grid;
+      grid-template-columns: 1fr 38px;
+      align-items: start;
+      gap: 14px;
+      width: min(92vw, 620px);
+      margin: 2px auto 14px;
+      padding: 0 2px;
+    }
+    .home-gallery-title {
+      margin: 0;
+      color: #151515;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(28px, 8vw, 46px);
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 0.98;
+    }
+    .home-gallery-subtitle {
+      margin: 8px 0 0;
+      color: #6f6658;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+    .home-gallery-notice {
+      width: 38px;
+      height: 38px;
+      border: 1px solid rgba(180, 146, 76, 0.28);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.72);
+      color: #9c7334;
+      font-size: 17px;
+      box-shadow: 0 10px 24px rgba(42, 34, 20, 0.1);
+    }
+    .home-gallery-list {
+      display: grid;
+      justify-items: center;
+      padding-bottom: 18px;
+    }
+    .home-gallery-card {
+      position: relative;
+      width: min(92vw, 620px);
+      min-height: 124px;
+      margin: 0 auto -10px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 22px;
+      background: #161616;
+      color: #fff;
+      box-shadow:
+        0 22px 48px rgba(39, 32, 21, 0.16),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+      cursor: pointer;
+      transform: translateY(10px) scale(0.985);
+      opacity: 0.98;
+      transition: transform 280ms ease, box-shadow 280ms ease, opacity 280ms ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .home-gallery-card:first-child {
+      min-height: clamp(168px, 42vw, 196px);
+      margin-bottom: -12px;
+    }
+    .home-gallery-card:nth-child(even) {
+      width: min(89vw, 594px);
+      margin-left: max(4vw, calc((100vw - min(92vw, 620px)) / 2 + 18px));
+    }
+    .home-gallery-card:nth-child(odd):not(:first-child) {
+      width: min(89vw, 594px);
+      margin-right: max(4vw, calc((100vw - min(92vw, 620px)) / 2 + 18px));
+    }
+    .home-gallery-card.is-visible {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    .home-gallery-card:hover,
+    .home-gallery-card:focus-visible {
+      transform: translateY(-12px) scale(1.01);
+      box-shadow: 0 28px 60px rgba(39, 32, 21, 0.2);
+      outline: none;
+    }
+    .home-gallery-card:active,
+    .home-gallery-card.is-pressed {
+      transform: translateY(-4px) scale(0.985);
+    }
+    .home-gallery-image {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(90deg, rgba(9, 9, 9, 0.78), rgba(9, 9, 9, 0.34) 48%, rgba(9, 9, 9, 0.1)),
+        var(--home-card-image);
+      background-position: center;
+      background-size: cover;
+      transform: scale(1.03);
+      transition: transform 420ms ease;
+    }
+    .home-gallery-card:hover .home-gallery-image,
+    .home-gallery-card:focus-visible .home-gallery-image {
+      transform: scale(1.07);
+    }
+    .home-gallery-card::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.18), transparent 34%),
+        linear-gradient(0deg, rgba(191, 158, 86, 0.18), transparent 42%);
+      pointer-events: none;
+    }
+    .home-gallery-copy {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      align-content: end;
+      min-height: inherit;
+      padding: 20px 58px 20px 20px;
+      text-align: left;
+    }
+    .home-gallery-card:first-child .home-gallery-copy {
+      padding: 26px 68px 24px 22px;
+    }
+    .home-gallery-label {
+      width: fit-content;
+      margin: 0 0 8px;
+      padding: 4px 8px;
+      border: 1px solid rgba(226, 200, 133, 0.45);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      color: #f4d98d;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+    }
+    .home-gallery-card h3 {
+      margin: 0;
+      color: #fff;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(24px, 6.4vw, 38px);
+      line-height: 1;
+      letter-spacing: 0;
+      text-shadow: 0 2px 16px rgba(0,0,0,0.26);
+    }
+    .home-gallery-card:not(:first-child) h3 {
+      font-size: clamp(20px, 5.2vw, 30px);
+    }
+    .home-gallery-card p {
+      max-width: 18em;
+      margin: 8px 0 0;
+      color: rgba(255,255,255,0.88);
+      font-size: 13px;
+      font-weight: 760;
+      line-height: 1.5;
+    }
+    .home-gallery-arrow {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,0.52);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    @media (min-width: 760px) {
+      .home-gallery-list {
+        gap: 2px;
+      }
+      .home-gallery-card,
+      .home-gallery-card:nth-child(even),
+      .home-gallery-card:nth-child(odd):not(:first-child) {
+        width: min(82vw, 720px);
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       .home-orbit-item,
-      .home-menu-dot {
+      .home-menu-dot,
+      .home-gallery-card,
+      .home-gallery-image {
         transition: none;
       }
       .home-orbit-item.is-bouncing .home-orbit-image-wrap {
@@ -1205,86 +1412,15 @@
           <p id="homeWelcome" class="home-welcome">ようこそ。今日使う機能を選んでください。</p>
         </section>
 
-        <section class="home-orbit-section" aria-label="Kimikea Connectメニュー">
-          <p class="home-orbit-brand">Kimikea Connect</p>
-          <p class="home-orbit-hint">左右にスワイプして機能を選択</p>
-          <div id="homeCarousel" class="home-orbit-stage" tabindex="0" aria-live="polite">
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="stylebook" onclick="activateOrbitItem(event, 0)" aria-label="スタイル図鑑を開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/stylebook-transparent.webp?v=20260712-final" alt="スタイル図鑑の開いた本イラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">図鑑</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">スタイル図鑑</strong>
-                <span class="home-orbit-description">施術写真、使用色、各色の本数を確認できます。</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="order" onclick="activateOrbitItem(event, 1)" aria-label="エクステ注文を開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/member-order-transparent.webp?v=20260712-final" alt="注文用紙とチェックのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">注文</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">エクステ注文</strong>
-                <span class="home-orbit-description">加盟店専用 エクステを注文する</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="coordinator" onclick="activateOrbitItem(event, 2)" aria-label="講習案内を開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/academy-transparent.webp?v=20260712-final" alt="ノートと鉛筆の講習案内イラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">講習</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">講習案内</strong>
-                <span class="home-orbit-description">講習内容、開催日、申込方法を確認できます。</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="map" onclick="activateOrbitItem(event, 3)" aria-label="加盟店マップを開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/map-transparent.webp?v=20260712-final" alt="地図と位置ピンのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">地図</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">加盟店マップ</strong>
-                <span class="home-orbit-description">加盟店、コーディネーター店舗を案内します。</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="popular" onclick="activateOrbitItem(event, 4)" aria-label="人気ランキングを開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/ranking-transparent.webp?v=20260712-final" alt="人気ランキングのイラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">人気</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">人気ランキング</strong>
-                <span class="home-orbit-description">今月・今年の人気色を表示します。</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="ai" onclick="activateOrbitItem(event, 5)" aria-label="あなたのピッタリを探すを開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/ai-diagnosis-transparent.webp?v=20260712-final" alt="AI診断のイラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">AI</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">あなたのピッタリを探す</strong>
-                <span class="home-orbit-description">似合う色やスタイルを提案します。</span>
-              </span>
-            </button>
-            <button type="button" class="home-orbit-item" data-carousel-card data-menu-key="notice" onclick="activateOrbitItem(event, 6)" aria-label="お知らせを開く">
-              <span class="home-orbit-image-wrap">
-                <img class="home-orbit-image" src="assets/home-icons/news-transparent.webp?v=20260712-final" alt="拡声器のお知らせイラスト" draggable="false" onerror="handleOrbitImageError(this)">
-                <span class="home-orbit-fallback" aria-hidden="true">お知らせ</span>
-              </span>
-              <span class="home-orbit-copy">
-                <strong class="home-orbit-title">お知らせ</strong>
-                <span class="home-orbit-description">新色、イベント、講習情報を確認できます。</span>
-              </span>
-            </button>
+        <section class="home-gallery" aria-label="Kimikea Connectメニュー">
+          <div class="home-gallery-head">
+            <div>
+              <h2 class="home-gallery-title">Kimikea Connect</h2>
+              <p class="home-gallery-subtitle">美容師のためのプラットフォーム</p>
+            </div>
+            <button type="button" class="home-gallery-notice" onclick="openPublicPage('notice')" aria-label="お知らせを開く">○</button>
           </div>
-          <div class="home-orbit-active-copy" aria-live="polite">
-            <strong id="homeOrbitActiveTitle" class="home-orbit-active-title">スタイル図鑑</strong>
-            <span id="homeOrbitActiveDescription" class="home-orbit-active-description">施術写真、使用色、各色の本数を確認できます。</span>
-          </div>
-          <div id="homeCarouselDots" class="home-menu-dots" aria-label="現在のメニュー位置"></div>
+          <div id="homeGalleryList" class="home-gallery-list"></div>
         </section>
       </section>
 
@@ -1769,6 +1905,128 @@
         : '公開アプリ';
     }
 
+    const HOME_GALLERY_CARDS = [
+      {
+        key: 'stylebook',
+        label: 'STYLE BOOK',
+        title: 'スタイル図鑑',
+        subtitle: '最新スタイルを探す・保存する',
+        imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 10,
+        isVisible: true,
+      },
+      {
+        key: 'order',
+        label: 'ORDER',
+        title: 'エクステ注文',
+        subtitle: 'エクステ・カラーを注文する',
+        imageUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 20,
+        isVisible: true,
+      },
+      {
+        key: 'coordinator',
+        label: 'ACADEMY',
+        title: '講習案内',
+        subtitle: '講習情報・動画でスキルアップ',
+        imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 30,
+        isVisible: true,
+      },
+      {
+        key: 'map',
+        label: 'SALON MAP',
+        title: '加盟店マップ',
+        subtitle: '加盟店・コーディネーターを探す',
+        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 40,
+        isVisible: true,
+      },
+      {
+        key: 'notice',
+        label: 'NEWS',
+        title: 'お知らせ',
+        subtitle: 'お知らせ・最新情報',
+        imageUrl: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 50,
+        isVisible: true,
+      },
+      {
+        key: 'popular',
+        label: 'RANKING',
+        title: '人気ランキング',
+        subtitle: '人気ランキングを見る',
+        imageUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 60,
+        isVisible: true,
+      },
+      {
+        key: 'ai',
+        label: 'AI ASSISTANT',
+        title: 'あなたのピッタリを探す',
+        subtitle: '似合う色やスタイルを提案',
+        imageUrl: 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1000&q=82',
+        sortOrder: 70,
+        isVisible: true,
+      },
+    ];
+
+    function renderHomeGallery() {
+      const list = document.getElementById('homeGalleryList');
+      if (!list || list.dataset.ready === 'true') return;
+      const cards = HOME_GALLERY_CARDS
+        .filter((card) => card.isVisible)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      list.innerHTML = cards.map((card) => `
+        <button
+          type="button"
+          class="home-gallery-card"
+          data-home-gallery-card
+          data-menu-key="${escapeHtml(card.key)}"
+          onclick="openHomeGalleryCard(event, '${escapeHtml(card.key)}')"
+          style="--home-card-image: url('${escapeHtml(card.imageUrl)}')"
+          aria-label="${escapeHtml(card.title)}を開く"
+        >
+          <span class="home-gallery-image" aria-hidden="true"></span>
+          <span class="home-gallery-copy">
+            <span class="home-gallery-label">${escapeHtml(card.label)}</span>
+            <h3>${escapeHtml(card.title)}</h3>
+            <p>${escapeHtml(card.subtitle)}</p>
+          </span>
+          <span class="home-gallery-arrow" aria-hidden="true">→</span>
+        </button>
+      `).join('');
+      list.dataset.ready = 'true';
+    }
+
+    function initializeHomeGallery() {
+      renderHomeGallery();
+      const cards = Array.from(document.querySelectorAll('[data-home-gallery-card]'));
+      if (!cards.length) return;
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) entry.target.classList.add('is-visible');
+        });
+      }, { threshold: 0.18, rootMargin: '0px 0px -6% 0px' });
+      cards.forEach((card) => {
+        if (card.dataset.bound === 'true') return;
+        card.dataset.bound = 'true';
+        observer.observe(card);
+        card.addEventListener('pointerdown', () => card.classList.add('is-pressed'), { passive: true });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+          card.addEventListener(eventName, () => card.classList.remove('is-pressed'), { passive: true });
+        });
+      });
+    }
+
+    function openHomeGalleryCard(event, key) {
+      event?.preventDefault?.();
+      if (navigator.vibrate) {
+        try { navigator.vibrate(8); } catch (error) { /* optional */ }
+      }
+      openOrbitMenu(key);
+    }
+
     const ORBIT_STORAGE_KEY = 'kimikea_home_orbit_index';
     let activeCarouselIndex = 0;
     let orbitFrame = 0;
@@ -2082,7 +2340,7 @@
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
-      initializeHomeCarousel();
+      initializeHomeGallery();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -2449,15 +2707,14 @@
       const isOrderVisible = orderWorkspace && !orderWorkspace.hidden;
       if (isOrderVisible) {
         showOrderLogin();
-        return;
+        return true;
       }
-      const isHomeVisible = !document.getElementById('portalView').hidden
-        && !document.getElementById('homeView').hidden;
-      if (isHomeVisible || window.history.length <= 1) {
-        goKimikeaHomeFromNav();
-        return;
+      if (window.history.length > 1) {
+        window.history.back();
+        return true;
       }
-      window.history.back();
+      goKimikeaHomeFromNav();
+      return true;
     }
 
     let initialRouteApplied = false;
@@ -2753,6 +3010,6 @@
     }
     runOpeningSplash();
   </script>
-  <script src="./shared-nav.js?v=20260712-1"></script>
+  <script src="./shared-nav.js?v=20260713-gallery-1"></script>
 </body>
 </html>

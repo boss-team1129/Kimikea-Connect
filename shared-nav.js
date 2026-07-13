@@ -3,6 +3,9 @@
   let isNavigating = false;
 
   function getHomeUrl() {
+    if (window.location.hostname === 'boss-team1129.github.io') {
+      return '/Kimikea-Connect/';
+    }
     const path = window.location.pathname;
     return path.includes('/stylebook/') ? '../index.html' : './index.html';
   }
@@ -41,8 +44,8 @@
 
   function goBack() {
     if (window.KimikeaConnectNav && typeof window.KimikeaConnectNav.back === 'function') {
-      window.KimikeaConnectNav.back();
-      return;
+      const handled = window.KimikeaConnectNav.back();
+      if (handled !== false) return;
     }
     if (window.history.length > 1) {
       window.history.back();
