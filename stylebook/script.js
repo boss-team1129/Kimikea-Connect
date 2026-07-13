@@ -282,13 +282,38 @@ function hasRemoteApi() {
   return Boolean(STYLEBOOK_API_URL && STYLEBOOK_API_URL.startsWith('https://'));
 }
 
+function requestJson(url, options = {}) {
+  if (typeof fetch === 'function') {
+    return fetch(url, options).then(response => response.json());
+  }
+  if (typeof XMLHttpRequest === 'function') {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(options.method || 'GET', url, true);
+      if (options.headers) {
+        Object.entries(options.headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+      }
+      xhr.onload = () => {
+        try {
+          resolve(JSON.parse(xhr.responseText || '{}'));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      xhr.onerror = () => reject(new Error('スタイル図鑑APIへ接続できませんでした。'));
+      xhr.send(options.body || null);
+    });
+  }
+  return Promise.reject(new Error('このブラウザでは通信機能を利用できません。'));
+}
+
 async function apiRequest(action, payload = {}) {
   if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
   debugStylebook('API POST request', {
     action,
     userId: currentUser()?.id || state.currentUserId,
   });
-  const response = await fetch(STYLEBOOK_API_URL, {
+  const data = await requestJson(STYLEBOOK_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({
@@ -297,7 +322,6 @@ async function apiRequest(action, payload = {}) {
       ...payload,
     }),
   });
-  const data = await response.json();
   debugStylebook('API POST response', {
     action,
     ok: data.ok,
@@ -313,10 +337,9 @@ async function loadRemoteDb() {
     url: STYLEBOOK_API_URL,
     userId: state.currentUserId,
   });
-  const response = await fetch(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}`, {
+  const data = await requestJson(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&t=${Date.now()}`, {
     cache: 'no-store',
   });
-  const data = await response.json();
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
   state.db = data.database;
   state.backendMode = 'remote';
