@@ -540,30 +540,46 @@
       position: relative;
       display: grid;
       gap: 0;
-      padding: 2px 0 118px;
+      min-height: 100vh;
+      padding: 4px 0 132px;
       isolation: isolate;
+      perspective: 1200px;
+      transform-style: preserve-3d;
+    }
+    .home-gallery::before,
+    .home-gallery::after {
+      position: absolute;
+      content: "";
+      pointer-events: none;
     }
     .home-gallery::before {
-      position: absolute;
-      inset: 16px 0 auto;
-      z-index: -1;
-      height: 280px;
-      content: "";
+      inset: 10px 0 auto;
+      z-index: -2;
+      height: 420px;
       border-radius: 999px;
       background:
-        radial-gradient(circle at 18% 22%, rgba(221, 196, 135, 0.24), transparent 36%),
-        radial-gradient(circle at 82% 28%, rgba(158, 182, 191, 0.22), transparent 36%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.66), transparent);
-      filter: blur(18px);
-      pointer-events: none;
+        radial-gradient(circle at 18% 18%, rgba(224, 197, 134, 0.28), transparent 34%),
+        radial-gradient(circle at 82% 24%, rgba(182, 199, 204, 0.24), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(250, 246, 236, 0));
+      filter: blur(22px);
+    }
+    .home-gallery::after {
+      inset: 80px 50% auto auto;
+      z-index: -1;
+      width: min(82vw, 360px);
+      height: min(82vw, 360px);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(178, 141, 68, 0.13), transparent 64%);
+      transform: translateX(50%);
+      filter: blur(28px);
     }
     .home-gallery-head {
       display: grid;
       grid-template-columns: 1fr 38px;
       align-items: start;
       gap: 14px;
-      width: min(90vw, 420px);
-      margin: 2px auto 14px;
+      width: min(90vw, 460px);
+      margin: 2px auto 18px;
       padding: 0 2px;
     }
     .home-gallery-title {
@@ -593,57 +609,88 @@
       box-shadow: 0 10px 24px rgba(42, 34, 20, 0.1);
     }
     .home-gallery-list {
+      position: relative;
       display: grid;
       justify-items: center;
-      padding-bottom: 28px;
+      width: min(90vw, 460px);
+      margin-inline: auto;
+      padding: 8px 0 34px;
+      perspective: 1180px;
+      transform-style: preserve-3d;
     }
     .home-gallery-card {
       position: relative;
-      width: min(90vw, 420px);
-      height: 136px;
-      margin: 0 auto -12px;
+      z-index: var(--gallery-z-index, 1);
+      width: 100%;
+      height: clamp(228px, 62vw, 306px);
+      margin: 0 auto -30px;
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.72);
-      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.78);
+      border-radius: 28px;
       background: #161616;
       color: #fff;
       box-shadow:
-        0 22px 48px rgba(39, 32, 21, 0.16),
-        inset 0 1px 0 rgba(255,255,255,0.22);
+        0 var(--gallery-shadow-y, 24px) var(--gallery-shadow-blur, 54px) rgba(39, 32, 21, var(--gallery-shadow-alpha, 0.16)),
+        inset 0 1px 0 rgba(255,255,255,0.26);
       cursor: pointer;
-      transform: translateY(10px);
-      opacity: 0.98;
-      transition: transform 280ms ease, box-shadow 280ms ease, opacity 280ms ease;
+      transform:
+        translate3d(var(--gallery-x, 0px), var(--gallery-y, 18px), var(--gallery-z, -72px))
+        rotateX(var(--gallery-tilt-x, 3deg))
+        rotateY(var(--gallery-tilt-y, 0deg))
+        scale(var(--gallery-scale, 0.94));
+      transform-origin: center center;
+      transform-style: preserve-3d;
+      opacity: var(--gallery-opacity, 0);
+      filter: blur(var(--gallery-blur, 1.3px));
+      transition:
+        transform 120ms linear,
+        box-shadow 180ms ease,
+        opacity 180ms ease,
+        filter 180ms ease;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
+      will-change: transform, opacity, filter;
     }
     .home-gallery-card:first-child {
-      height: 136px;
-      margin-bottom: -12px;
-    }
-    .home-gallery-card:nth-child(even) {
-      width: min(90vw, 420px);
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .home-gallery-card:nth-child(odd):not(:first-child) {
-      width: min(90vw, 420px);
-      margin-left: auto;
-      margin-right: auto;
+      height: clamp(238px, 66vw, 318px);
     }
     .home-gallery-card.is-visible {
-      transform: translateY(0) scale(1);
-      opacity: 1;
+      animation: galleryPanelRise 720ms cubic-bezier(.18, .72, .2, 1) both;
+      animation-delay: calc(var(--stagger-index, 0) * 130ms);
     }
     .home-gallery-card:hover,
     .home-gallery-card:focus-visible {
-      transform: translateY(-12px) scale(1.005);
-      box-shadow: 0 28px 60px rgba(39, 32, 21, 0.2);
+      box-shadow:
+        0 calc(var(--gallery-shadow-y, 24px) + 8px) calc(var(--gallery-shadow-blur, 54px) + 16px) rgba(39, 32, 21, calc(var(--gallery-shadow-alpha, 0.16) + 0.06)),
+        inset 0 1px 0 rgba(255,255,255,0.32);
       outline: none;
     }
     .home-gallery-card:active,
     .home-gallery-card.is-pressed {
-      transform: translateY(-4px) scale(0.985);
+      transform:
+        translate3d(var(--gallery-x, 0px), var(--gallery-y, 18px), var(--gallery-z, -72px))
+        rotateX(var(--gallery-tilt-x, 3deg))
+        rotateY(var(--gallery-tilt-y, 0deg))
+        scale(calc(var(--gallery-scale, 0.94) * 0.95));
+    }
+    .home-gallery-card.is-opening {
+      z-index: 999 !important;
+      filter: blur(0) !important;
+      opacity: 0 !important;
+      transform: translate3d(0, 0, 160px) rotateX(0deg) rotateY(0deg) scale(1.22) !important;
+      transition:
+        transform 360ms cubic-bezier(.16, .86, .22, 1),
+        opacity 280ms ease,
+        filter 280ms ease !important;
+    }
+    body.home-gallery-opening::after {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      content: "";
+      background: rgba(250, 246, 236, 0.26);
+      pointer-events: none;
+      animation: homeGalleryPageBloom 320ms ease both;
     }
     .home-gallery-image {
       position: absolute;
@@ -652,8 +699,8 @@
       height: 100%;
       object-fit: cover;
       object-position: var(--home-card-position, center);
-      transform: scale(1.03);
-      transition: transform 420ms ease;
+      transform: scale(var(--gallery-image-scale, 1.03));
+      transition: transform 260ms ease;
       user-select: none;
       -webkit-user-drag: none;
     }
@@ -671,8 +718,8 @@
     .home-gallery-card::before {
       z-index: 1;
       background:
-        linear-gradient(90deg, rgba(9, 9, 9, 0.74), rgba(9, 9, 9, 0.38) 48%, rgba(9, 9, 9, 0.16)),
-        linear-gradient(0deg, rgba(9, 9, 9, 0.16), transparent 54%);
+        linear-gradient(0deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.28) 48%, rgba(0, 0, 0, 0.04) 86%),
+        linear-gradient(90deg, rgba(9, 9, 9, 0.42), rgba(9, 9, 9, 0.12) 55%, rgba(9, 9, 9, 0.06));
     }
     .home-gallery-card::after {
       z-index: 2;
@@ -686,16 +733,16 @@
       display: grid;
       align-content: end;
       min-height: 100%;
-      padding: 18px 58px 18px 20px;
+      padding: 24px 72px 24px 24px;
       text-align: left;
     }
     .home-gallery-card:first-child .home-gallery-copy {
-      padding: 24px 68px 22px 22px;
+      padding: 26px 76px 26px 26px;
     }
     .home-gallery-label {
       width: fit-content;
       margin: 0 0 8px;
-      padding: 4px 8px;
+      padding: 5px 9px;
       border: 1px solid rgba(226, 200, 133, 0.45);
       border-radius: 999px;
       background: rgba(255,255,255,0.12);
@@ -708,51 +755,81 @@
       margin: 0;
       color: #fff;
       font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(24px, 6.4vw, 38px);
+      font-size: clamp(30px, 8.4vw, 48px);
       line-height: 1;
       letter-spacing: 0;
-      text-shadow: 0 2px 16px rgba(0,0,0,0.26);
+      text-shadow: 0 3px 20px rgba(0,0,0,0.34);
     }
     .home-gallery-card:not(:first-child) h3 {
-      font-size: clamp(20px, 5.2vw, 30px);
+      font-size: clamp(27px, 7.2vw, 42px);
     }
     .home-gallery-card p {
-      max-width: 18em;
+      max-width: 19em;
       margin: 8px 0 0;
       color: rgba(255,255,255,0.88);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 760;
       line-height: 1.5;
     }
     .home-gallery-arrow {
       position: absolute;
-      right: 18px;
-      bottom: 18px;
+      right: 22px;
+      bottom: 22px;
       z-index: 4;
       display: grid;
-      width: 38px;
-      height: 38px;
+      width: 44px;
+      height: 44px;
       place-items: center;
       border: 1px solid rgba(255,255,255,0.52);
       border-radius: 50%;
-      background: rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.3);
       color: #fff;
       font-size: 18px;
       font-weight: 900;
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+      transition: transform 160ms ease, background 160ms ease;
+    }
+    .home-gallery-card:active .home-gallery-arrow,
+    .home-gallery-card.is-pressed .home-gallery-arrow {
+      transform: scale(0.95);
+      background: rgba(255,255,255,0.42);
     }
     @media (min-width: 760px) {
-      .home-gallery-list {
-        gap: 0;
+      .home-gallery-list,
+      .home-gallery-head {
+        width: min(76vw, 520px);
       }
-      .home-gallery-card,
-      .home-gallery-card:nth-child(even),
-      .home-gallery-card:nth-child(odd):not(:first-child) {
-        width: min(90vw, 420px);
-        margin-left: auto;
-        margin-right: auto;
+      .home-gallery-card {
+        height: 300px;
+        margin-bottom: -32px;
       }
+      .home-gallery-card:first-child {
+        height: 318px;
+      }
+    }
+    @keyframes galleryPanelRise {
+      from {
+        opacity: 0;
+        transform:
+          translate3d(var(--gallery-x, 0px), calc(var(--gallery-y, 18px) + 32px), var(--gallery-z, -72px))
+          rotateX(var(--gallery-tilt-x, 3deg))
+          rotateY(var(--gallery-tilt-y, 0deg))
+          scale(calc(var(--gallery-scale, 0.94) * 0.96));
+      }
+      to {
+        opacity: var(--gallery-opacity, 1);
+        transform:
+          translate3d(var(--gallery-x, 0px), var(--gallery-y, 18px), var(--gallery-z, -72px))
+          rotateX(var(--gallery-tilt-x, 3deg))
+          rotateY(var(--gallery-tilt-y, 0deg))
+          scale(var(--gallery-scale, 0.94));
+      }
+    }
+    @keyframes homeGalleryPageBloom {
+      from { opacity: 0; backdrop-filter: blur(0); }
+      55% { opacity: 1; backdrop-filter: blur(4px); }
+      to { opacity: 0; backdrop-filter: blur(0); }
     }
     @media (prefers-reduced-motion: reduce) {
       .home-orbit-item,
@@ -760,9 +837,14 @@
       .home-gallery-card,
       .home-gallery-image {
         transition: none;
+        animation: none;
       }
       .home-orbit-item.is-bouncing .home-orbit-image-wrap {
         animation: none;
+      }
+      body.home-gallery-opening::after {
+        animation: none;
+        opacity: 0;
       }
     }
     .coming-soon {
@@ -1629,6 +1711,7 @@
     }
 
     function showOrderLogin() {
+      rememberKimikeaRoute('login');
       document.getElementById('portalView').hidden = true;
       document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('loginView').hidden = false;
@@ -1999,14 +2082,14 @@
       const cards = HOME_GALLERY_CARDS
         .filter((card) => card.isVisible)
         .sort((a, b) => a.sortOrder - b.sortOrder);
-      list.innerHTML = cards.map((card) => `
+      list.innerHTML = cards.map((card, index) => `
         <button
           type="button"
           class="home-gallery-card"
           data-home-gallery-card
+          data-home-index="${index}"
           data-menu-key="${escapeHtml(card.key)}"
-          onclick="openHomeGalleryCard(event, '${escapeHtml(card.key)}')"
-          style="--home-card-position: ${escapeHtml(card.imagePosition || 'center')}"
+          style="--home-card-position: ${escapeHtml(card.imagePosition || 'center')}; --stagger-index: ${index};"
           aria-label="${escapeHtml(card.title)}を開く"
         >
           <img
@@ -2029,6 +2112,77 @@
       list.dataset.ready = 'true';
     }
 
+    let homeGalleryAnimationFrame = 0;
+
+    function clampHomeGalleryValue(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function updateHomeGalleryDepth() {
+      const cards = Array.from(document.querySelectorAll('[data-home-gallery-card]'));
+      if (!cards.length) return;
+      const viewportCenter = window.innerHeight * 0.52;
+      const spread = Math.max(window.innerHeight * 0.46, 320);
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const scrollWave = window.scrollY * 0.014;
+      let bestCard = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      cards.forEach((card, index) => {
+        const rect = card.getBoundingClientRect();
+        const cardCenter = rect.top + rect.height / 2;
+        const rawDistance = (cardCenter - viewportCenter) / spread;
+        const distance = clampHomeGalleryValue(rawDistance, -1.55, 1.55);
+        const abs = Math.abs(distance);
+        const closeness = clampHomeGalleryValue(1 - abs, 0, 1);
+        const ease = closeness * closeness * (3 - 2 * closeness);
+        const scale = reduced ? 1 : 0.95 + ease * 0.13;
+        const opacity = 0.78 + ease * 0.22;
+        const z = reduced ? 0 : -74 + ease * 148;
+        const y = reduced ? 0 : distance * -10;
+        const tiltX = reduced ? 0 : clampHomeGalleryValue(distance * -4, -4, 4);
+        const tiltY = reduced ? 0 : Math.sin(scrollWave + index * 0.82) * (1 - ease) * 2.2;
+        const wobble = reduced ? 0 : Math.sin(scrollWave + index * 1.1) * (1 - ease) * 5;
+        const blur = reduced ? 0 : (1 - ease) * 1.15;
+        const shadowY = 24 + ease * 24;
+        const shadowBlur = 54 + ease * 40;
+        const shadowAlpha = 0.14 + ease * 0.12;
+        const imageScale = 1.025 + ease * 0.035;
+        const zIndex = Math.round(20 + ease * 80);
+
+        card.style.setProperty('--gallery-scale', scale.toFixed(3));
+        card.style.setProperty('--gallery-opacity', opacity.toFixed(3));
+        card.style.setProperty('--gallery-z', `${z.toFixed(1)}px`);
+        card.style.setProperty('--gallery-y', `${y.toFixed(1)}px`);
+        card.style.setProperty('--gallery-x', `${wobble.toFixed(1)}px`);
+        card.style.setProperty('--gallery-tilt-x', `${tiltX.toFixed(2)}deg`);
+        card.style.setProperty('--gallery-tilt-y', `${tiltY.toFixed(2)}deg`);
+        card.style.setProperty('--gallery-blur', `${blur.toFixed(2)}px`);
+        card.style.setProperty('--gallery-shadow-y', `${shadowY.toFixed(1)}px`);
+        card.style.setProperty('--gallery-shadow-blur', `${shadowBlur.toFixed(1)}px`);
+        card.style.setProperty('--gallery-shadow-alpha', shadowAlpha.toFixed(3));
+        card.style.setProperty('--gallery-image-scale', imageScale.toFixed(3));
+        card.style.setProperty('--gallery-z-index', String(zIndex));
+        card.classList.toggle('is-center', ease > 0.82);
+        card.classList.toggle('is-distant', ease < 0.35);
+
+        if (abs < bestDistance) {
+          bestDistance = abs;
+          bestCard = card;
+        }
+      });
+
+      cards.forEach((card) => card.setAttribute('aria-current', card === bestCard ? 'true' : 'false'));
+    }
+
+    function requestHomeGalleryDepthUpdate() {
+      if (homeGalleryAnimationFrame) return;
+      homeGalleryAnimationFrame = window.requestAnimationFrame(() => {
+        homeGalleryAnimationFrame = 0;
+        updateHomeGalleryDepth();
+      });
+    }
+
     function initializeHomeGallery() {
       renderHomeGallery();
       const cards = Array.from(document.querySelectorAll('[data-home-gallery-card]'));
@@ -2042,11 +2196,19 @@
         if (card.dataset.bound === 'true') return;
         card.dataset.bound = 'true';
         observer.observe(card);
+        card.addEventListener('click', (event) => openHomeGalleryCard(event, card.dataset.menuKey));
         card.addEventListener('pointerdown', () => card.classList.add('is-pressed'), { passive: true });
         ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
           card.addEventListener(eventName, () => card.classList.remove('is-pressed'), { passive: true });
         });
       });
+      const list = document.getElementById('homeGalleryList');
+      if (list && list.dataset.depthReady !== 'true') {
+        list.dataset.depthReady = 'true';
+        window.addEventListener('scroll', requestHomeGalleryDepthUpdate, { passive: true });
+        window.addEventListener('resize', requestHomeGalleryDepthUpdate, { passive: true });
+      }
+      requestHomeGalleryDepthUpdate();
     }
 
     function openHomeGalleryCard(event, key) {
@@ -2054,7 +2216,16 @@
       if (navigator.vibrate) {
         try { navigator.vibrate(8); } catch (error) { /* optional */ }
       }
-      openOrbitMenu(key);
+      const card = event?.currentTarget || event?.target?.closest?.('[data-home-gallery-card]');
+      if (card) {
+        card.classList.add('is-pressed', 'is-opening');
+        document.body.classList.add('home-gallery-opening');
+      }
+      window.setTimeout(() => {
+        openOrbitMenu(key);
+        if (card) card.classList.remove('is-pressed', 'is-opening');
+        document.body.classList.remove('home-gallery-opening');
+      }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 260);
     }
 
     const ORBIT_STORAGE_KEY = 'kimikea_home_orbit_index';
@@ -2366,7 +2537,78 @@
       renderOrbit(activeCarouselIndex, false);
     }
 
+    const kimikeaAppHistory = [];
+    let isRestoringKimikeaRoute = false;
+    let currentPublicPageKey = '';
+
+    function getCurrentKimikeaRoute() {
+      const loginView = document.getElementById('loginView');
+      const passwordSetupView = document.getElementById('passwordSetupView');
+      const portalView = document.getElementById('portalView');
+      const homeView = document.getElementById('homeView');
+      const publicPageView = document.getElementById('publicPageView');
+      const orderWorkspace = document.getElementById('orderWorkspace');
+      if (loginView && !loginView.hidden) return { name: 'login' };
+      if (passwordSetupView && !passwordSetupView.hidden) return { name: 'password' };
+      if (portalView && !portalView.hidden) {
+        if (orderWorkspace && !orderWorkspace.hidden) return { name: 'order' };
+        if (publicPageView && !publicPageView.hidden) return { name: 'public', key: currentPublicPageKey || 'notice' };
+        if (homeView && !homeView.hidden) return { name: 'home' };
+      }
+      return { name: 'home' };
+    }
+
+    function getKimikeaRouteId(route) {
+      return `${route?.name || 'home'}:${route?.key || ''}`;
+    }
+
+    function rememberKimikeaRoute(nextName, nextKey = '') {
+      if (isRestoringKimikeaRoute) return;
+      const current = getCurrentKimikeaRoute();
+      const currentId = getKimikeaRouteId(current);
+      const nextId = getKimikeaRouteId({ name: nextName, key: nextKey });
+      if (!current || currentId === nextId) return;
+      const previous = kimikeaAppHistory[kimikeaAppHistory.length - 1];
+      if (previous && getKimikeaRouteId(previous) === currentId) return;
+      kimikeaAppHistory.push(current);
+      if (kimikeaAppHistory.length > 24) kimikeaAppHistory.shift();
+    }
+
+    function restoreKimikeaRoute(route) {
+      isRestoringKimikeaRoute = true;
+      try {
+        if (!route || route.name === 'home') {
+          showHomePage();
+          return;
+        }
+        if (route.name === 'login') {
+          showOrderLogin();
+          return;
+        }
+        if (route.name === 'order') {
+          openOrderPage();
+          return;
+        }
+        if (route.name === 'public') {
+          if (route.key === 'search') {
+            openSearchPage();
+            return;
+          }
+          if (route.key === 'mypage') {
+            openMyPage();
+            return;
+          }
+          openPublicPage(route.key || 'notice');
+          return;
+        }
+        showHomePage();
+      } finally {
+        isRestoringKimikeaRoute = false;
+      }
+    }
+
     function showHomePage() {
+      rememberKimikeaRoute('home');
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
@@ -2379,6 +2621,7 @@
         showOrderLogin();
         return;
       }
+      rememberKimikeaRoute('order');
       document.getElementById('homeView').hidden = true;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = false;
@@ -2419,6 +2662,8 @@
     };
 
     function openPublicPage(pageKey) {
+      rememberKimikeaRoute('public', pageKey);
+      currentPublicPageKey = pageKey;
       const page = publicPages[pageKey] || publicPages.notice;
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
@@ -2536,6 +2781,8 @@
     }
 
     function openSearchPage() {
+      rememberKimikeaRoute('public', 'search');
+      currentPublicPageKey = 'search';
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
       document.getElementById('publicPageView').hidden = false;
@@ -2569,6 +2816,8 @@
         setMessage('loginMessage', 'マイページを見るには登録済みメールアドレスとパスワードでログインしてください。', false);
         return;
       }
+      rememberKimikeaRoute('public', 'mypage');
+      currentPublicPageKey = 'mypage';
       const franchise = state.franchise || {};
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
@@ -2733,14 +2982,9 @@
     }
 
     function goKimikeaBackFromNav() {
-      const orderWorkspace = document.getElementById('orderWorkspace');
-      const isOrderVisible = orderWorkspace && !orderWorkspace.hidden;
-      if (isOrderVisible) {
-        showOrderLogin();
-        return true;
-      }
-      if (window.history.length > 1) {
-        window.history.back();
+      const previousRoute = kimikeaAppHistory.pop();
+      if (previousRoute) {
+        restoreKimikeaRoute(previousRoute);
         return true;
       }
       goKimikeaHomeFromNav();
