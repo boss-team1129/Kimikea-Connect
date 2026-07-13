@@ -17,7 +17,7 @@
   <link id="manifestLink" rel="manifest">
   <link rel="canonical" href="https://boss-team1129.github.io/Kimikea-Connect/">
   <title>Kimikea Connect</title>
-  <link rel="stylesheet" href="./shared-nav.css?v=20260713-gallery-1">
+  <link rel="stylesheet" href="./shared-nav.css?v=20260713-polish-1">
   <style>
     :root {
       --black: #111111;
@@ -540,7 +540,7 @@
       position: relative;
       display: grid;
       gap: 0;
-      padding: 2px 0 24px;
+      padding: 2px 0 118px;
       isolation: isolate;
     }
     .home-gallery::before {
@@ -562,7 +562,7 @@
       grid-template-columns: 1fr 38px;
       align-items: start;
       gap: 14px;
-      width: min(92vw, 620px);
+      width: min(90vw, 420px);
       margin: 2px auto 14px;
       padding: 0 2px;
     }
@@ -595,13 +595,13 @@
     .home-gallery-list {
       display: grid;
       justify-items: center;
-      padding-bottom: 18px;
+      padding-bottom: 28px;
     }
     .home-gallery-card {
       position: relative;
-      width: min(92vw, 620px);
-      min-height: 124px;
-      margin: 0 auto -10px;
+      width: min(90vw, 420px);
+      min-height: 128px;
+      margin: 0 auto -12px;
       overflow: hidden;
       border: 1px solid rgba(255,255,255,0.72);
       border-radius: 22px;
@@ -611,23 +611,23 @@
         0 22px 48px rgba(39, 32, 21, 0.16),
         inset 0 1px 0 rgba(255,255,255,0.22);
       cursor: pointer;
-      transform: translateY(10px) scale(0.985);
+      transform: translateY(10px);
       opacity: 0.98;
       transition: transform 280ms ease, box-shadow 280ms ease, opacity 280ms ease;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
     .home-gallery-card:first-child {
-      min-height: clamp(168px, 42vw, 196px);
+      min-height: 182px;
       margin-bottom: -12px;
     }
     .home-gallery-card:nth-child(even) {
-      width: min(89vw, 594px);
-      margin-left: max(4vw, calc((100vw - min(92vw, 620px)) / 2 + 18px));
+      width: min(90vw, 420px);
+      margin-left: auto;
     }
     .home-gallery-card:nth-child(odd):not(:first-child) {
-      width: min(89vw, 594px);
-      margin-right: max(4vw, calc((100vw - min(92vw, 620px)) / 2 + 18px));
+      width: min(90vw, 420px);
+      margin-right: auto;
     }
     .home-gallery-card.is-visible {
       transform: translateY(0) scale(1);
@@ -635,7 +635,7 @@
     }
     .home-gallery-card:hover,
     .home-gallery-card:focus-visible {
-      transform: translateY(-12px) scale(1.01);
+      transform: translateY(-12px) scale(1.005);
       box-shadow: 0 28px 60px rgba(39, 32, 21, 0.2);
       outline: none;
     }
@@ -673,11 +673,11 @@
       display: grid;
       align-content: end;
       min-height: inherit;
-      padding: 20px 58px 20px 20px;
+      padding: 18px 58px 18px 20px;
       text-align: left;
     }
     .home-gallery-card:first-child .home-gallery-copy {
-      padding: 26px 68px 24px 22px;
+      padding: 24px 68px 22px 22px;
     }
     .home-gallery-label {
       width: fit-content;
@@ -731,12 +731,12 @@
     }
     @media (min-width: 760px) {
       .home-gallery-list {
-        gap: 2px;
+        gap: 0;
       }
       .home-gallery-card,
       .home-gallery-card:nth-child(even),
       .home-gallery-card:nth-child(odd):not(:first-child) {
-        width: min(82vw, 720px);
+        width: min(90vw, 420px);
         margin-left: auto;
         margin-right: auto;
       }
@@ -3010,6 +3010,6 @@
     }
     runOpeningSplash();
   </script>
-  <script src="./shared-nav.js?v=20260713-gallery-1"></script>
+  <script src="./shared-nav.js?v=20260713-polish-1"></script>
 </body>
 </html>

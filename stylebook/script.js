@@ -549,7 +549,7 @@ function renderColorChoiceList() {
     const list = colors.filter(color => color.category === category);
     if (!list.length) return '';
     return `<section class="color-category"><h3>${escapeHtml(category)}</h3><div class="color-choice-grid">${list.map(color => `
-      <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}">
+      <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
         <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
         <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
         <small>${escapeHtml(color.category)}</small>
@@ -558,7 +558,7 @@ function renderColorChoiceList() {
   }).join('');
   const otherColors = colors.filter(color => !categories.includes(color.category));
   const otherHtml = otherColors.length ? `<section class="color-category"><h3>その他</h3><div class="color-choice-grid">${otherColors.map(color => `
-    <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}">
+    <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
       <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
       <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
       <small>${escapeHtml(color.category)}</small>
@@ -575,7 +575,9 @@ function renderColorChoiceList() {
   const selectedLabels = activeColors()
     .filter(color => selected.has(color.id))
     .map(colorDisplayLabel);
-  el.selectedColorSummary.textContent = selectedLabels.length ? `選択中：${selectedLabels.join('、')}` : '選択中の色はありません。';
+  el.selectedColorSummary.innerHTML = selectedLabels.length
+    ? `<strong>${selectedLabels.length}色選択中</strong><span>${selectedLabels.map(label => `<em>${escapeHtml(label)}</em>`).join('')}</span>`
+    : '<small>選択中の色はありません。</small>';
 }
 
 function renderStaffSelectForForm() {
