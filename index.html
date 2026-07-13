@@ -1150,10 +1150,10 @@
     <form id="loginForm" class="login-panel" onsubmit="handleLogin(event)">
       <h1 class="brand">Kimikea Connect</h1>
       <div class="brand-accent"></div>
-      <p class="lead">会員専用注文ページに進みます。<br>登録済みのメールアドレスとパスワードでログインしてください。</p>
+      <p class="lead">会員専用注文ページに進みます。<br>登録済みの会員IDまたはメールアドレスとパスワードでログインしてください。</p>
       <div class="field">
-        <label for="loginEmail">メールアドレス</label>
-        <input id="loginEmail" type="email" inputmode="email" autocomplete="username email" required>
+        <label for="loginEmail">会員IDまたはメールアドレス</label>
+        <input id="loginEmail" type="text" inputmode="email" autocomplete="username" required>
       </div>
       <div class="field">
         <label for="loginPassword">パスワード</label>
@@ -1623,11 +1623,11 @@
 
     function handleLogin(event) {
       event.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim();
+      const loginId = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value.normalize('NFKC').replace(/\s/g, '');
       document.getElementById('loginPassword').value = password;
-      if (!email || !password) {
-        setMessage('loginMessage', 'メールアドレスとパスワードを入力してください。', true);
+      if (!loginId || !password) {
+        setMessage('loginMessage', '会員IDまたはメールアドレスとパスワードを入力してください。', true);
         return;
       }
 
@@ -1640,7 +1640,7 @@
         return;
       }
 
-      callServer('loginFranchise', { email, password })
+      callServer('loginFranchise', { loginId, password })
         .then((response) => {
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
@@ -1656,7 +1656,7 @@
           const message = getErrorMessage(error);
           const safeMessage = message.includes('入力してください')
             ? message
-            : 'メールアドレスまたはパスワードが正しくありません。';
+            : '会員IDまたはメールアドレス、またはパスワードが正しくありません。';
           setMessage('loginMessage', safeMessage, true);
         });
     }

@@ -227,7 +227,9 @@ function getPublicOrderSettings(sessionToken) {
 }
 
 function loginFranchise(credentials) {
-  const email = normalizeEmail_(pickFirstDefined_(
+  const loginId = normalizeLoginIdentifier_(pickFirstDefined_(
+    credentials && credentials.loginId,
+    credentials && credentials.memberId,
     credentials && credentials.email,
     credentials && credentials.loginEmail,
     credentials && credentials.franchiseId
@@ -236,17 +238,16 @@ function loginFranchise(credentials) {
     credentials && credentials.password,
     credentials && credentials.loginPassword
   ));
-  if (!email || !password) {
-    throw new Error('メールアドレスとパスワードを入力してください。');
+  if (!loginId || !password) {
+    throw new Error('会員IDまたはメールアドレスとパスワードを入力してください。');
   }
 
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible
-    && item.email
-    && normalizeEmail_(item.email) === email
+    && isMatchingFranchiseLoginId_(item, loginId)
   ));
   if (!franchise || !isValidFranchisePassword_(franchise, password)) {
-    throw new Error('メールアドレスまたはパスワードが正しくありません。');
+    throw new Error('会員IDまたはメールアドレス、またはパスワードが正しくありません。');
   }
 
   const sessionToken = Utilities.getUuid();
@@ -1658,6 +1659,21 @@ function normalizeEmail_(value) {
     .normalize('NFKC')
     .trim()
     .toLowerCase();
+}
+
+function normalizeLoginIdentifier_(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+}
+
+function isMatchingFranchiseLoginId_(franchise, loginId) {
+  const normalizedLoginId = normalizeLoginIdentifier_(loginId);
+  if (!normalizedLoginId) return false;
+  return normalizeEmail_(franchise.email) === normalizedLoginId
+    || normalizeLoginIdentifier_(franchise.franchiseId) === normalizedLoginId
+    || normalizeLoginIdentifier_(franchise.memberId) === normalizedLoginId;
 }
 
 function normalizePhone_(value) {
