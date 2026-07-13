@@ -274,9 +274,9 @@
     .home-orbit-section {
       position: relative;
       display: grid;
-      gap: 12px;
-      min-height: min(640px, calc(100svh - 208px));
-      padding: 6px 0 max(20px, env(safe-area-inset-bottom));
+      gap: 8px;
+      min-height: min(540px, calc(100svh - 224px));
+      padding: 4px 0 max(16px, env(safe-area-inset-bottom));
       overflow: hidden;
       user-select: none;
     }
@@ -327,8 +327,8 @@
     .home-orbit-stage {
       position: relative;
       z-index: 1;
-      height: clamp(380px, 62svh, 560px);
-      min-height: 380px;
+      height: clamp(310px, 52svh, 450px);
+      min-height: 310px;
       margin: 0 -16px;
       outline: none;
       perspective: 980px;
@@ -339,9 +339,9 @@
     .home-orbit-stage::before {
       position: absolute;
       left: 50%;
-      bottom: 22px;
-      width: min(74vw, 420px);
-      height: 58px;
+      bottom: 14px;
+      width: min(64vw, 340px);
+      height: 44px;
       content: "";
       border-radius: 50%;
       background: radial-gradient(ellipse, rgba(65, 57, 47, 0.17), rgba(65, 57, 47, 0));
@@ -351,13 +351,13 @@
     }
     .home-orbit-item {
       position: absolute;
-      top: 42%;
+      top: 44%;
       left: 50%;
       display: grid;
       justify-items: center;
-      width: min(88vw, 420px);
-      min-height: 348px;
-      padding: 0 18px;
+      width: min(78vw, 340px);
+      min-height: 270px;
+      padding: 0 12px;
       border: 0;
       background: transparent;
       color: var(--text);
@@ -386,9 +386,9 @@
       position: relative;
       display: grid;
       place-items: center;
-      width: min(84vw, 390px);
-      height: min(84vw, 390px);
-      max-height: 420px;
+      width: min(62vw, 285px);
+      height: min(62vw, 285px);
+      max-height: 310px;
       pointer-events: none;
     }
     .home-orbit-item.is-active .home-orbit-image-wrap,
@@ -449,8 +449,8 @@
       z-index: 2;
       width: min(92vw, 430px);
       max-width: min(92vw, 430px);
-      margin-top: -14px;
-      padding: 12px 18px 0;
+      margin-top: -22px;
+      padding: 6px 14px 0;
       pointer-events: none;
       display: none;
     }
@@ -460,9 +460,9 @@
       display: grid;
       justify-items: center;
       width: min(92vw, 440px);
-      min-height: 112px;
-      margin: -34px auto 0;
-      padding: 10px 14px 0;
+      min-height: 96px;
+      margin: -38px auto 0;
+      padding: 6px 14px 0;
       text-align: center;
     }
     .home-orbit-title {
@@ -487,7 +487,7 @@
     }
     .home-orbit-description {
       display: block;
-      margin-top: 9px;
+      margin-top: 6px;
       color: #65777d;
       font-size: clamp(13px, 3.5vw, 16px);
       font-weight: 760;
@@ -497,7 +497,7 @@
     .home-orbit-active-description {
       display: block;
       max-width: 34em;
-      margin-top: 9px;
+      margin-top: 6px;
       color: #65777d;
       font-size: clamp(13px, 3.5vw, 16px);
       font-weight: 760;
@@ -509,9 +509,12 @@
       z-index: 3;
       display: flex;
       justify-content: center;
-      gap: 8px;
-      min-height: 24px;
-      padding-bottom: 4px;
+      gap: 6px;
+      min-height: 22px;
+      max-width: min(86vw, 320px);
+      margin-inline: auto;
+      padding-bottom: 2px;
+      flex-wrap: wrap;
     }
     .home-menu-dot {
       width: 8px;
@@ -1019,31 +1022,31 @@
         padding: 18px 18px;
       }
       .home-orbit-section {
-        min-height: min(560px, calc(100svh - 190px));
-        padding-bottom: max(22px, env(safe-area-inset-bottom));
+        min-height: min(470px, calc(100svh - 206px));
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
       }
       .home-orbit-stage {
-        height: clamp(320px, 48svh, 460px);
-        min-height: 320px;
+        height: clamp(270px, 42svh, 380px);
+        min-height: 270px;
         margin-inline: -12px;
       }
       .home-orbit-item {
-        top: 42%;
-        width: min(90vw, 390px);
-        min-height: 292px;
-        padding-inline: 10px;
+        top: 45%;
+        width: min(80vw, 320px);
+        min-height: 236px;
+        padding-inline: 8px;
       }
       .home-orbit-image-wrap {
-        width: min(78vw, 330px);
-        height: min(78vw, 330px);
+        width: min(60vw, 245px);
+        height: min(60vw, 245px);
       }
       .home-orbit-copy {
         max-width: 88vw;
-        margin-top: -20px;
+        margin-top: -26px;
       }
       .home-orbit-active-copy {
-        min-height: 96px;
-        margin-top: -52px;
+        min-height: 84px;
+        margin-top: -42px;
       }
       .member-summary { grid-template-columns: 1fr; gap: 10px; padding: 15px; }
       .panel { padding: 16px 14px; margin-bottom: 10px; }
