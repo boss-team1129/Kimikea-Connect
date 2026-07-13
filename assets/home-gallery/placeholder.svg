@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-label="Kimikea Connect placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbf8f1"/>
+      <stop offset="0.55" stop-color="#eadcc5"/>
+      <stop offset="1" stop-color="#c8a76a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="72%" cy="28%" r="55%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <rect width="1200" height="700" fill="url(#glow)"/>
+  <path d="M760 120c-85 52-142 134-144 222-1 79 43 143 112 190 35 24 76 42 116 53-69-69-89-140-51-214 35-69 101-104 118-174 12-49-22-82-151-77Z" fill="#2c231b" opacity="0.85"/>
+  <path d="M782 140c-43 68-56 130-38 188 23 72 92 117 126 176 20 36 23 72 10 110 74-55 116-128 106-207-9-78-68-151-204-267Z" fill="#b98b3e" opacity="0.82"/>
+  <path d="M330 460h360" stroke="#fff7e7" stroke-width="7" stroke-linecap="round" opacity="0.66"/>
+  <path d="M330 506h240" stroke="#fff7e7" stroke-width="7" stroke-linecap="round" opacity="0.46"/>
+</svg>

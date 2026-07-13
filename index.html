@@ -600,7 +600,7 @@
     .home-gallery-card {
       position: relative;
       width: min(90vw, 420px);
-      min-height: 128px;
+      height: 136px;
       margin: 0 auto -12px;
       overflow: hidden;
       border: 1px solid rgba(255,255,255,0.72);
@@ -618,15 +618,17 @@
       touch-action: manipulation;
     }
     .home-gallery-card:first-child {
-      min-height: 182px;
+      height: 136px;
       margin-bottom: -12px;
     }
     .home-gallery-card:nth-child(even) {
       width: min(90vw, 420px);
       margin-left: auto;
+      margin-right: auto;
     }
     .home-gallery-card:nth-child(odd):not(:first-child) {
       width: min(90vw, 420px);
+      margin-left: auto;
       margin-right: auto;
     }
     .home-gallery-card.is-visible {
@@ -646,33 +648,44 @@
     .home-gallery-image {
       position: absolute;
       inset: 0;
-      background-image:
-        linear-gradient(90deg, rgba(9, 9, 9, 0.78), rgba(9, 9, 9, 0.34) 48%, rgba(9, 9, 9, 0.1)),
-        var(--home-card-image);
-      background-position: var(--home-card-position, center);
-      background-size: cover;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: var(--home-card-position, center);
       transform: scale(1.03);
       transition: transform 420ms ease;
+      user-select: none;
+      -webkit-user-drag: none;
     }
     .home-gallery-card:hover .home-gallery-image,
     .home-gallery-card:focus-visible .home-gallery-image {
       transform: scale(1.07);
     }
+    .home-gallery-card::before,
     .home-gallery-card::after {
       position: absolute;
       inset: 0;
       content: "";
+      pointer-events: none;
+    }
+    .home-gallery-card::before {
+      z-index: 1;
+      background:
+        linear-gradient(90deg, rgba(9, 9, 9, 0.74), rgba(9, 9, 9, 0.38) 48%, rgba(9, 9, 9, 0.16)),
+        linear-gradient(0deg, rgba(9, 9, 9, 0.16), transparent 54%);
+    }
+    .home-gallery-card::after {
+      z-index: 2;
       background:
         linear-gradient(135deg, rgba(255,255,255,0.18), transparent 34%),
         linear-gradient(0deg, rgba(191, 158, 86, 0.18), transparent 42%);
-      pointer-events: none;
     }
     .home-gallery-copy {
       position: relative;
-      z-index: 1;
+      z-index: 3;
       display: grid;
       align-content: end;
-      min-height: inherit;
+      min-height: 100%;
       padding: 18px 58px 18px 20px;
       text-align: left;
     }
@@ -715,7 +728,7 @@
       position: absolute;
       right: 18px;
       bottom: 18px;
-      z-index: 2;
+      z-index: 4;
       display: grid;
       width: 38px;
       height: 38px;
@@ -1905,14 +1918,16 @@
         : '公開アプリ';
     }
 
+    const HOME_GALLERY_PLACEHOLDER = 'assets/home-gallery/placeholder.svg';
+
     const HOME_GALLERY_CARDS = [
       {
         key: 'stylebook',
         label: 'STYLE BOOK',
         title: 'スタイル図鑑',
         subtitle: '最新スタイルを探す・保存する',
-        imageUrl: 'assets/home-gallery/stylebook.webp',
-        imagePosition: 'center 44%',
+        imageUrl: 'assets/home-gallery/stylebook.jpg',
+        imagePosition: 'center center',
         sortOrder: 10,
         isVisible: true,
       },
@@ -1921,8 +1936,8 @@
         label: 'MEMBERS ONLY',
         title: 'エクステ注文',
         subtitle: '会員専用の注文ページ',
-        imageUrl: 'assets/home-gallery/order.webp',
-        imagePosition: 'center 42%',
+        imageUrl: 'assets/home-gallery/order.jpg',
+        imagePosition: 'center center',
         sortOrder: 20,
         isVisible: true,
       },
@@ -1931,8 +1946,8 @@
         label: 'ACADEMY',
         title: '講習案内',
         subtitle: '講習情報・動画でスキルアップ',
-        imageUrl: 'assets/home-gallery/academy.webp',
-        imagePosition: 'center 45%',
+        imageUrl: 'assets/home-gallery/academy.jpg',
+        imagePosition: 'center center',
         sortOrder: 30,
         isVisible: true,
       },
@@ -1941,8 +1956,8 @@
         label: 'SALON MAP',
         title: '加盟店マップ',
         subtitle: '加盟店・コーディネーターを探す',
-        imageUrl: 'assets/home-gallery/salon-map.webp',
-        imagePosition: 'center 50%',
+        imageUrl: 'assets/home-gallery/map.jpg',
+        imagePosition: 'center center',
         sortOrder: 40,
         isVisible: true,
       },
@@ -1951,8 +1966,8 @@
         label: 'NEWS',
         title: 'お知らせ',
         subtitle: 'お知らせ・最新情報',
-        imageUrl: 'assets/home-gallery/news.webp',
-        imagePosition: 'center 46%',
+        imageUrl: 'assets/home-gallery/news.jpg',
+        imagePosition: 'center center',
         sortOrder: 50,
         isVisible: true,
       },
@@ -1961,8 +1976,8 @@
         label: 'RANKING',
         title: '人気ランキング',
         subtitle: '人気ランキングを見る',
-        imageUrl: 'assets/home-gallery/ranking.webp',
-        imagePosition: 'center 46%',
+        imageUrl: 'assets/home-gallery/ranking.jpg',
+        imagePosition: 'center center',
         sortOrder: 60,
         isVisible: true,
       },
@@ -1971,8 +1986,8 @@
         label: 'AI ASSISTANT',
         title: 'あなたのピッタリを探す',
         subtitle: '似合う色やスタイルを提案',
-        imageUrl: 'assets/home-gallery/ai-assistant.webp',
-        imagePosition: 'center 48%',
+        imageUrl: 'assets/home-gallery/ai.jpg',
+        imagePosition: 'center center',
         sortOrder: 70,
         isVisible: true,
       },
@@ -1991,10 +2006,18 @@
           data-home-gallery-card
           data-menu-key="${escapeHtml(card.key)}"
           onclick="openHomeGalleryCard(event, '${escapeHtml(card.key)}')"
-          style="--home-card-image: url('${escapeHtml(card.imageUrl)}'); --home-card-position: ${escapeHtml(card.imagePosition || 'center')}"
+          style="--home-card-position: ${escapeHtml(card.imagePosition || 'center')}"
           aria-label="${escapeHtml(card.title)}を開く"
         >
-          <span class="home-gallery-image" aria-hidden="true"></span>
+          <img
+            class="home-gallery-image"
+            src="${escapeHtml(card.imageUrl)}"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onerror="this.onerror=null; this.src='${escapeHtml(HOME_GALLERY_PLACEHOLDER)}';"
+            aria-hidden="true"
+          >
           <span class="home-gallery-copy">
             <span class="home-gallery-label">${escapeHtml(card.label)}</span>
             <h3>${escapeHtml(card.title)}</h3>
