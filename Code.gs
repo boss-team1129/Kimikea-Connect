@@ -130,6 +130,11 @@ function doGet(event) {
 function handleJsonpApi_(event) {
   const callback = String(event.parameter.callback || '').trim();
   const apiName = String(event.parameter.api || '').trim();
+  logOrderDebug_('JSONP request received', {
+    apiName,
+    hasArgs: Boolean(event.parameter.args),
+    callback,
+  });
   if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
     return ContentService
       .createTextOutput(JSON.stringify({ ok: false, error: 'Invalid callback.' }))
@@ -160,6 +165,10 @@ function handleJsonpApi_(event) {
     }
     payload = { ok: true, data: allowedApi[apiName].apply(null, args) };
   } catch (error) {
+    logOrderDebug_('JSONP request failed', {
+      apiName,
+      error: error && error.message ? error.message : String(error),
+    });
     payload = { ok: false, error: error && error.message ? error.message : String(error) };
   }
 
@@ -238,15 +247,60 @@ function loginFranchise(credentials) {
     credentials && credentials.password,
     credentials && credentials.loginPassword
   ));
+  logOrderDebug_('loginFranchise received', {
+    receivedLoginId: loginId,
+    receivedPasswordLength: password.length,
+    receivedPasswordNormalized: password,
+  });
   if (!loginId || !password) {
+    logOrderDebug_('loginFranchise failed', {
+      reason: 'missing_login_id_or_password',
+      receivedLoginId: loginId,
+      receivedPasswordLength: password.length,
+    });
     throw new Error('会員IDまたはメールアドレスとパスワードを入力してください。');
   }
 
-  const franchise = getFranchiseMasterRecords_().find((item) => (
+  const franchises = getFranchiseMasterRecords_();
+  logOrderDebug_('loginFranchise franchise records loaded', {
+    searchedFranchiseCount: franchises.length,
+    loginId,
+    candidates: franchises.map((item) => ({
+      rowNumber: item.rowNumber,
+      franchiseId: item.franchiseId,
+      franchiseName: item.franchiseName,
+      email: normalizeEmail_(item.email),
+      visible: item.visible,
+      membershipStatus: item.membershipStatus,
+      hasPasswordHash: Boolean(item.passwordHash),
+      initialPassword: item.initialPassword,
+    })),
+  });
+  const franchise = franchises.find((item) => (
     item.visible
     && isMatchingFranchiseLoginId_(item, loginId)
   ));
-  if (!franchise || !isValidFranchisePassword_(franchise, password)) {
+  const passwordResult = franchise ? getFranchisePasswordCheckResult_(franchise, password) : {
+    ok: false,
+    reason: 'no_matching_user',
+  };
+  logOrderDebug_('loginFranchise match result', {
+    loginId,
+    matchedUser: franchise ? {
+      rowNumber: franchise.rowNumber,
+      franchiseId: franchise.franchiseId,
+      franchiseName: franchise.franchiseName,
+      email: normalizeEmail_(franchise.email),
+      visible: franchise.visible,
+      membershipStatus: franchise.membershipStatus,
+    } : null,
+    passwordComparison: passwordResult,
+  });
+  if (!franchise || !passwordResult.ok) {
+    logOrderDebug_('loginFranchise failed', {
+      reason: franchise ? passwordResult.reason : 'no_matching_user',
+      loginId,
+    });
     throw new Error('会員IDまたはメールアドレス、またはパスワードが正しくありません。');
   }
 
@@ -1568,6 +1622,24 @@ function getFranchiseMasterRecords_() {
   const createdAtIndex = findHeaderIndex(['createdAt', '作成日', '登録日']);
   const updatedAtIndex = findHeaderIndex(['updatedAt', '更新日']);
   const visibleIndex = findHeaderIndex(['表示']);
+  logOrderDebug_('getFranchiseMasterRecords headers', {
+    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    spreadsheetName: SpreadsheetApp.getActiveSpreadsheet().getName(),
+    sheetName: sheet.getName(),
+    totalRowsIncludingHeader: values.length,
+    rawHeaders: values[0].map(String),
+    normalizedHeaders: headers,
+    indexes: {
+      franchiseIdIndex,
+      franchiseNameIndex,
+      emailIndex,
+      phoneIndex,
+      passwordIndex,
+      passwordHashIndex,
+      membershipStatusIndex,
+      visibleIndex,
+    },
+  });
 
   const requiredHeaders = [
     ['memberId', franchiseIdIndex],
@@ -1582,7 +1654,7 @@ function getFranchiseMasterRecords_() {
     throw new Error(`加盟店マスタに必要なヘッダーがありません：${missingHeaders.join('、')}`);
   }
 
-  return values.slice(1)
+  const records = values.slice(1)
     .map((row, offset) => {
       const rawStatus = membershipStatusIndex === -1 ? '' : String(row[membershipStatusIndex] || '').trim();
       const visible = visibleIndex === -1 ? true : isVisible_(row[visibleIndex]);
@@ -1614,6 +1686,20 @@ function getFranchiseMasterRecords_() {
     })
     .filter((franchise) => franchise.visible)
     .filter((franchise) => franchise.franchiseId && franchise.franchiseName);
+  logOrderDebug_('getFranchiseMasterRecords result', {
+    activeRecordCount: records.length,
+    records: records.map((item) => ({
+      rowNumber: item.rowNumber,
+      franchiseId: item.franchiseId,
+      franchiseName: item.franchiseName,
+      email: normalizeEmail_(item.email),
+      visible: item.visible,
+      membershipStatus: item.membershipStatus,
+      initialPassword: item.initialPassword,
+      hasPasswordHash: Boolean(item.passwordHash),
+    })),
+  });
+  return records;
 }
 
 function getVisibleFranchises(sessionToken) {
@@ -1729,12 +1815,36 @@ function isInitialPasswordLogin_(franchise, password) {
 }
 
 function isValidFranchisePassword_(franchise, password) {
+  return getFranchisePasswordCheckResult_(franchise, password).ok;
+}
+
+function getFranchisePasswordCheckResult_(franchise, password) {
   const normalizedPassword = normalizeLoginPassword_(password);
-  if (!normalizedPassword) return false;
-  if (franchise.passwordHash) {
-    return franchise.passwordHash === hashPassword_(normalizedPassword);
+  if (!normalizedPassword) {
+    return { ok: false, reason: 'empty_password' };
   }
-  return isInitialPasswordLogin_(franchise, normalizedPassword);
+  if (!franchise) {
+    return { ok: false, reason: 'missing_franchise' };
+  }
+  if (franchise.passwordHash) {
+    const loginHash = hashPassword_(normalizedPassword);
+    return {
+      ok: franchise.passwordHash === loginHash,
+      reason: franchise.passwordHash === loginHash ? 'changed_password_match' : 'changed_password_mismatch',
+      mode: 'passwordHash',
+      loginHashPrefix: loginHash.slice(0, 10),
+      storedHashPrefix: String(franchise.passwordHash).slice(0, 10),
+    };
+  }
+  const storedInitialPassword = normalizeInitialPasswordValue_(franchise.initialPassword);
+  const initialMatch = isInitialPasswordLogin_(franchise, normalizedPassword);
+  return {
+    ok: initialMatch,
+    reason: initialMatch ? 'initial_password_match' : 'initial_password_mismatch',
+    mode: 'initialPassword',
+    storedInitialPassword,
+    normalizedLoginPassword: normalizedPassword,
+  };
 }
 
 function validateNewPassword_(newPassword, confirmPassword) {
@@ -1887,6 +1997,14 @@ function applyHeaderStyle_(sheet, colCount) {
 function isVisible_(value) {
   const text = String(value || '').trim().toUpperCase();
   return value === true || text === 'TRUE' || text === 'ON' || value === '表示' || value === '表示する';
+}
+
+function logOrderDebug_(label, data) {
+  try {
+    Logger.log(`[KCO DEBUG] ${label}: ${JSON.stringify(data)}`);
+  } catch (error) {
+    Logger.log(`[KCO DEBUG] ${label}: ${String(data)}`);
+  }
 }
 
 function normalize_(value) {

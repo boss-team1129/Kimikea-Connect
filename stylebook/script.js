@@ -2,6 +2,7 @@ const DB_KEY = 'kimikea_stylebook_gallery_db_v1';
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
+const DEBUG_STYLEBOOK = true;
 
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
@@ -33,7 +34,7 @@ const state = {
   backendMode: 'local',
   isLoading: false,
   adminTab: 'posts',
-  lastDirectMenuTapAt: 0,
+  actionEventCount: 0,
 };
 
 const el = {
@@ -109,6 +110,15 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function debugStylebook(label, data = {}) {
+  if (!DEBUG_STYLEBOOK) return;
+  try {
+    console.info(`[Kimikea Stylebook DEBUG] ${label}`, data);
+  } catch (error) {
+    console.info(`[Kimikea Stylebook DEBUG] ${label}`);
+  }
 }
 
 function driveFileIdFromUrl(url) {
@@ -263,6 +273,10 @@ function hasRemoteApi() {
 
 async function apiRequest(action, payload = {}) {
   if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
+  debugStylebook('API POST request', {
+    action,
+    userId: currentUser()?.id || state.currentUserId,
+  });
   const response = await fetch(STYLEBOOK_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -273,11 +287,21 @@ async function apiRequest(action, payload = {}) {
     }),
   });
   const data = await response.json();
+  debugStylebook('API POST response', {
+    action,
+    ok: data.ok,
+    message: data.message || '',
+    colorCount: data.database?.extensionColors?.length,
+  });
   if (!data.ok) throw new Error(data.message || '処理に失敗しました。');
   return data;
 }
 
 async function loadRemoteDb() {
+  debugStylebook('API database request', {
+    url: STYLEBOOK_API_URL,
+    userId: state.currentUserId,
+  });
   const response = await fetch(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}`, {
     cache: 'no-store',
   });
@@ -286,6 +310,23 @@ async function loadRemoteDb() {
   state.db = data.database;
   state.backendMode = 'remote';
   localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+  debugStylebook('API database response counts', {
+    posts: state.db.stylePosts?.length || 0,
+    colorsFromApi: state.db.extensionColors?.length || 0,
+    activeColorsFromApi: (state.db.extensionColors || []).filter(color => color.isActive).length,
+    types: state.db.styleTypes?.length || 0,
+    shops: state.db.shops?.length || 0,
+    staff: state.db.staff?.length || 0,
+    users: state.db.users?.length || 0,
+    firstColors: (state.db.extensionColors || []).slice(0, 12).map(color => ({
+      id: color.id,
+      productCode: color.productCode,
+      category: color.category,
+      colorCode: color.colorCode,
+      colorName: color.colorName,
+      productColor: color.productColor,
+    })),
+  });
 }
 
 async function loadDb() {
@@ -425,11 +466,19 @@ function updateRoleVisibility() {
 }
 
 function renderFilterControls() {
-  const colorGroups = activeColors()
+  const activeColorList = activeColors();
+  debugStylebook('renderFilterControls color counts', {
+    apiColors: state.db.extensionColors?.length || 0,
+    activeColors: activeColorList.length,
+  });
+  const colorGroups = activeColorList
     .map(color => `<button type="button" class="chip ${state.selectedColorIds.has(color.id) ? 'active' : ''}" data-filter-color="${color.id}">
       <span class="swatch" style="${colorSwatchStyle(color)}"></span>${escapeHtml(colorDisplayLabel(color))}
     </button>`).join('');
   el.colorFilters.innerHTML = colorGroups;
+  debugStylebook('renderFilterControls rendered colors', {
+    renderedFilterButtons: el.colorFilters.querySelectorAll('[data-filter-color]').length,
+  });
 
   el.styleFilters.innerHTML = state.db.styleTypes
     .filter(type => type.isActive)
@@ -448,9 +497,17 @@ function renderFilterControls() {
 }
 
 function renderSelectOptions() {
-  el.colorSelect.innerHTML = activeColors()
+  const activeColorList = activeColors();
+  debugStylebook('renderSelectOptions color counts', {
+    apiColors: state.db.extensionColors?.length || 0,
+    activeColors: activeColorList.length,
+  });
+  el.colorSelect.innerHTML = activeColorList
     .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(colorDisplayLabel(color))}</option>`)
     .join('');
+  debugStylebook('renderSelectOptions rendered colors', {
+    colorSelectOptions: el.colorSelect.options.length,
+  });
   renderColorChoiceList();
   el.styleTypeSelect.innerHTML = state.db.styleTypes
     .filter(type => type.isActive)
@@ -475,9 +532,16 @@ function renderColorChoiceList() {
   const query = (el.colorSearchInput?.value || '').trim().toLowerCase();
   const selected = new Set(selectedValues(el.colorSelect));
   const categories = ['ダークカラー', 'ライトカラー', '原色'];
-  const colors = activeColors().filter(color => {
+  const activeColorList = activeColors();
+  const colors = activeColorList.filter(color => {
     if (!query) return true;
     return [color.colorCode, color.colorName, color.category].join(' ').toLowerCase().includes(query);
+  });
+  debugStylebook('renderColorChoiceList counts before render', {
+    query,
+    apiColors: state.db.extensionColors?.length || 0,
+    activeColors: activeColorList.length,
+    filteredColors: colors.length,
   });
   const categoryHtml = categories.map(category => {
     const list = colors.filter(color => color.category === category);
@@ -499,6 +563,13 @@ function renderColorChoiceList() {
     </button>
   `).join('')}</div></section>` : '';
   el.colorChoiceList.innerHTML = categoryHtml + otherHtml || '<p class="empty-state compact">該当する色がありません。</p>';
+  debugStylebook('renderColorChoiceList rendered colors', {
+    renderedColorChoiceButtons: el.colorChoiceList.querySelectorAll('[data-color-choice]').length,
+    byCategory: categories.reduce((result, category) => {
+      result[category] = colors.filter(color => color.category === category).length;
+      return result;
+    }, {}),
+  });
   const selectedLabels = activeColors()
     .filter(color => selected.has(color.id))
     .map(colorDisplayLabel);
@@ -784,6 +855,12 @@ function handleActionElement(action) {
   const id = action.dataset.id;
   const actionName = action.dataset.action;
   if (!actionName) return false;
+  debugStylebook('handleActionElement', {
+    actionName,
+    id,
+    currentView: state.currentView,
+    actionEventCount: state.actionEventCount,
+  });
 
   if (actionName === 'detail') showDetail(id);
   else if (actionName === 'save') toggleSave(id);
@@ -1190,6 +1267,17 @@ function clearFilters() {
 }
 
 function bindEvents() {
+  debugStylebook('bindEvents start', {
+    menuCards: document.querySelectorAll('.menu-card[data-action]').length,
+    dataActionElements: document.querySelectorAll('[data-action]').length,
+    bottomNav: document.querySelectorAll('.kc-bottom-nav, .shared-bottom-nav, [data-kc-bottom-nav]').length,
+    menuCardPointerEvents: Array.from(document.querySelectorAll('.menu-card[data-action]')).map(card => ({
+      action: card.dataset.action,
+      pointerEvents: window.getComputedStyle(card).pointerEvents,
+      zIndex: window.getComputedStyle(card).zIndex,
+      position: window.getComputedStyle(card).position,
+    })),
+  });
   if (el.userSelect) {
     el.userSelect.addEventListener('change', async () => {
       state.currentUserId = el.userSelect.value;
@@ -1244,6 +1332,21 @@ function bindEvents() {
   el.cancelEditButton.addEventListener('click', clearPostForm);
   el.openAdminButton.addEventListener('click', renderAdmin);
   document.addEventListener('click', event => {
+    state.actionEventCount += 1;
+    const actionCandidate = event.target.closest('[data-action]');
+    if (actionCandidate) {
+      debugStylebook('document click action candidate', {
+        eventType: event.type,
+        action: actionCandidate.dataset.action,
+        targetTag: event.target.tagName,
+        targetClass: event.target.className,
+        currentTargetTag: actionCandidate.tagName,
+        defaultPreventedBefore: event.defaultPrevented,
+        pointerEvents: window.getComputedStyle(actionCandidate).pointerEvents,
+        zIndex: window.getComputedStyle(actionCandidate).zIndex,
+        path: event.composedPath ? event.composedPath().slice(0, 6).map(node => node.id || node.className || node.tagName).join(' > ') : '',
+      });
+    }
     const colorButton = event.target.closest('[data-filter-color]');
     if (colorButton) {
       const id = colorButton.dataset.filterColor;
@@ -1281,15 +1384,8 @@ function bindEvents() {
     }
     const action = event.target.closest('[data-action]');
     if (!action) return;
-    if (Date.now() - state.lastDirectMenuTapAt < 450 && action.closest('.menu-card')) return;
+    event.preventDefault();
     handleActionElement(action);
-  });
-  document.querySelectorAll('.menu-card[data-action]').forEach(card => {
-    card.addEventListener('touchend', event => {
-      event.preventDefault();
-      state.lastDirectMenuTapAt = Date.now();
-      handleActionElement(card);
-    }, { passive: false });
   });
   document.querySelectorAll('[data-admin-tab]').forEach(button => {
     button.addEventListener('click', () => {

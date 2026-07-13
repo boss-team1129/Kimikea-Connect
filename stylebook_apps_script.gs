@@ -62,6 +62,11 @@ const KC_USER_HEADERS = ['id', 'name', 'email', 'role', 'shopId', 'staffId'];
 function doGet(e) {
   const action = e.parameter.action || 'database';
   const userId = e.parameter.userId || 'user-member';
+  logStylebookDebug_('doGet received', {
+    action,
+    userId,
+    parameters: e && e.parameter ? e.parameter : {},
+  });
   if (action === 'database' || action === 'list') {
     return json_({ ok: true, database: getStylebookDatabase_(userId) });
   }
@@ -110,6 +115,18 @@ function getStylebookDatabase_(userId) {
   const staff = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF)).map(normalizeBooleans_);
   const users = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.USERS));
   if (!users.some(user => user.id === userId) && users.length) userId = users[0].id;
+  logStylebookDebug_('database response counts', {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    userId,
+    posts: posts.length,
+    saves: saves.length,
+    colors: colors.length,
+    types: types.length,
+    shops: shops.length,
+    staff: staff.length,
+    users: users.length,
+  });
   return {
     stylePosts: posts,
     savedStyles: saves,
@@ -304,7 +321,14 @@ function getProductMasterColors_(ss) {
   setHeaders_(sheet, KC_PRODUCT_MASTER_HEADERS);
   fillMissingProductCodes_(sheet);
   const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
+  if (values.length < 2) {
+    logStylebookDebug_('product master empty', {
+      spreadsheetId: ss.getId(),
+      sheetName: sheet.getName(),
+      totalRowsIncludingHeader: values.length,
+    });
+    return [];
+  }
 
   const headers = values[0].map(normalizeHeaderName_);
   const indexes = {
@@ -317,23 +341,58 @@ function getProductMasterColors_(ss) {
     stock: headers.indexOf(normalizeHeaderName_('在庫')),
   };
   if (indexes.category < 0 || indexes.color < 0 || indexes.visible < 0) {
+    logStylebookDebug_('product master missing headers', {
+      rawHeaders: values[0].map(String),
+      normalizedHeaders: headers,
+      indexes,
+    });
     throw new Error('商品マスタに必要な列がありません。商品カテゴリー・カラー・表示を確認してください。');
   }
 
   const colors = [];
   const seenKeys = {};
+  const diagnostics = {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: sheet.getName(),
+    totalRowsIncludingHeader: values.length,
+    dataRows: Math.max(values.length - 1, 0),
+    rawHeaders: values[0].map(String),
+    normalizedHeaders: headers,
+    indexes,
+    skippedBlankCategory: 0,
+    skippedBlankColor: 0,
+    skippedHidden: 0,
+    skippedDuplicate: 0,
+    acceptedByCategory: {},
+  };
   values.slice(1).forEach((row, index) => {
     const category = String(row[indexes.category] || '').trim();
     const colorValue = String(row[indexes.color] || '').trim();
-    const productCode = String(row[indexes.productCode] || '').trim();
+    const productCode = indexes.productCode >= 0 ? String(row[indexes.productCode] || '').trim() : '';
     const visible = normalizeBoolean_(row[indexes.visible]);
-    if (!category || !colorValue || !visible) return;
+    if (!category) {
+      diagnostics.skippedBlankCategory += 1;
+      return;
+    }
+    if (!colorValue) {
+      diagnostics.skippedBlankColor += 1;
+      return;
+    }
+    if (!visible) {
+      diagnostics.skippedHidden += 1;
+      return;
+    }
     const dedupeKey = `${normalizeHeaderName_(category)}::${normalizeHeaderName_(colorValue)}`;
-    if (seenKeys[dedupeKey]) return;
+    if (seenKeys[dedupeKey]) {
+      diagnostics.skippedDuplicate += 1;
+      return;
+    }
     seenKeys[dedupeKey] = true;
 
     const parsed = parseProductColor_(colorValue);
     const fallbackProductCode = productCode || createDefaultProductCode_(category, index + 1);
+    diagnostics.acceptedByCategory[category] = Number(diagnostics.acceptedByCategory[category] || 0) + 1;
     colors.push({
       id: fallbackProductCode,
       colorId: fallbackProductCode,
@@ -351,6 +410,16 @@ function getProductMasterColors_(ss) {
       stock: indexes.stock >= 0 ? row[indexes.stock] : '',
     });
   });
+  diagnostics.returnedColors = colors.length;
+  diagnostics.firstColors = colors.slice(0, 12).map(color => ({
+    id: color.id,
+    category: color.category,
+    colorCode: color.colorCode,
+    colorName: color.colorName,
+    productColor: color.productColor,
+    productCode: color.productCode,
+  }));
+  logStylebookDebug_('product master colors loaded', diagnostics);
   return colors;
 }
 
@@ -510,6 +579,14 @@ function getFileUrl_(fileId) {
 
 function driveViewUrl_(fileId) {
   return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
+}
+
+function logStylebookDebug_(label, data) {
+  try {
+    Logger.log(`[STYLEBOOK DEBUG] ${label}: ${JSON.stringify(data)}`);
+  } catch (error) {
+    Logger.log(`[STYLEBOOK DEBUG] ${label}: ${String(data)}`);
+  }
 }
 
 function getOrCreateImageFolder_() {
