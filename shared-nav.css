@@ -83,6 +83,13 @@ body.kc-has-bottom-nav .tabs {
   transform: scale(0.94);
 }
 
+.kc-bottom-nav__button.is-disabled,
+.kc-bottom-nav__button:disabled {
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .kc-bottom-nav__button:hover,
 .kc-bottom-nav__button:focus-visible {
   background: rgba(255, 255, 255, 0.72);

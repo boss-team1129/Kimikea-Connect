@@ -47,11 +47,23 @@
       const handled = window.KimikeaConnectNav.back();
       if (handled !== false) return;
     }
-    if (window.history.length > 1) {
-      window.history.back();
+    setBackEnabled(false);
+  }
+
+  function setBackEnabled(enabled) {
+    const button = document.querySelector('[data-kc-nav-action="back"]');
+    if (!button) return;
+    button.disabled = !enabled;
+    button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    button.classList.toggle('is-disabled', !enabled);
+  }
+
+  function refreshBackState() {
+    if (window.KimikeaConnectNav && typeof window.KimikeaConnectNav.canGoBack === 'function') {
+      setBackEnabled(Boolean(window.KimikeaConnectNav.canGoBack()));
       return;
     }
-    goHome();
+    setBackEnabled(false);
   }
 
   function handleAction(action) {
@@ -96,6 +108,9 @@
       createButton('mypage', '○', 'マイページ')
     );
     document.body.appendChild(nav);
+    refreshBackState();
+    window.addEventListener('kimikea:navigation-state', refreshBackState);
+    window.addEventListener('popstate', () => window.setTimeout(refreshBackState, 0));
   }
 
   if (document.readyState === 'loading') {

@@ -37,6 +37,8 @@ const state = {
   actionEventCount: 0,
   pendingActionName: '',
   historyReady: false,
+  appHistory: [],
+  isRestoringAppHistory: false,
 };
 
 const el = {
@@ -726,8 +728,98 @@ function pushStylebookHistory(name, id = '') {
   window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId }, '', url);
 }
 
+function notifyStylebookNavigationState() {
+  window.dispatchEvent(new CustomEvent('kimikea:navigation-state'));
+}
+
+function stylebookRouteId(route) {
+  return `${route?.name || 'menu'}:${route?.id || ''}`;
+}
+
+function currentStylebookRoute() {
+  return {
+    name: state.currentView || 'menu',
+    id: state.currentView === 'detail' ? state.currentDetailId : (state.currentView === 'post' ? state.currentEditId : ''),
+  };
+}
+
+function rememberStylebookRoute(nextName, nextId = '') {
+  if (state.isRestoringAppHistory) return;
+  const current = currentStylebookRoute();
+  const next = { name: nextName || 'menu', id: nextId || '' };
+  if (stylebookRouteId(current) === stylebookRouteId(next)) {
+    notifyStylebookNavigationState();
+    return;
+  }
+  const previous = state.appHistory[state.appHistory.length - 1];
+  if (!previous || stylebookRouteId(previous) !== stylebookRouteId(current)) {
+    state.appHistory.push(current);
+    if (state.appHistory.length > 30) state.appHistory.shift();
+  }
+  notifyStylebookNavigationState();
+}
+
+function canStylebookGoBack() {
+  return state.appHistory.length > 0;
+}
+
+function restoreStylebookAppRoute(route) {
+  state.isRestoringAppHistory = true;
+  try {
+    if (!route || route.name === 'menu') {
+      showView('menu', { push: false });
+      replaceStylebookHistory('menu');
+    } else if (route.name === 'gallery') {
+      showView('gallery', { push: false });
+      replaceStylebookHistory('gallery');
+    } else if (route.name === 'detail' && route.id) {
+      showDetail(route.id, { push: false });
+      replaceStylebookHistory('detail', route.id);
+    } else if (route.name === 'post') {
+      showPostForm(route.id || '', { push: false });
+      replaceStylebookHistory('post', route.id || '');
+    } else if (route.name === 'saved') {
+      showSaved({ push: false });
+      replaceStylebookHistory('gallery');
+    } else if (route.name === 'drafts') {
+      showDrafts({ push: false });
+      replaceStylebookHistory('drafts');
+    } else if (route.name === 'mine') {
+      showMine({ push: false });
+      replaceStylebookHistory('mine');
+    } else if (route.name === 'admin') {
+      renderAdmin({ push: false });
+      replaceStylebookHistory('admin');
+    } else {
+      showView('menu', { push: false });
+      replaceStylebookHistory('menu');
+    }
+  } finally {
+    state.isRestoringAppHistory = false;
+    notifyStylebookNavigationState();
+  }
+}
+
+function goStylebookBackFromNav() {
+  const route = state.appHistory.pop();
+  if (!route) {
+    notifyStylebookNavigationState();
+    return true;
+  }
+  restoreStylebookAppRoute(route);
+  return true;
+}
+
+function showStylebookMenuEntry() {
+  state.appHistory.length = 0;
+  showView('menu', { push: false });
+  replaceStylebookHistory('menu');
+  notifyStylebookNavigationState();
+}
+
 function showView(name, options = {}) {
   const { push = true, id = '' } = options;
+  if (push) rememberStylebookRoute(name, id);
   state.currentView = name;
   ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'mineView', 'adminView'].forEach(key => {
     const view = document.getElementById(key);
@@ -735,12 +827,14 @@ function showView(name, options = {}) {
   });
   updateRoleVisibility();
   if (push && state.historyReady) pushStylebookHistory(name, id);
+  if (!push && state.historyReady) replaceStylebookHistory(name, id);
   if (name === 'gallery') {
     renderGallery();
     window.requestAnimationFrame(() => window.scrollTo(0, Number(sessionStorage.getItem(SCROLL_KEY) || 0)));
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  notifyStylebookNavigationState();
 }
 
 function showDetail(postId, options = {}) {
@@ -754,7 +848,6 @@ function showDetail(postId, options = {}) {
   const creator = getById('users', post.createdByUserId);
   const canEdit = canManagePost(post);
   el.detailView.innerHTML = `
-    <button class="text-button" type="button" data-action="show-gallery">写真一覧へ戻る</button>
     <article class="detail-card">
       <div class="detail-photo-wrap">
         ${imageTag(post.imageUrl, post.title, 'detail-photo')}
@@ -829,13 +922,14 @@ function renderSaved() {
   el.savedGrid.innerHTML = posts.length ? posts.map(renderGalleryItem).join('') : '<p class="empty-state">保存したスタイルはまだありません。</p>';
 }
 
-function showSaved() {
+function showSaved(options = {}) {
+  const { push = true } = options;
   state.savedOnly = true;
   state.sort = 'savedDate';
   state.visibleCount = PAGE_SIZE;
   el.savedOnlyToggle.checked = true;
   el.sortSelect.value = 'savedDate';
-  showView('gallery');
+  showView('gallery', { push });
 }
 
 function ownPosts({ draftsOnly = false } = {}) {
@@ -946,7 +1040,7 @@ function handleActionElement(action) {
   else if (actionName === 'publish') publishPost(id);
   else if (actionName === 'restore') restorePost(id);
   else if (actionName === 'hard-delete') hardDeletePost(id);
-  else if (actionName === 'show-menu') showView('menu');
+  else if (actionName === 'show-menu') showStylebookMenuEntry();
   else if (actionName === 'open-gallery') {
     resetGalleryViewState();
     showView('gallery');
@@ -993,6 +1087,22 @@ function handleActionElement(action) {
 
 window.__kimikeaStylebookRunAction = function runStylebookAction(actionName, id = '') {
   return handleActionElement({ dataset: { action: actionName, id } });
+};
+
+window.KimikeaConnectNav = {
+  back: goStylebookBackFromNav,
+  home() {
+    state.appHistory.length = 0;
+    notifyStylebookNavigationState();
+    window.location.href = '../index.html';
+  },
+  search() {
+    window.location.href = '../index.html?view=search';
+  },
+  mypage() {
+    window.location.href = '../index.html?view=mypage';
+  },
+  canGoBack: canStylebookGoBack,
 };
 
 async function resizeImage(file) {
@@ -1530,6 +1640,7 @@ async function init() {
   bindEvents();
   showView('menu', { push: false });
   replaceStylebookHistory('menu');
+  notifyStylebookNavigationState();
   if (window.__kimikeaStylebookQueuedAction) {
     state.pendingActionName = window.__kimikeaStylebookQueuedAction;
     window.__kimikeaStylebookQueuedAction = '';
