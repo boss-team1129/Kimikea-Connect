@@ -273,9 +273,30 @@ img { display: block; max-width: 100%; }
 .save-pill.saved { color: #b58d3d; background: #fff5d8; }
 .empty-state {
   grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: min(54vh, 420px);
   padding: 40px 20px;
   color: var(--muted);
   text-align: center;
+}
+.empty-state strong {
+  color: var(--ink);
+  font-size: clamp(18px, 5vw, 24px);
+  line-height: 1.35;
+}
+.empty-state span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+.empty-state .primary-button {
+  width: min(260px, 78vw);
+  margin-top: 8px;
+}
+.empty-gallery-state {
+  align-content: center;
 }
 .sentinel { height: 80px; }
 

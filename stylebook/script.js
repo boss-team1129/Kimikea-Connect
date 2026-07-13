@@ -161,6 +161,10 @@ function activeColors() {
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 }
 
+function colorDisplayLabel(color) {
+  return [color?.colorCode, color?.colorName].filter(Boolean).join(' ');
+}
+
 function buildImageSvg(seed, title, a, b, c) {
   const safeTitle = escapeHtml(title).slice(0, 18);
   const wave = 80 + (seed % 30);
@@ -418,7 +422,7 @@ function updateRoleVisibility() {
 function renderFilterControls() {
   const colorGroups = activeColors()
     .map(color => `<button type="button" class="chip ${state.selectedColorIds.has(color.id) ? 'active' : ''}" data-filter-color="${color.id}">
-      <span class="swatch" style="${colorSwatchStyle(color)}"></span>${escapeHtml(color.colorCode)} ${escapeHtml(color.colorName)}
+      <span class="swatch" style="${colorSwatchStyle(color)}"></span>${escapeHtml(colorDisplayLabel(color))}
     </button>`).join('');
   el.colorFilters.innerHTML = colorGroups;
 
@@ -440,7 +444,7 @@ function renderFilterControls() {
 
 function renderSelectOptions() {
   el.colorSelect.innerHTML = activeColors()
-    .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(color.colorCode)} ${escapeHtml(color.colorName)}</option>`)
+    .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(colorDisplayLabel(color))}</option>`)
     .join('');
   renderColorChoiceList();
   el.styleTypeSelect.innerHTML = state.db.styleTypes
@@ -492,7 +496,7 @@ function renderColorChoiceList() {
   el.colorChoiceList.innerHTML = categoryHtml + otherHtml || '<p class="empty-state compact">該当する色がありません。</p>';
   const selectedLabels = activeColors()
     .filter(color => selected.has(color.id))
-    .map(color => `${color.colorCode} ${color.colorName}`);
+    .map(colorDisplayLabel);
   el.selectedColorSummary.textContent = selectedLabels.length ? `選択中：${selectedLabels.join('、')}` : '選択中の色はありません。';
 }
 
@@ -519,7 +523,7 @@ function findStaffByName(name, shopId = '') {
 function colorLabels(post) {
   return post.extensionColorIds.map(id => {
     const color = getById('extensionColors', id);
-    return color ? `${color.colorCode} ${color.colorName}` : '';
+    return color ? colorDisplayLabel(color) : '';
   }).filter(Boolean);
 }
 
@@ -571,7 +575,7 @@ function renderActiveChips() {
   const chips = [];
   state.selectedColorIds.forEach(id => {
     const color = getById('extensionColors', id);
-    if (color) chips.push({ label: `${color.colorCode} ${color.colorName}`, type: 'color', id });
+    if (color) chips.push({ label: colorDisplayLabel(color), type: 'color', id });
   });
   state.selectedStyleTypeIds.forEach(id => {
     const type = getById('styleTypes', id);
@@ -597,7 +601,14 @@ function renderGallery() {
   el.galleryGrid.innerHTML = visible.map(renderGalleryItem).join('');
   el.resultCount.textContent = `${posts.length}件`;
   if (!posts.length) {
-    el.galleryGrid.innerHTML = '<p class="empty-state">条件を減らして検索してください。</p>';
+    const hasPublishedPosts = activePosts().length > 0;
+    el.galleryGrid.innerHTML = hasPublishedPosts
+      ? '<div class="empty-state"><strong>条件に合うスタイルが見つかりません</strong><span>検索条件を減らしてもう一度お試しください。</span></div>'
+      : `<div class="empty-state empty-gallery-state">
+          <strong>まだ投稿されたスタイルはありません</strong>
+          <span>最初のスタイルを投稿してみましょう</span>
+          <button class="primary-button" type="button" data-action="show-post">投稿する</button>
+        </div>`;
   }
   renderActiveChips();
   renderFilterControls();
@@ -1037,7 +1048,7 @@ function adminRowsFor(tab) {
     }).join('');
   }
   if (tab === 'colors') {
-    return state.db.extensionColors.map(color => `<tr><td><span class="admin-swatch" style="background:${escapeHtml(color.imageUrl)}"></span></td><td>${escapeHtml(color.colorCode)}</td><td>${escapeHtml(color.colorName)}</td><td>${escapeHtml(color.category)}</td><td>${color.isActive ? '公開' : '非公開'}</td><td>${color.sortOrder}</td><td><button data-admin-action="toggle-color" data-id="${color.id}">切替</button></td></tr>`).join('');
+    return state.db.extensionColors.map(color => `<tr><td><span class="admin-swatch" style="background:${escapeHtml(color.imageUrl)}"></span></td><td>${escapeHtml(color.productCode || color.id)}</td><td>${escapeHtml(color.category)}</td><td>${escapeHtml(colorDisplayLabel(color))}</td><td>${color.isActive ? '表示' : '非表示'}</td><td>${color.sortOrder}</td><td>商品マスタで管理</td></tr>`).join('');
   }
   if (tab === 'types') return state.db.styleTypes.map(type => `<tr><td>${escapeHtml(type.name)}</td><td>${type.isActive ? '公開' : '非公開'}</td><td>${type.sortOrder}</td><td><button data-admin-action="toggle-type" data-id="${type.id}">切替</button></td></tr>`).join('');
   if (tab === 'shops') return state.db.shops.map(shop => `<tr><td>${escapeHtml(shop.name)}</td><td>${escapeHtml(shop.address)}</td><td>${shop.isActive ? '公開' : '非公開'}</td><td>${state.db.staff.filter(person => person.shopId === shop.id).length}名</td></tr>`).join('');
@@ -1054,7 +1065,7 @@ function adminRowsFor(tab) {
 function adminHeaders(tab) {
   const headers = {
     posts: ['写真', 'スタイル名', '店舗', '担当者', '投稿者', '投稿日', '状態', '保存数', '操作'],
-    colors: ['色', '色番号', '色名', 'カテゴリ', '状態', '順番', '操作'],
+    colors: ['色', '商品コード', 'カテゴリ', '表示名', '状態', '順番', '管理'],
     types: ['施術スタイル', '状態', '順番', '操作'],
     shops: ['店舗', '住所', '状態', '担当者数'],
     staff: ['担当者', '店舗', '状態'],
@@ -1241,7 +1252,7 @@ function bindEvents() {
       const label = action.dataset.label || '';
       const kind = action.dataset.kind;
       if (kind === 'color') {
-        const color = state.db.extensionColors.find(item => label.includes(item.colorCode) || label.includes(item.colorName));
+        const color = state.db.extensionColors.find(item => label.includes(item.colorCode) || label.includes(item.colorName) || label.includes(item.productCode));
         if (color) state.selectedColorIds = new Set([color.id]);
       }
       if (kind === 'type') {
@@ -1260,7 +1271,6 @@ function bindEvents() {
   el.adminTable.addEventListener('click', event => {
     const button = event.target.closest('[data-admin-action]');
     if (!button) return;
-    if (button.dataset.adminAction === 'toggle-color') toggleAdminActive('extensionColors', button.dataset.id);
     if (button.dataset.adminAction === 'toggle-type') toggleAdminActive('styleTypes', button.dataset.id);
   });
   el.adminTable.addEventListener('change', event => {

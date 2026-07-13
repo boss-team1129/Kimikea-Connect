@@ -15,10 +15,10 @@
  */
 
 const KC_STYLEBOOK = {
+  SPREADSHEET_NAME: 'Kimikea Connect Order 管理表',
   POSTS: 'style_posts',
   SAVES: 'style_saves',
-  COLORS: 'Colors',
-  LEGACY_COLORS: 'style_colors',
+  PRODUCT_MASTER: '商品マスタ',
   TYPES: 'style_types',
   SHOPS: 'style_shops',
   STAFF: 'style_staff',
@@ -53,7 +53,7 @@ const KC_POST_HEADERS = [
 ];
 
 const KC_SAVE_HEADERS = ['id', 'userId', 'stylePostId', 'createdAt'];
-const KC_COLOR_HEADERS = ['id', 'colorId', 'colorCode', 'colorName', 'category', 'imageUrl', 'isActive', 'sortOrder', 'createdAt', 'updatedAt'];
+const KC_PRODUCT_MASTER_HEADERS = ['商品コード', '商品カテゴリー', 'カラー', '仕入価格', '販売価格', '在庫', '表示'];
 const KC_TYPE_HEADERS = ['id', 'name', 'isActive', 'sortOrder'];
 const KC_SHOP_HEADERS = ['id', 'name', 'address', 'imageUrl', 'isActive'];
 const KC_STAFF_HEADERS = ['id', 'name', 'shopId', 'profileImageUrl', 'isActive'];
@@ -86,10 +86,11 @@ function doPost(e) {
 }
 
 function setupKimikeaStylebook() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKimikeaConnectSpreadsheet_();
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), KC_POST_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
-  setHeaders_(getColorsSheet_(ss), KC_COLOR_HEADERS);
+  setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER), KC_PRODUCT_MASTER_HEADERS);
+  fillMissingProductCodes_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER));
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF), KC_STAFF_HEADERS);
@@ -99,11 +100,11 @@ function setupKimikeaStylebook() {
 }
 
 function getStylebookDatabase_(userId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
   const saves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES));
-  const colors = rowsToObjects_(getColorsSheet_(ss)).map(normalizeBooleans_);
+  const colors = getProductMasterColors_(ss);
   const types = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES)).map(normalizeBooleans_);
   const shops = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS)).map(normalizeBooleans_);
   const staff = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF)).map(normalizeBooleans_);
@@ -121,7 +122,7 @@ function getStylebookDatabase_(userId) {
 }
 
 function savePost_(post, userId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   const user = getUser_(userId);
   if (!user) throw new Error('ログインユーザーが見つかりません。');
@@ -166,7 +167,7 @@ function savePost_(post, userId) {
 }
 
 function publishPost_(postId, userId) {
-  const sheet = getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.POSTS);
+  const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
   const user = getUser_(userId);
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
@@ -179,7 +180,7 @@ function publishPost_(postId, userId) {
 }
 
 function deletePost_(postId, userId, reason) {
-  const sheet = getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.POSTS);
+  const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
   const user = getUser_(userId);
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
@@ -197,7 +198,7 @@ function deletePost_(postId, userId, reason) {
 function restorePost_(postId, userId) {
   const user = getUser_(userId);
   if (!isHeadquartersAdmin_(user)) throw new Error('本部管理者のみ復元できます。');
-  const sheet = getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.POSTS);
+  const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
   found.object.status = 'published';
@@ -213,14 +214,14 @@ function restorePost_(postId, userId) {
 function hardDeletePost_(postId, userId) {
   const user = getUser_(userId);
   if (!isHeadquartersAdmin_(user)) throw new Error('本部管理者のみ完全削除できます。');
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKimikeaConnectSpreadsheet_();
   deleteRowsByValue_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), 'id', postId);
   deleteRowsByValue_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), 'stylePostId', postId);
   return { ok: true, id: postId };
 }
 
 function toggleSave_(postId, userId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKimikeaConnectSpreadsheet_();
   const saveSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES);
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = rowsToObjects_(saveSheet).find(save => save.userId === userId && save.stylePostId === postId);
@@ -240,7 +241,7 @@ function toggleSave_(postId, userId) {
 function setupSheetsIfNeeded_(ss) {
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), KC_POST_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
-  setHeaders_(getColorsSheet_(ss), KC_COLOR_HEADERS);
+  setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER), KC_PRODUCT_MASTER_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF), KC_STAFF_HEADERS);
@@ -249,8 +250,6 @@ function setupSheetsIfNeeded_(ss) {
 }
 
 function seedMastersIfEmpty_(ss) {
-  migrateLegacyColorsIfNeeded_(ss);
-  seedSheetIfEmpty_(getColorsSheet_(ss), KC_COLOR_HEADERS, defaultColors_());
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS, defaultTypes_());
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS, [
     ['shop-team', 'TEAM hair', '静岡県富士市横割2丁目2-27', '', true],
@@ -269,30 +268,6 @@ function seedMastersIfEmpty_(ss) {
   ]);
 }
 
-function defaultColors_() {
-  const now = new Date().toISOString();
-  return [
-    ['color-001', 'color-001', 'N-1', 'ナチュラルブラック', 'ダークカラー', '#171312', true, 1, now, now],
-    ['color-002', 'color-002', 'N-2', 'ダークブラウン', 'ダークカラー', '#30231f', true, 2, now, now],
-    ['color-003', 'color-003', 'N-3', 'ショコラブラウン', 'ダークカラー', '#4a3129', true, 3, now, now],
-    ['color-004', 'color-004', 'N-4', 'モカブラウン', 'ダークカラー', '#61453a', true, 4, now, now],
-    ['color-005', 'color-005', 'N-5', 'アッシュブラウン', 'ダークカラー', '#5b554e', true, 5, now, now],
-    ['color-006', 'color-006', 'L-8', 'ベージュブラウン', 'ライトカラー', '#b9926d', true, 6, now, now],
-    ['color-007', 'color-007', 'L-10', 'ミルクティー', 'ライトカラー', '#d8c4a8', true, 7, now, now],
-    ['color-008', 'color-008', 'L-12', 'シルバーグレージュ', 'ライトカラー', '#c7c4bd', true, 8, now, now],
-    ['color-009', 'color-009', 'L-14', 'ホワイトベージュ', 'ライトカラー', '#eadfca', true, 9, now, now],
-    ['color-010', 'color-010', 'L-18', 'ライトグレー', 'ライトカラー', '#d2d4d6', true, 10, now, now],
-    ['color-011', 'color-011', 'P-01', 'ホワイト', '原色', '#f9f8f2', true, 11, now, now],
-    ['color-012', 'color-012', 'P-02', 'ピンク', '原色', '#f3a7c3', true, 12, now, now],
-    ['color-013', 'color-013', 'P-03', 'チェリーピンク', '原色', '#df467c', true, 13, now, now],
-    ['color-014', 'color-014', 'P-04', 'レッド', '原色', '#c92f35', true, 14, now, now],
-    ['color-015', 'color-015', 'P-05', 'パープル', '原色', '#7755a6', true, 15, now, now],
-    ['color-016', 'color-016', 'P-06', 'ラベンダー', '原色', '#b8a1d8', true, 16, now, now],
-    ['color-017', 'color-017', 'P-07', 'ブルー', '原色', '#438ac9', true, 17, now, now],
-    ['color-018', 'color-018', 'P-08', 'スカイブルー', '原色', '#8ec8df', true, 18, now, now],
-  ];
-}
-
 function defaultTypes_() {
   return ['イヤリングカラー', 'インナーカラー', 'ハイライト', 'メッシュ', 'グラデーション', '長さ出し', 'ボリュームアップ', '前髪エクステ', 'ポイントエクステ', '原色デザイン', 'その他']
     .map((name, index) => [`type-${String(index + 1).padStart(2, '0')}`, name, true, index + 1]);
@@ -309,34 +284,150 @@ function isHeadquartersAdmin_(user) {
 }
 
 function getUser_(userId) {
-  return rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.USERS)).find(user => user.id === userId) || null;
+  return rowsToObjects_(getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.USERS)).find(user => user.id === userId) || null;
 }
 
 function getShopName_(shopId) {
   if (!shopId) return '';
-  const shop = rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.SHOPS)).find(item => item.id === shopId);
+  const shop = rowsToObjects_(getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.SHOPS)).find(item => item.id === shopId);
   return shop ? shop.name : '';
 }
 
 function getStaffName_(staffId) {
   if (!staffId) return '';
-  const staff = rowsToObjects_(getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KC_STYLEBOOK.STAFF)).find(item => item.id === staffId);
+  const staff = rowsToObjects_(getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.STAFF)).find(item => item.id === staffId);
   return staff ? staff.name : '';
 }
 
-function getColorsSheet_(ss) {
-  return getOrCreateSheet_(ss, KC_STYLEBOOK.COLORS);
+function getProductMasterColors_(ss) {
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER);
+  setHeaders_(sheet, KC_PRODUCT_MASTER_HEADERS);
+  fillMissingProductCodes_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  const headers = values[0].map(normalizeHeaderName_);
+  const indexes = {
+    productCode: headers.indexOf(normalizeHeaderName_('商品コード')),
+    category: headers.indexOf(normalizeHeaderName_('商品カテゴリー')),
+    color: headers.indexOf(normalizeHeaderName_('カラー')),
+    visible: headers.indexOf(normalizeHeaderName_('表示')),
+    purchasePrice: headers.indexOf(normalizeHeaderName_('仕入価格')),
+    salesPrice: headers.indexOf(normalizeHeaderName_('販売価格')),
+    stock: headers.indexOf(normalizeHeaderName_('在庫')),
+  };
+  if (indexes.category < 0 || indexes.color < 0 || indexes.visible < 0) {
+    throw new Error('商品マスタに必要な列がありません。商品カテゴリー・カラー・表示を確認してください。');
+  }
+
+  const colors = [];
+  const seenKeys = {};
+  values.slice(1).forEach((row, index) => {
+    const category = String(row[indexes.category] || '').trim();
+    const colorValue = String(row[indexes.color] || '').trim();
+    const productCode = String(row[indexes.productCode] || '').trim();
+    const visible = normalizeBoolean_(row[indexes.visible]);
+    if (!category || !colorValue || !visible) return;
+    const dedupeKey = `${normalizeHeaderName_(category)}::${normalizeHeaderName_(colorValue)}`;
+    if (seenKeys[dedupeKey]) return;
+    seenKeys[dedupeKey] = true;
+
+    const parsed = parseProductColor_(colorValue);
+    const fallbackProductCode = productCode || createDefaultProductCode_(category, index + 1);
+    colors.push({
+      id: fallbackProductCode,
+      colorId: fallbackProductCode,
+      colorCode: parsed.code,
+      colorName: parsed.name,
+      category,
+      imageUrl: colorSwatchFromProduct_(category, colorValue),
+      isActive: true,
+      sortOrder: index + 1,
+      productCode: fallbackProductCode,
+      productCategory: category,
+      productColor: colorValue,
+      purchasePrice: indexes.purchasePrice >= 0 ? Number(row[indexes.purchasePrice] || 0) : 0,
+      salesPrice: indexes.salesPrice >= 0 ? Number(row[indexes.salesPrice] || 0) : 0,
+      stock: indexes.stock >= 0 ? row[indexes.stock] : '',
+    });
+  });
+  return colors;
 }
 
-function migrateLegacyColorsIfNeeded_(ss) {
-  const colorsSheet = getColorsSheet_(ss);
-  const legacySheet = ss.getSheetByName(KC_STYLEBOOK.LEGACY_COLORS);
-  if (!legacySheet || colorsSheet.getLastRow() > 1 || legacySheet.getLastRow() < 2) return;
-  setHeaders_(colorsSheet, KC_COLOR_HEADERS);
-  const legacyRows = rowsToObjects_(legacySheet);
-  if (!legacyRows.length) return;
-  const rows = legacyRows.map(row => KC_COLOR_HEADERS.map(header => row[header] == null ? '' : row[header]));
-  colorsSheet.getRange(2, 1, rows.length, KC_COLOR_HEADERS.length).setValues(rows);
+function fillMissingProductCodes_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return;
+  const headers = values[0].map(normalizeHeaderName_);
+  const codeIndex = headers.indexOf(normalizeHeaderName_('商品コード'));
+  const categoryIndex = headers.indexOf(normalizeHeaderName_('商品カテゴリー'));
+  if (codeIndex < 0 || categoryIndex < 0) return;
+
+  const counters = {};
+  values.slice(1).forEach((row) => {
+    const category = String(row[categoryIndex] || '').trim();
+    const code = String(row[codeIndex] || '').trim();
+    if (!category || !code) return;
+    counters[category] = Number(counters[category] || 0) + 1;
+  });
+  values.slice(1).forEach((row, rowOffset) => {
+    if (String(row[codeIndex] || '').trim()) return;
+    const category = String(row[categoryIndex] || '').trim();
+    counters[category] = Number(counters[category] || 0) + 1;
+    sheet.getRange(rowOffset + 2, codeIndex + 1).setValue(createDefaultProductCode_(category, counters[category]));
+  });
+}
+
+function createDefaultProductCode_(category, sequence) {
+  const prefixes = {
+    'ダークカラー': 'DC',
+    'ライトカラー': 'LC',
+    '原色': 'OR',
+  };
+  const prefix = prefixes[category] || 'EX';
+  return `${prefix}${String(sequence).padStart(3, '0')}`;
+}
+
+function normalizeHeaderName_(value) {
+  return String(value || '').replace(/[\s　\r\n]/g, '').trim();
+}
+
+function parseProductColor_(value) {
+  const text = String(value || '').trim();
+  if (!text) return { code: '', name: '' };
+  const match = text.match(/^([^\s　]+)[\s　]+(.+)$/);
+  if (!match) return { code: text, name: '' };
+  return { code: match[1], name: match[2] };
+}
+
+function colorSwatchFromProduct_(category, colorValue) {
+  const text = `${category} ${colorValue}`.toLowerCase();
+  if (text.includes('white') || text.includes('ホワイト')) return '#f8f5ec';
+  if (text.includes('silver') || text.includes('シルバー') || text.includes('gray') || text.includes('グレー')) return '#c9c9c4';
+  if (text.includes('milk') || text.includes('tea') || text.includes('ミルク') || text.includes('ベージュ')) return '#d4bea0';
+  if (text.includes('pink') || text.includes('ピンク')) return '#e9a5c4';
+  if (text.includes('red') || text.includes('レッド')) return '#c74348';
+  if (text.includes('purple') || text.includes('パープル') || text.includes('vn')) return '#7d5aa6';
+  if (text.includes('blue') || text.includes('ブルー') || text.includes('sb')) return '#4e8fc6';
+  if (text.includes('green') || text.includes('グリーン')) return '#4d9872';
+  if (text.includes('orange') || text.includes('オレンジ')) return '#dd8a43';
+  if (text.includes('yellow') || text.includes('イエロー')) return '#e3c54f';
+  if (category === 'ダークカラー') return '#3c2b24';
+  if (category === 'ライトカラー') return '#c8b49a';
+  if (category === '原色') return 'linear-gradient(135deg, #f5b5cf, #8fc8df, #f0d36a)';
+  return '#efe9df';
+}
+
+function getKimikeaConnectSpreadsheet_() {
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active && active.getName && active.getName() === KC_STYLEBOOK.SPREADSHEET_NAME) return active;
+  if (active && active.getSheetByName(KC_STYLEBOOK.PRODUCT_MASTER)) return active;
+
+  const files = DriveApp.getFilesByName(KC_STYLEBOOK.SPREADSHEET_NAME);
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  if (active) return active;
+  throw new Error(`${KC_STYLEBOOK.SPREADSHEET_NAME} が見つかりません。`);
 }
 
 function normalizePost_(row) {
@@ -373,7 +464,7 @@ function normalizeBooleans_(row) {
 
 function normalizeBoolean_(value) {
   if (value === true) return true;
-  return String(value).toUpperCase() === 'TRUE';
+  return String(value).normalize('NFKC').trim().toUpperCase() === 'TRUE';
 }
 
 function saveImageIfNeeded_(prefix, value, existingFileId) {
