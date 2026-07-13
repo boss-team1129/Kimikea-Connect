@@ -33,6 +33,7 @@ const state = {
   backendMode: 'local',
   isLoading: false,
   adminTab: 'posts',
+  lastDirectMenuTapAt: 0,
 };
 
 const el = {
@@ -407,6 +408,10 @@ function filteredPosts() {
 }
 
 function renderUserSelect() {
+  if (!el.userSelect) {
+    updateRoleVisibility();
+    return;
+  }
   el.userSelect.innerHTML = state.db.users.map(user => (
     `<option value="${user.id}" ${user.id === currentUser().id ? 'selected' : ''}>${escapeHtml(user.name)} / ${user.role}</option>`
   )).join('');
@@ -766,6 +771,72 @@ function selectedValues(select) {
   return Array.from(select.selectedOptions).map(option => option.value);
 }
 
+function resetGalleryViewState() {
+  state.savedOnly = false;
+  state.sort = 'recommended';
+  state.visibleCount = PAGE_SIZE;
+  if (el.savedOnlyToggle) el.savedOnlyToggle.checked = false;
+  if (el.sortSelect) el.sortSelect.value = 'recommended';
+}
+
+function handleActionElement(action) {
+  if (!action) return false;
+  const id = action.dataset.id;
+  const actionName = action.dataset.action;
+  if (!actionName) return false;
+
+  if (actionName === 'detail') showDetail(id);
+  else if (actionName === 'save') toggleSave(id);
+  else if (actionName === 'edit') showPostForm(id);
+  else if (actionName === 'delete') logicalDeletePost(id);
+  else if (actionName === 'publish') publishPost(id);
+  else if (actionName === 'restore') restorePost(id);
+  else if (actionName === 'hard-delete') hardDeletePost(id);
+  else if (actionName === 'show-menu') showView('menu');
+  else if (actionName === 'open-gallery') {
+    resetGalleryViewState();
+    showView('gallery');
+  }
+  else if (actionName === 'show-gallery' || actionName === 'back-gallery') showView('gallery');
+  else if (actionName === 'show-post') showPostForm();
+  else if (actionName === 'show-saved') showSaved();
+  else if (actionName === 'show-drafts') showDrafts();
+  else if (actionName === 'show-mine') showMine();
+  else if (actionName === 'show-admin') renderAdmin();
+  else if (actionName === 'share') navigator.share?.({ title: document.title, url: location.href }).catch(() => {});
+  else if (actionName === 'similar') {
+    const post = state.db.stylePosts.find(item => item.id === id);
+    if (post) {
+      state.selectedStyleTypeIds = new Set(post.styleTypeIds);
+      showView('gallery');
+    }
+  }
+  else if (actionName === 'filter-shop') {
+    state.selectedShopIds = new Set([id]);
+    showView('gallery');
+  }
+  else if (actionName === 'filter-staff') {
+    state.selectedStaffIds = new Set([id]);
+    showView('gallery');
+  }
+  else if (actionName === 'filter-label') {
+    const label = action.dataset.label || '';
+    const kind = action.dataset.kind;
+    if (kind === 'color') {
+      const color = state.db.extensionColors.find(item => label.includes(item.colorCode) || label.includes(item.colorName) || label.includes(item.productCode));
+      if (color) state.selectedColorIds = new Set([color.id]);
+    }
+    if (kind === 'type') {
+      const type = state.db.styleTypes.find(item => item.name === label);
+      if (type) state.selectedStyleTypeIds = new Set([type.id]);
+    }
+    showView('gallery');
+  } else {
+    return false;
+  }
+  return true;
+}
+
 async function resizeImage(file) {
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1119,16 +1190,18 @@ function clearFilters() {
 }
 
 function bindEvents() {
-  el.userSelect.addEventListener('change', async () => {
-    state.currentUserId = el.userSelect.value;
-    localStorage.setItem(SESSION_KEY, state.currentUserId);
-    if (state.backendMode === 'remote') {
-      await refreshRemoteDb();
-    } else {
-      renderUserSelect();
-    }
-    renderGallery();
-  });
+  if (el.userSelect) {
+    el.userSelect.addEventListener('change', async () => {
+      state.currentUserId = el.userSelect.value;
+      localStorage.setItem(SESSION_KEY, state.currentUserId);
+      if (state.backendMode === 'remote') {
+        await refreshRemoteDb();
+      } else {
+        renderUserSelect();
+      }
+      renderGallery();
+    });
+  }
   el.keywordInput.addEventListener('input', event => {
     state.query = event.target.value.trim();
     state.visibleCount = PAGE_SIZE;
@@ -1208,59 +1281,15 @@ function bindEvents() {
     }
     const action = event.target.closest('[data-action]');
     if (!action) return;
-    const id = action.dataset.id;
-    const actionName = action.dataset.action;
-    if (actionName === 'detail') showDetail(id);
-    if (actionName === 'save') toggleSave(id);
-    if (actionName === 'edit') showPostForm(id);
-    if (actionName === 'delete') logicalDeletePost(id);
-    if (actionName === 'publish') publishPost(id);
-    if (actionName === 'restore') restorePost(id);
-    if (actionName === 'hard-delete') hardDeletePost(id);
-    if (actionName === 'show-menu') showView('menu');
-    if (actionName === 'open-gallery') {
-      state.savedOnly = false;
-      state.sort = 'recommended';
-      state.visibleCount = PAGE_SIZE;
-      el.savedOnlyToggle.checked = false;
-      el.sortSelect.value = 'recommended';
-      showView('gallery');
-    }
-    if (actionName === 'show-gallery' || actionName === 'back-gallery') showView('gallery');
-    if (actionName === 'show-post') showPostForm();
-    if (actionName === 'show-saved') showSaved();
-    if (actionName === 'show-drafts') showDrafts();
-    if (actionName === 'show-mine') showMine();
-    if (actionName === 'show-admin') renderAdmin();
-    if (actionName === 'share') navigator.share?.({ title: document.title, url: location.href }).catch(() => {});
-    if (actionName === 'similar') {
-      const post = state.db.stylePosts.find(item => item.id === id);
-      if (post) {
-        state.selectedStyleTypeIds = new Set(post.styleTypeIds);
-        showView('gallery');
-      }
-    }
-    if (actionName === 'filter-shop') {
-      state.selectedShopIds = new Set([id]);
-      showView('gallery');
-    }
-    if (actionName === 'filter-staff') {
-      state.selectedStaffIds = new Set([id]);
-      showView('gallery');
-    }
-    if (actionName === 'filter-label') {
-      const label = action.dataset.label || '';
-      const kind = action.dataset.kind;
-      if (kind === 'color') {
-        const color = state.db.extensionColors.find(item => label.includes(item.colorCode) || label.includes(item.colorName) || label.includes(item.productCode));
-        if (color) state.selectedColorIds = new Set([color.id]);
-      }
-      if (kind === 'type') {
-        const type = state.db.styleTypes.find(item => item.name === label);
-        if (type) state.selectedStyleTypeIds = new Set([type.id]);
-      }
-      showView('gallery');
-    }
+    if (Date.now() - state.lastDirectMenuTapAt < 450 && action.closest('.menu-card')) return;
+    handleActionElement(action);
+  });
+  document.querySelectorAll('.menu-card[data-action]').forEach(card => {
+    card.addEventListener('touchend', event => {
+      event.preventDefault();
+      state.lastDirectMenuTapAt = Date.now();
+      handleActionElement(card);
+    }, { passive: false });
   });
   document.querySelectorAll('[data-admin-tab]').forEach(button => {
     button.addEventListener('click', () => {

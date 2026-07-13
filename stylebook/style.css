@@ -606,11 +606,15 @@ img { display: block; max-width: 100%; }
 .menu-hero h2 { font-size: clamp(28px, 8vw, 44px); line-height: 1.05; }
 .menu-hero span { color: var(--muted); font-size: 14px; font-weight: 700; }
 .menu-card-grid {
+  position: relative;
+  z-index: 5;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 .menu-card {
+  position: relative;
+  z-index: 6;
   min-height: 132px;
   display: grid;
   align-content: center;
@@ -621,11 +625,20 @@ img { display: block; max-width: 100%; }
   border-radius: 24px;
   background: rgba(255,255,255,.78);
   color: var(--ink);
+  cursor: pointer;
   text-align: left;
   box-shadow: 0 14px 30px rgba(35,45,49,.08);
-  transition: transform .22s ease, box-shadow .22s ease;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(192, 154, 75, 0.18);
+  transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
 }
-.menu-card:active { transform: scale(.98); }
+.menu-card > * { pointer-events: none; }
+.menu-card:active {
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 10px 22px rgba(35,45,49,.08);
+  transform: scale(.985);
+}
 .menu-card.primary {
   grid-column: 1 / -1;
   min-height: 156px;
