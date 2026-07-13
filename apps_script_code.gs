@@ -1599,7 +1599,7 @@ function getFranchiseMasterRecords_() {
         phone: normalizePhone_(row[phoneIndex]),
         initialPassword: passwordIndex === -1
           ? KCO_DEFAULT_INITIAL_PASSWORD
-          : normalizeLoginPassword_(row[passwordIndex] || KCO_DEFAULT_INITIAL_PASSWORD),
+          : normalizeInitialPasswordValue_(row[passwordIndex]),
         passwordHash: passwordHashIndex === -1 ? '' : String(row[passwordHashIndex] || '').trim(),
         postalCode,
         address,
@@ -1669,6 +1669,14 @@ function normalizeLoginPassword_(value) {
     .replace(/\s/g, '');
 }
 
+function normalizeInitialPasswordValue_(value) {
+  const password = normalizeLoginPassword_(value);
+  if (!password || password === '0' || password === KCO_DEFAULT_INITIAL_PASSWORD) {
+    return KCO_DEFAULT_INITIAL_PASSWORD;
+  }
+  return password;
+}
+
 function hashPassword_(password) {
   const bytes = Utilities.computeDigest(
     Utilities.DigestAlgorithm.SHA_256,
@@ -1682,8 +1690,10 @@ function hashPassword_(password) {
 
 function isInitialPasswordLogin_(franchise, password) {
   if (franchise.passwordHash) return false;
-  return normalizeLoginPassword_(franchise.initialPassword || KCO_DEFAULT_INITIAL_PASSWORD)
-    === normalizeLoginPassword_(password);
+  const storedInitialPassword = normalizeInitialPasswordValue_(franchise.initialPassword);
+  const loginPassword = normalizeLoginPassword_(password);
+  return loginPassword === storedInitialPassword
+    || (storedInitialPassword === KCO_DEFAULT_INITIAL_PASSWORD && loginPassword === '0');
 }
 
 function isValidFranchisePassword_(franchise, password) {
