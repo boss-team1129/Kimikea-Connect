@@ -414,8 +414,8 @@ function isSaved(postId) {
 }
 
 function postSearchText(post) {
-  const colors = post.extensionColorIds.map(id => getById('extensionColors', id)).filter(Boolean);
-  const types = post.styleTypeIds.map(id => getById('styleTypes', id)).filter(Boolean);
+  const colors = (post.extensionColorIds || []).map(id => getById('extensionColors', id)).filter(Boolean);
+  const types = (post.styleTypeIds || []).map(id => getById('styleTypes', id)).filter(Boolean);
   return [
     post.title, post.description, post.extensionCount,
     displaySalonName(post), displayStaffName(post),
@@ -430,8 +430,8 @@ function filteredPosts() {
   let posts = activePosts().filter(post => {
     if (state.savedOnly && !savedIds.has(post.id)) return false;
     if (query && !postSearchText(post).includes(query)) return false;
-    if (state.selectedColorIds.size && !post.extensionColorIds.some(id => state.selectedColorIds.has(id))) return false;
-    if (state.selectedStyleTypeIds.size && !post.styleTypeIds.some(id => state.selectedStyleTypeIds.has(id))) return false;
+    if (state.selectedColorIds.size && !(post.extensionColorIds || []).some(id => state.selectedColorIds.has(id))) return false;
+    if (state.selectedStyleTypeIds.size && !(post.styleTypeIds || []).some(id => state.selectedStyleTypeIds.has(id))) return false;
     if (state.selectedShopIds.size && !state.selectedShopIds.has(post.shopId)) return false;
     if (state.selectedStaffIds.size && !state.selectedStaffIds.has(post.staffId)) return false;
     return true;
@@ -504,11 +504,13 @@ function renderSelectOptions() {
     apiColors: state.db.extensionColors?.length || 0,
     activeColors: activeColorList.length,
   });
-  el.colorSelect.innerHTML = activeColorList
-    .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(colorDisplayLabel(color))}</option>`)
-    .join('');
+  if (el.colorSelect) {
+    el.colorSelect.innerHTML = activeColorList
+      .map(color => `<option value="${color.id}">${escapeHtml(color.category)} / ${escapeHtml(colorDisplayLabel(color))}</option>`)
+      .join('');
+  }
   debugStylebook('renderSelectOptions rendered colors', {
-    colorSelectOptions: el.colorSelect.options.length,
+    colorSelectOptions: el.colorSelect?.options.length || 0,
   });
   renderColorChoiceList();
   el.styleTypeSelect.innerHTML = state.db.styleTypes
@@ -531,6 +533,7 @@ function renderSelectOptions() {
 }
 
 function renderColorChoiceList() {
+  if (!el.colorSearchInput || !el.colorChoiceList || !el.selectedColorSummary || !el.colorSelect) return;
   const query = (el.colorSearchInput?.value || '').trim().toLowerCase();
   const selected = new Set(selectedValues(el.colorSelect));
   const categories = ['ダークカラー', 'ライトカラー', '原色'];
@@ -601,7 +604,7 @@ function findStaffByName(name, shopId = '') {
 }
 
 function colorLabels(post) {
-  return post.extensionColorIds.map(id => {
+  return (post.extensionColorIds || []).map(id => {
     const color = getById('extensionColors', id);
     return color ? colorDisplayLabel(color) : '';
   }).filter(Boolean);
@@ -877,6 +880,7 @@ function showMine(options = {}) {
 }
 
 function selectedValues(select) {
+  if (!select) return [];
   return Array.from(select.selectedOptions).map(option => option.value);
 }
 
@@ -1055,7 +1059,9 @@ function fillPostForm(post) {
   el.shopSelect.value = post.shopId || '';
   renderStaffSelectForForm();
   el.staffSelect.value = post.staffId || '';
-  Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
+  if (el.colorSelect) {
+    Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
+  }
   renderColorChoiceList();
   Array.from(el.styleTypeSelect.options).forEach(option => { option.selected = post.styleTypeIds.includes(option.value); });
   el.imagePreview.innerHTML = imageTag(post.imageUrl, post.title || '写真プレビュー');
@@ -1111,7 +1117,7 @@ async function submitPost(event) {
     description: el.descriptionInput.value.trim(),
     imageUrl,
     additionalImages,
-    extensionColorIds: selectedValues(el.colorSelect),
+    extensionColorIds: editing?.extensionColorIds || [],
     styleTypeIds: selectedValues(el.styleTypeSelect),
     extensionCount: Number(el.extensionCountInput.value || 0),
     shopId: matchedShop?.id || '',
@@ -1128,8 +1134,8 @@ async function submitPost(event) {
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
   };
-  if (requestedStatus === 'published' && (!imageUrl || !post.extensionColorIds.length || !post.styleTypeIds.length || !post.extensionCount || !post.salonName || !post.staffName)) {
-    el.formMessage.textContent = '公開するには、写真、色、本数、施術、サロン名、担当者名を入力してください。';
+  if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount || !post.salonName || !post.staffName)) {
+    el.formMessage.textContent = '公開するには、写真、本数、施術、サロン名、担当者名を入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -1378,7 +1384,7 @@ function bindEvents() {
   el.sortSelect.addEventListener('change', event => { state.sort = event.target.value; renderGallery(); });
   el.savedOnlyToggle.addEventListener('change', event => { state.savedOnly = event.target.checked; renderGallery(); });
   el.clearFiltersButton.addEventListener('click', clearFilters);
-  el.colorSearchInput.addEventListener('input', renderColorChoiceList);
+  if (el.colorSearchInput) el.colorSearchInput.addEventListener('input', renderColorChoiceList);
   el.shopFilter.addEventListener('change', () => {
     state.selectedShopIds = new Set(selectedValues(el.shopFilter));
     state.selectedStaffIds.clear();
@@ -1464,7 +1470,7 @@ function bindEvents() {
     const colorChoice = event.target.closest('[data-color-choice]');
     if (colorChoice) {
       const id = colorChoice.dataset.colorChoice;
-      const option = Array.from(el.colorSelect.options).find(item => item.value === id);
+      const option = Array.from(el.colorSelect?.options || []).find(item => item.value === id);
       if (option) {
         option.selected = !option.selected;
         renderColorChoiceList();

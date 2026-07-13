@@ -151,15 +151,20 @@ function savePost_(post, userId) {
 
   const id = post.id || `post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
-  const image = saveImageIfNeeded_(id, post.imageUrl || post.photo || '', existing && existing.object.imageFileId);
-  const additional = saveAdditionalImages_(id, post.additionalImages || [], existing && existing.object.additionalImageFileIds);
+  const existingImageUrl = existing ? String(existing.object.imageUrl || '') : '';
+  const existingImageFileId = existing ? String(existing.object.imageFileId || '') : '';
+  const incomingImage = post.imageUrl || post.photo || existingImageUrl || '';
+  const image = saveImageIfNeeded_(id, incomingImage, existingImageFileId);
+  const existingAdditionalImages = existing ? splitArray_(existing.object.additionalImages) : [];
+  const incomingAdditionalImages = Array.isArray(post.additionalImages) ? post.additionalImages : existingAdditionalImages;
+  const additional = saveAdditionalImages_(id, incomingAdditionalImages, existing && existing.object.additionalImageFileIds);
   const status = post.status === 'published' ? 'published' : 'draft';
   const row = {
     id,
     title: post.title || '',
     description: post.description || '',
-    imageUrl: image.url || post.imageUrl || '',
-    imageFileId: image.fileId || '',
+    imageUrl: image.url || existingImageUrl || post.imageUrl || '',
+    imageFileId: image.fileId || existingImageFileId || '',
     additionalImages: additional.urls.join('\n'),
     additionalImageFileIds: additional.fileIds.join('\n'),
     extensionColorIds: arrayString_(post.extensionColorIds),
@@ -500,12 +505,16 @@ function getKimikeaConnectSpreadsheet_() {
 }
 
 function normalizePost_(row) {
+  const imageFileId = row.imageFileId || row.imageFileID || row.fileId || '';
+  const imageUrl = row.imageUrl || row.imageUrls || row.photo || row.photoUrl || getFileUrl_(imageFileId) || '';
   return {
     id: row.id,
     title: row.title || '',
     description: row.description || '',
-    imageUrl: row.imageUrl || '',
-    additionalImages: splitArray_(row.additionalImages),
+    imageUrl,
+    imageFileId,
+    additionalImages: splitArray_(row.additionalImages || row.additionalImageUrls || row.imageUrls),
+    additionalImageFileIds: splitArray_(row.additionalImageFileIds),
     extensionColorIds: splitArray_(row.extensionColorIds),
     styleTypeIds: splitArray_(row.styleTypeIds),
     extensionCount: Number(row.extensionCount || 0),

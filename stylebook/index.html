@@ -144,14 +144,8 @@
           <input id="additionalImageFiles" type="file" accept="image/*" multiple>
         </label>
         <input id="additionalImagesInput" type="hidden">
+        <select id="colorSelect" multiple hidden></select>
         <div class="field-grid">
-          <section class="field color-picker-field">
-            <span>使用カラー（複数選択可）</span>
-            <input id="colorSearchInput" type="search" placeholder="色番号・色名で検索 例：N-1 / ベージュ / ピンク">
-            <div id="colorChoiceList" class="color-choice-list" aria-label="エクステカラー一覧"></div>
-            <p id="selectedColorSummary" class="selected-color-summary">選択中の色はありません。</p>
-            <select id="colorSelect" multiple hidden></select>
-          </section>
           <label class="field">
             <span>使用本数</span>
             <input id="extensionCountInput" type="number" min="1" inputmode="numeric" required>
