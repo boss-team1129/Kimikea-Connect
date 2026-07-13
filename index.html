@@ -649,7 +649,7 @@
       background-image:
         linear-gradient(90deg, rgba(9, 9, 9, 0.78), rgba(9, 9, 9, 0.34) 48%, rgba(9, 9, 9, 0.1)),
         var(--home-card-image);
-      background-position: center;
+      background-position: var(--home-card-position, center);
       background-size: cover;
       transform: scale(1.03);
       transition: transform 420ms ease;
@@ -1911,7 +1911,8 @@
         label: 'STYLE BOOK',
         title: 'スタイル図鑑',
         subtitle: '最新スタイルを探す・保存する',
-        imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/stylebook.webp',
+        imagePosition: 'center 44%',
         sortOrder: 10,
         isVisible: true,
       },
@@ -1920,7 +1921,8 @@
         label: 'ORDER',
         title: 'エクステ注文',
         subtitle: 'エクステ・カラーを注文する',
-        imageUrl: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/order.webp',
+        imagePosition: 'center 42%',
         sortOrder: 20,
         isVisible: true,
       },
@@ -1929,7 +1931,8 @@
         label: 'ACADEMY',
         title: '講習案内',
         subtitle: '講習情報・動画でスキルアップ',
-        imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/academy.webp',
+        imagePosition: 'center 45%',
         sortOrder: 30,
         isVisible: true,
       },
@@ -1938,7 +1941,8 @@
         label: 'SALON MAP',
         title: '加盟店マップ',
         subtitle: '加盟店・コーディネーターを探す',
-        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/salon-map.webp',
+        imagePosition: 'center 50%',
         sortOrder: 40,
         isVisible: true,
       },
@@ -1947,7 +1951,8 @@
         label: 'NEWS',
         title: 'お知らせ',
         subtitle: 'お知らせ・最新情報',
-        imageUrl: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/news.webp',
+        imagePosition: 'center 46%',
         sortOrder: 50,
         isVisible: true,
       },
@@ -1956,7 +1961,8 @@
         label: 'RANKING',
         title: '人気ランキング',
         subtitle: '人気ランキングを見る',
-        imageUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/ranking.webp',
+        imagePosition: 'center 46%',
         sortOrder: 60,
         isVisible: true,
       },
@@ -1965,7 +1971,8 @@
         label: 'AI ASSISTANT',
         title: 'あなたのピッタリを探す',
         subtitle: '似合う色やスタイルを提案',
-        imageUrl: 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1000&q=82',
+        imageUrl: 'assets/home-gallery/ai-assistant.webp',
+        imagePosition: 'center 48%',
         sortOrder: 70,
         isVisible: true,
       },
@@ -1984,7 +1991,7 @@
           data-home-gallery-card
           data-menu-key="${escapeHtml(card.key)}"
           onclick="openHomeGalleryCard(event, '${escapeHtml(card.key)}')"
-          style="--home-card-image: url('${escapeHtml(card.imageUrl)}')"
+          style="--home-card-image: url('${escapeHtml(card.imageUrl)}'); --home-card-position: ${escapeHtml(card.imagePosition || 'center')}"
           aria-label="${escapeHtml(card.title)}を開く"
         >
           <span class="home-gallery-image" aria-hidden="true"></span>
