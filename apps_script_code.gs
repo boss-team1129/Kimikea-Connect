@@ -227,14 +227,14 @@ function getPublicOrderSettings(sessionToken) {
 }
 
 function loginFranchise(credentials) {
-  const email = normalizeEmail_(credentials && (
-    credentials.email
-    || credentials.loginEmail
-    || credentials.franchiseId
+  const email = normalizeEmail_(pickFirstDefined_(
+    credentials && credentials.email,
+    credentials && credentials.loginEmail,
+    credentials && credentials.franchiseId
   ));
-  const password = normalizeLoginPassword_(credentials && (
-    credentials.password
-    || credentials.loginPassword
+  const password = normalizeLoginPassword_(pickFirstDefined_(
+    credentials && credentials.password,
+    credentials && credentials.loginPassword
   ));
   if (!email || !password) {
     throw new Error('メールアドレスとパスワードを入力してください。');
@@ -1600,7 +1600,7 @@ function getFranchiseMasterRecords_() {
         initialPassword: passwordIndex === -1
           ? KCO_DEFAULT_INITIAL_PASSWORD
           : normalizeInitialPasswordValue_(row[passwordIndex]),
-        passwordHash: passwordHashIndex === -1 ? '' : String(row[passwordHashIndex] || '').trim(),
+        passwordHash: passwordHashIndex === -1 ? '' : normalizePasswordHashValue_(row[passwordHashIndex]),
         postalCode,
         address,
         fullAddress: [postalCode, address].filter(Boolean).join(' '),
@@ -1654,19 +1654,35 @@ function findMasterHeaderIndex_(headers, candidates) {
 }
 
 function normalizeEmail_(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value === null || value === undefined ? '' : value)
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
 }
 
 function normalizePhone_(value) {
-  return String(value || '')
+  return String(value === null || value === undefined ? '' : value)
     .normalize('NFKC')
     .replace(/[^\d]/g, '');
 }
 
 function normalizeLoginPassword_(value) {
-  return String(value || '')
+  return String(value === null || value === undefined ? '' : value)
     .normalize('NFKC')
     .replace(/\s/g, '');
+}
+
+function normalizePasswordHashValue_(value) {
+  const text = String(value === null || value === undefined ? '' : value).trim();
+  if (!text || text === '0' || text === KCO_DEFAULT_INITIAL_PASSWORD) return '';
+  return text;
+}
+
+function pickFirstDefined_() {
+  for (let i = 0; i < arguments.length; i += 1) {
+    if (arguments[i] !== undefined && arguments[i] !== null) return arguments[i];
+  }
+  return '';
 }
 
 function normalizeInitialPasswordValue_(value) {
