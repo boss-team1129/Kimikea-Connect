@@ -220,8 +220,94 @@
 
     .home-screen {
       display: grid;
-      gap: 16px;
+      gap: 14px;
       padding-bottom: 34px;
+    }
+    .home-news-panel,
+    .home-notice-panel {
+      width: min(90vw, 460px);
+      margin: 0 auto;
+      padding: 16px;
+      border: 1px solid rgba(189, 147, 64, 0.18);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.76);
+      box-shadow: 0 16px 34px rgba(54, 48, 37, 0.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .home-news-panel { margin-top: 4px; }
+    .home-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .home-section-head h2 {
+      margin: 0;
+      color: var(--black);
+      font-size: 17px;
+      line-height: 1.2;
+    }
+    .home-section-head button {
+      width: auto;
+      min-height: 30px;
+      padding: 0 10px;
+      border: 1px solid rgba(189,147,64,.26);
+      border-radius: 999px;
+      background: rgba(255,255,255,.84);
+      color: #8a6b32;
+      font-size: 12px;
+      font-weight: 850;
+    }
+    .home-news-list,
+    .home-notice-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .home-news-item,
+    .home-notice-mini {
+      display: grid;
+      width: 100%;
+      gap: 3px;
+      padding: 10px 11px;
+      border: 1px solid rgba(0,0,0,.06);
+      border-radius: 15px;
+      background: rgba(250,248,242,.78);
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .home-news-meta {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .home-news-new {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--gold-soft);
+      color: #8a6b32;
+      font-size: 10px;
+      font-weight: 950;
+    }
+    .home-news-title,
+    .home-notice-mini strong {
+      color: var(--black);
+      font-size: 14px;
+      font-weight: 850;
+      line-height: 1.4;
+    }
+    .home-notice-mini span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
     }
     .home-hero {
       padding: 22px 20px;
@@ -1295,6 +1381,40 @@
       text-decoration: underline;
       cursor: pointer;
     }
+    .login-info-box {
+      position: relative;
+      margin-top: 14px;
+      padding: 14px 14px 14px 42px;
+      border: 1px solid rgba(189, 147, 64, 0.34);
+      border-radius: 12px;
+      background: #fffaf0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.75;
+    }
+    .login-info-box::before {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--gold-soft);
+      color: #8a6b32;
+      content: "i";
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12px;
+      font-weight: 950;
+    }
+    .login-info-box a {
+      color: #8a6b32;
+      font-weight: 900;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
     @media (max-width: 720px) {
       .login-shell {
         min-height: 100vh;
@@ -1457,9 +1577,10 @@
         <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required>
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
-      <p class="form-note">初期パスワードは0000です。<br>変更したい場合は、ログイン後にマイページから変更できます。</p>
-      <button class="link-button" type="button" onclick="showForgotPasswordHelp()">パスワードを忘れた方はこちら</button>
-      <button class="link-button" type="button" onclick="openRegistrationGuide()">新規登録・会員登録案内</button>
+      <div class="login-info-box">
+        加盟店・コーディネーターとしてご登録いただいた方には、IDとパスワードをお渡ししています。<br>
+        ご登録をご希望の方は、<a href="#" onclick="openRegistrationGuide(); return false;">お問い合わせください</a>。
+      </div>
       <p id="loginMessage" class="message error" aria-live="polite"></p>
     </form>
   </section>
@@ -1496,21 +1617,23 @@
 
     <main>
       <section id="homeView" class="home-screen" aria-label="Kimikea Connectホーム">
-        <section class="home-hero">
-          <p class="home-kicker">NPO法人シールエクステ協会きみけあ</p>
-          <h2 class="home-title">Kimikea Connect</h2>
-          <p id="homeWelcome" class="home-welcome">ようこそ。今日使う機能を選んでください。</p>
+        <section class="home-news-panel" aria-label="新着情報">
+          <div class="home-section-head">
+            <h2>新着情報</h2>
+            <button type="button" onclick="openPublicPage('notice')">すべて見る</button>
+          </div>
+          <ul id="homeNewsList" class="home-news-list"></ul>
         </section>
 
         <section class="home-gallery" aria-label="Kimikea Connectメニュー">
-          <div class="home-gallery-head">
-            <div>
-              <h2 class="home-gallery-title">Kimikea Connect</h2>
-              <p class="home-gallery-subtitle">美容師のためのプラットフォーム</p>
-            </div>
-            <button type="button" class="home-gallery-notice" onclick="openPublicPage('notice')" aria-label="お知らせを開く">○</button>
-          </div>
           <div id="homeGalleryList" class="home-gallery-list"></div>
+          <section class="home-notice-panel" aria-label="お知らせ">
+            <div class="home-section-head">
+              <h2>お知らせ</h2>
+              <button type="button" onclick="openPublicPage('notice')">一覧へ</button>
+            </div>
+            <ul id="homeNoticeList" class="home-notice-list"></ul>
+          </section>
         </section>
       </section>
 
@@ -2627,6 +2750,7 @@
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
+      renderHomeAnnouncements();
       initializeHomeGallery();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
@@ -2650,6 +2774,56 @@
       notifyKimikeaNavigationState();
     }
 
+    const HOME_NOTICE_ITEMS = [
+      {
+        date: '2026.07.14',
+        title: 'Kimikea Connect ホーム画像を更新しました',
+        summary: 'ホーム画面のギャラリー画像を新しいブランドビジュアルへ切り替えました。',
+        isNew: true,
+      },
+      {
+        date: '2026.07.13',
+        title: 'スタイル図鑑の投稿機能を調整中です',
+        summary: '加盟店・コーディネーターが施術写真を共有しやすい画面へ整えています。',
+        isNew: true,
+      },
+      {
+        date: '2026.07.12',
+        title: '会員専用注文ページを準備しています',
+        summary: 'エクステ注文、注文履歴、請求関連を会員向けに使いやすく整備しています。',
+        isNew: false,
+      },
+    ];
+
+    function renderHomeAnnouncements() {
+      const newsList = document.getElementById('homeNewsList');
+      const noticeList = document.getElementById('homeNoticeList');
+      const latest = HOME_NOTICE_ITEMS.slice(0, 3);
+      if (newsList) {
+        newsList.innerHTML = latest.map(item => `
+          <li>
+            <button type="button" class="home-news-item" onclick="openPublicPage('notice')">
+              <span class="home-news-meta">
+                <span>${escapeHtml(item.date)}</span>
+                ${item.isNew ? '<span class="home-news-new">NEW</span>' : ''}
+              </span>
+              <span class="home-news-title">${escapeHtml(item.title)}</span>
+            </button>
+          </li>
+        `).join('');
+      }
+      if (noticeList) {
+        noticeList.innerHTML = latest.map(item => `
+          <li>
+            <button type="button" class="home-notice-mini" onclick="openPublicPage('notice')">
+              <span>${escapeHtml(item.date)}</span>
+              <strong>${escapeHtml(item.title)}</strong>
+            </button>
+          </li>
+        `).join('');
+      }
+    }
+
     const publicPages = {
       popular: {
         title: '人気ランキング',
@@ -2669,7 +2843,7 @@
       notice: {
         title: 'お知らせ',
         lead: '新色、イベント、講習、メンテナンス情報を確認できます。',
-        items: ['新色情報：準備中', 'イベント情報：準備中', '講習情報：準備中']
+        items: HOME_NOTICE_ITEMS.map(item => `${item.date}　${item.title}：${item.summary}`)
       },
       coordinator: {
         title: 'コーディネーター講習案内',

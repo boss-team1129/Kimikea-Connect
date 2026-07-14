@@ -835,12 +835,90 @@ body,
 .empty-state.compact { padding: 18px 10px; }
 .form-actions { display: grid; grid-template-columns: 1fr 1fr; }
 .form-actions .primary-button { grid-column: span 2; }
+
+/* 2026-07-14: stylebook gallery header and two-column mobile cards */
+.topbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 12px;
+}
+.topbar-title {
+  text-align: left;
+  white-space: normal;
+}
+.topbar-title p,
+.topbar-title h1 {
+  word-break: keep-all;
+  overflow-wrap: normal;
+  writing-mode: horizontal-tb;
+}
+.topbar-title p {
+  font-size: 10px;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+.topbar-title h1 {
+  font-size: clamp(20px, 5.4vw, 28px);
+  white-space: nowrap;
+}
+.post-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(183,154,92,.32);
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  color: #8b6b31;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.gallery-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 8px 18px;
+}
+.gallery-item {
+  border-radius: 18px;
+  box-shadow: 0 12px 26px rgba(35,45,49,.08);
+}
+.gallery-item::before {
+  padding-top: 142%;
+}
+.photo-button {
+  cursor: pointer;
+}
+.photo-button::after {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  height: 44%;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.68));
+  content: "";
+  pointer-events: none;
+}
+.photo-meta {
+  z-index: 2;
+  padding: 34px 9px 9px;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.35;
+  text-shadow: 0 2px 8px rgba(0,0,0,.36);
+}
 @media (max-width: 430px) {
   .role-panel { margin-bottom: 6px; }
-  .topbar { grid-template-columns: 48px 1fr 48px; }
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; }
   .back-link, .icon-button { min-height: 36px; font-size: 12px; }
   .menu-card { min-height: 118px; padding: 14px; border-radius: 20px; }
   .menu-card.primary { min-height: 132px; }
   .menu-card strong { font-size: 18px; }
   .menu-card-icon { width: 38px; height: 38px; border-radius: 14px; }
+}
+@media (min-width: 680px) {
+  .gallery-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 980px) {
+  .gallery-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }

@@ -55,6 +55,7 @@ const el = {
   activeChips: document.getElementById('activeChips'),
   clearFiltersButton: document.getElementById('clearFiltersButton'),
   resultCount: document.getElementById('resultCount'),
+  stylebookPostCount: document.getElementById('stylebookPostCount'),
   galleryGrid: document.getElementById('galleryGrid'),
   savedGrid: document.getElementById('savedGrid'),
   draftsGrid: document.getElementById('draftsGrid'),
@@ -717,6 +718,7 @@ function renderGallery() {
   const visible = posts.slice(0, state.visibleCount);
   el.galleryGrid.innerHTML = visible.map(renderGalleryItem).join('');
   el.resultCount.textContent = `${posts.length}件`;
+  if (el.stylebookPostCount) el.stylebookPostCount.textContent = `${activePosts().length}件`;
   if (!posts.length) {
     const hasPublishedPosts = activePosts().length > 0;
     el.galleryGrid.innerHTML = hasPublishedPosts
@@ -1558,7 +1560,7 @@ function bindEvents() {
   });
   el.postForm.addEventListener('submit', submitPost);
   el.cancelEditButton.addEventListener('click', clearPostForm);
-  el.openAdminButton.addEventListener('click', renderAdmin);
+  if (el.openAdminButton) el.openAdminButton.addEventListener('click', renderAdmin);
   document.addEventListener('pointerdown', event => {
     const action = event.target.closest('[data-action]');
     if (action) action.classList.add('is-pressing');
