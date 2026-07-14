@@ -3212,19 +3212,23 @@
       const salonName = franchise.salonName || franchise.franchiseName || '';
       const registrationLead = 'マイページで店舗と担当者を登録してください';
       const address = franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' ');
-      document.getElementById('headerMemberName').textContent = salonName;
-      document.getElementById('profileName').textContent = salonName || registrationLead;
-      document.getElementById('profileContact').textContent = franchise.contactName || registrationLead;
-      document.getElementById('profileEmail').textContent = franchise.email || registrationLead;
-      document.getElementById('profilePhone').textContent = franchise.phone || registrationLead;
-      document.getElementById('profileAddress').textContent = address || registrationLead;
-      document.getElementById('profileStatus').textContent = franchise.membershipStatus === 'active' ? '利用中' : '管理画面で確認してください';
+      const setText = (id, value) => {
+        const node = document.getElementById(id);
+        if (node) node.textContent = value;
+      };
+      setText('headerMemberName', salonName);
+      setText('profileName', salonName || registrationLead);
+      setText('profileContact', franchise.contactName || registrationLead);
+      setText('profileEmail', franchise.email || registrationLead);
+      setText('profilePhone', franchise.phone || registrationLead);
+      setText('profileAddress', address || registrationLead);
+      setText('profileStatus', franchise.membershipStatus === 'active' ? '利用中' : '管理画面で確認してください');
       const missingProfile = !salonName || !franchise.contactName || !franchise.email || !franchise.phone || !address;
       const notice = document.getElementById('orderProfileNotice');
       if (notice) notice.hidden = !missingProfile;
-      document.getElementById('homeWelcome').textContent = salonName
+      setText('homeWelcome', salonName
         ? `${salonName} 様、ようこそ。今日使う機能を選んでください。`
-        : 'ようこそ。今日使う機能を選んでください。';
+        : 'ようこそ。今日使う機能を選んでください。');
     }
 
     function switchTab(tabName) {
