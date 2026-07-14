@@ -48,6 +48,21 @@ const KCO_PRODUCT_HEADERS = [
   '販売価格',
   '在庫',
   '表示',
+  '色系統',
+];
+
+const KCO_COLOR_GROUPS = [
+  'ブラウン・ナチュラル',
+  'ベージュ・ブロンド',
+  'グレー・アッシュ',
+  'ピンク・レッド',
+  'パープル',
+  'ブルー',
+  'グリーン',
+  'イエロー・オレンジ',
+  'ブラック・ホワイト',
+  'ミックス・特殊色',
+  '未分類',
 ];
 
 const KCO_ORDER_HEADERS = [
@@ -145,6 +160,7 @@ function handleJsonpApi_(event) {
     getAppAppearance,
     loginFranchise,
     completeInitialPasswordSetup,
+    getPublicProducts,
     getPortalData,
     updateMemberEmail,
     changeMemberPassword,
@@ -397,6 +413,10 @@ function getPortalData(sessionToken) {
   };
 }
 
+function getPublicProducts() {
+  return getClientProducts_();
+}
+
 function getVisibleProducts(sessionToken) {
   getSessionFranchise_(sessionToken);
   return getClientProducts_();
@@ -407,7 +427,13 @@ function getClientProducts_() {
     productCode: product.productCode,
     category: product.category,
     color: product.color,
+    colorCode: product.colorCode,
+    colorName: product.colorName,
+    colorGroup: product.colorGroup,
+    swatchImageUrl: product.swatchImageUrl,
     salesPrice: product.salesPrice,
+    sortOrder: product.sortOrder,
+    visible: true,
   }));
 }
 
@@ -422,14 +448,20 @@ function getVisibleProducts_() {
   const index = createIndex_(headers);
 
   return values.slice(1)
-    .filter((row) => isVisible_(row[index['表示']]))
-    .map((row) => ({
+    .map((row, rowIndex) => ({ row, rowIndex }))
+    .filter(({ row }) => isVisible_(row[index['表示']]))
+    .map(({ row, rowIndex }) => ({
       productCode: String(row[index['商品コード']] || '').trim(),
       category: String(row[index['商品カテゴリー']] || ''),
       color: String(row[index['カラー']] || ''),
+      colorCode: String(row[index['カラー']] || '').trim(),
+      colorName: String(getRowValueByHeader_(row, index, ['カラー名', '色名']) || '').trim(),
+      colorGroup: String(row[index['色系統']] || '').trim() || '未分類',
+      swatchImageUrl: String(getRowValueByHeader_(row, index, ['色見本画像URL', '画像URL', 'imageUrl']) || '').trim(),
       purchasePrice: Number(row[index['仕入価格']] || 0),
       salesPrice: Number(row[index['販売価格']] || 0),
       stock: row[index['在庫']],
+      sortOrder: rowIndex + 1,
     }))
     .filter((product) => product.productCode && product.category && product.color && product.salesPrice > 0);
 }
@@ -566,6 +598,7 @@ function setupProductMaster_(ss) {
     ensureProductMasterColumns_(sheet);
     fillMissingProductCodes_(sheet);
   }
+  applyProductMasterDropdowns_(sheet);
   applyHeaderStyle_(sheet, KCO_PRODUCT_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_PRODUCT_HEADERS.length);
 }
@@ -580,6 +613,7 @@ function createProductRows_(category, colors) {
     price.salesPrice,
     100,
     true,
+    '',
   ]);
 }
 
@@ -595,6 +629,23 @@ function ensureProductMasterColumns_(sheet) {
     sheet.getRange(1, sheet.getLastColumn()).setValue(header);
     existingHeaders.push(normalizeMasterHeader_(header));
   });
+  applyProductMasterDropdowns_(sheet);
+}
+
+function applyProductMasterDropdowns_(sheet) {
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const colorGroupIndex = findMasterHeaderIndex_(headers, ['色系統', 'colorGroup']);
+  if (colorGroupIndex < 0) return;
+
+  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(KCO_COLOR_GROUPS, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, colorGroupIndex + 1, maxRows, 1).setDataValidation(rule);
 }
 
 function fillMissingProductCodes_(sheet) {
@@ -1984,6 +2035,15 @@ function createIndex_(headers) {
     index[String(header).trim()] = i;
   });
   return index;
+}
+
+function getRowValueByHeader_(row, index, names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(index, name)) {
+      return row[index[name]];
+    }
+  }
+  return '';
 }
 
 function applyHeaderStyle_(sheet, colCount) {

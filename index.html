@@ -1090,31 +1090,134 @@
       line-height: 1.55;
     }
     .public-actions { display: grid; gap: 10px; margin-top: 16px; }
+    .color-chart-shell {
+      display: grid;
+      gap: 14px;
+    }
+    .color-chart-toolbar {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid rgba(189,147,64,.2);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(250,246,236,.9));
+    }
+    .color-chart-search {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid rgba(189,147,64,.26);
+      border-radius: 999px;
+      background: rgba(255,255,255,.92);
+      padding: 0 15px;
+      color: var(--black);
+      font-size: 16px;
+      font-weight: 750;
+      outline: none;
+    }
+    .color-chart-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .color-chart-tabs::-webkit-scrollbar { display: none; }
+    .color-chart-tab {
+      flex: 0 0 auto;
+      min-height: 36px;
+      border: 1px solid rgba(189,147,64,.25);
+      border-radius: 999px;
+      background: rgba(255,255,255,.86);
+      color: #6e604b;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .color-chart-tab.is-active {
+      background: linear-gradient(135deg, #d6b05b, #f3df9d);
+      border-color: rgba(153,112,39,.38);
+      color: #241b0d;
+      box-shadow: 0 8px 18px rgba(153,112,39,.16);
+    }
+    .color-chart-meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
     .color-chart-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
       margin-top: 14px;
     }
     .color-chart-item {
       display: grid;
-      gap: 5px;
-      min-height: 78px;
-      padding: 12px;
-      border: 1px solid rgba(189,147,64,.18);
-      border-radius: 14px;
-      background: #fffdf9;
+      align-content: start;
+      justify-items: center;
+      gap: 6px;
+      min-height: 132px;
+      padding: 9px 7px 10px;
+      border: 1px solid rgba(189,147,64,.22);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fffefb, #faf6ec);
+      box-shadow: 0 10px 24px rgba(44,32,14,.07);
+      text-align: center;
+    }
+    .color-chart-swatch {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      border: 1px solid rgba(189,147,64,.22);
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 35% 25%, rgba(255,255,255,.92), rgba(255,255,255,.34) 28%, transparent 55%),
+        linear-gradient(145deg, #fffaf0, #e8dcc4);
+      box-shadow: inset 0 1px 8px rgba(255,255,255,.7), 0 10px 18px rgba(44,32,14,.12);
+      overflow: hidden;
+    }
+    .color-chart-swatch img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .color-chart-swatch-text {
+      color: #8a6b32;
+      font-size: 11px;
+      font-weight: 950;
+      line-height: 1.1;
+      max-width: 48px;
+      overflow-wrap: anywhere;
     }
     .color-chart-item strong {
       color: var(--black);
-      font-size: 15px;
+      font-size: 13px;
       line-height: 1.35;
+      overflow-wrap: anywhere;
     }
     .color-chart-item span {
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       line-height: 1.4;
+    }
+    .color-chart-category {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: rgba(189,147,64,.1);
+      color: #7c6432 !important;
+      font-size: 9px !important;
+      white-space: nowrap;
     }
     .color-chart-empty {
       padding: 14px;
@@ -1123,6 +1226,15 @@
       background: #fffdf9;
       color: var(--muted);
       line-height: 1.65;
+    }
+    @media (max-width: 360px) {
+      .color-chart-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width: 700px) {
+      .color-chart-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+    }
+    @media (min-width: 1100px) {
+      .color-chart-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
     }
     .public-card-grid {
       display: grid;
@@ -1947,6 +2059,8 @@
       orderUnlocked: false,
       pendingOpenOrder: false,
       orderSettings: { shippingFee: 1000, freeShippingBags: 5 },
+      colorChartFilter: 'すべて',
+      colorChartSearch: '',
     };
     let manifestObjectUrl = '';
     const OFFICIAL_PUBLIC_URL = 'https://boss-team1129.github.io/Kimikea-Connect/';
@@ -2989,6 +3103,27 @@
       }
     }
 
+    const COLOR_CHART_GROUPS = [
+      'すべて',
+      'ブラウン・ナチュラル',
+      'ベージュ・ブロンド',
+      'グレー・アッシュ',
+      'ピンク・レッド',
+      'パープル',
+      'ブルー',
+      'グリーン',
+      'イエロー・オレンジ',
+      'ブラック・ホワイト',
+      'ミックス・特殊色',
+      '未分類',
+    ];
+
+    function normalizeColorGroup(group) {
+      const text = String(group || '').trim();
+      if (!text) return '未分類';
+      return COLOR_CHART_GROUPS.includes(text) && text !== 'すべて' ? text : '未分類';
+    }
+
     function getActiveColorChartProducts() {
       const allowedCategories = new Set(['ダークカラー', 'ライトカラー', '原色']);
       const seen = new Set();
@@ -3004,29 +3139,119 @@
       }).map((product) => ({
         category: String(product.category || product.productCategory || product['商品カテゴリー'] || '').trim(),
         color: String(product.color || product.colorName || product['カラー'] || '').trim(),
+        colorName: String(product.colorName || product.name || product['カラー名'] || '').trim(),
+        colorGroup: normalizeColorGroup(product.colorGroup || product['色系統']),
+        swatchImageUrl: String(product.swatchImageUrl || product.imageUrl || product['色見本画像URL'] || '').trim(),
         code: String(product.productCode || product.code || product.id || '').trim(),
+        sortOrder: Number(product.sortOrder || 0),
       }));
     }
 
-    function renderColorChartContent() {
-      const colors = getActiveColorChartProducts();
+    function getFilteredColorChartProducts() {
+      const query = String(state.colorChartSearch || '').trim().toLowerCase();
+      return getActiveColorChartProducts().filter((color) => {
+        const groupMatch = state.colorChartFilter === 'すべて' || color.colorGroup === state.colorChartFilter;
+        if (!groupMatch) return false;
+        if (!query) return true;
+        return `${color.color} ${color.colorName}`.toLowerCase().includes(query);
+      });
+    }
+
+    function setColorChartFilter(group) {
+      state.colorChartFilter = group || 'すべて';
+      updateColorChartTabs();
+      refreshColorChartContent();
+    }
+
+    function setColorChartSearch(value) {
+      state.colorChartSearch = value || '';
+      refreshColorChartContent();
+    }
+
+    function refreshColorChartContent() {
+      const target = document.getElementById('colorChartDynamicContent');
+      if (target) target.innerHTML = renderColorChartResults();
+    }
+
+    function updateColorChartTabs() {
+      document.querySelectorAll('.color-chart-tab').forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.group === state.colorChartFilter);
+      });
+    }
+
+    function loadPublicProductsForColorChart() {
+      if (state.products.length || !canUseOrderApi()) return;
+      callServer('getPublicProducts')
+        .then((products) => {
+          state.products = Array.isArray(products) ? products : [];
+          refreshColorChartContent();
+        })
+        .catch(() => {
+          refreshColorChartContent();
+        });
+    }
+
+    function renderColorChartResults() {
+      const allColors = getActiveColorChartProducts();
+      const colors = getFilteredColorChartProducts();
+      const query = String(state.colorChartSearch || '').trim();
+      const emptyText = state.colorChartFilter === 'すべて' && !query
+        ? '商品マスタに表示中のカラーがまだ読み込まれていません。'
+        : 'この分類にはまだカラーが登録されていません';
+
       if (!colors.length) {
         return `
-          <div class="color-chart-empty">
-            商品マスタに登録された表示中のカラーをここへ表示します。<br>
-            「Kimikea Connect Order 管理表」の商品マスタと連携すると、新色や非表示設定が自動で反映されます。
-          </div>
+          <p class="color-chart-meta">表示中 0件 / 登録カラー ${allColors.length}件</p>
+          <div class="color-chart-empty">${escapeHtml(emptyText)}</div>
         `;
       }
+
       return `
+        <p class="color-chart-meta">表示中 ${colors.length}件 / 登録カラー ${allColors.length}件</p>
         <div class="color-chart-grid">
           ${colors.map((color) => `
             <article class="color-chart-item">
+              <span class="color-chart-swatch">
+                ${color.swatchImageUrl
+                  ? `<img src="${escapeHtml(color.swatchImageUrl)}" alt="${escapeHtml(color.color)}">`
+                  : `<span class="color-chart-swatch-text">${escapeHtml(color.color)}</span>`}
+              </span>
               <strong>${escapeHtml(color.color)}</strong>
-              <span>${escapeHtml(color.category)}</span>
-              ${color.code ? `<span>${escapeHtml(color.code)}</span>` : ''}
+              ${color.colorName ? `<span>${escapeHtml(color.colorName)}</span>` : ''}
+              <span class="color-chart-category">${escapeHtml(color.category)}</span>
+              <span>${escapeHtml(color.colorGroup)}</span>
             </article>
           `).join('')}
+        </div>
+      `;
+    }
+
+    function renderColorChartContent() {
+      window.setTimeout(loadPublicProductsForColorChart, 0);
+      return `
+        <div class="color-chart-shell">
+          <div class="color-chart-toolbar">
+            <input
+              class="color-chart-search"
+              type="search"
+              value="${escapeHtml(state.colorChartSearch)}"
+              placeholder="カラー番号・カラー名で検索"
+              oninput="setColorChartSearch(this.value)"
+            >
+            <div class="color-chart-tabs" aria-label="色系統で絞り込み">
+              ${COLOR_CHART_GROUPS.map((group) => `
+                <button
+                  type="button"
+                  class="color-chart-tab${state.colorChartFilter === group ? ' is-active' : ''}"
+                  data-group="${escapeHtml(group)}"
+                  onclick="setColorChartFilter('${escapeHtml(group)}')"
+                >${escapeHtml(group)}</button>
+              `).join('')}
+            </div>
+          </div>
+          <div id="colorChartDynamicContent">
+            ${renderColorChartResults()}
+          </div>
         </div>
       `;
     }
