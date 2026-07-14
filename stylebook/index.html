@@ -35,32 +35,32 @@
         <span>写真、使用色、本数をすばやく確認できます。</span>
       </div>
       <section class="menu-card-grid" aria-label="スタイル図鑑メニュー">
-        <button class="menu-card primary" type="button" data-action="open-gallery" onclick="return kimikeaStylebookTap(event, 'open-gallery')">
+        <button class="menu-card primary" type="button" data-action="open-gallery">
           <span class="menu-card-icon">📖</span>
           <strong>図鑑を見る</strong>
           <small>写真一覧へ</small>
         </button>
-        <button class="menu-card" type="button" data-action="show-post" onclick="return kimikeaStylebookTap(event, 'show-post')">
+        <button class="menu-card" type="button" data-action="show-post">
           <span class="menu-card-icon">＋</span>
           <strong>投稿する</strong>
           <small>新規投稿画面へ</small>
         </button>
-        <button class="menu-card" type="button" data-action="show-drafts" onclick="return kimikeaStylebookTap(event, 'show-drafts')">
+        <button class="menu-card" type="button" data-action="show-drafts">
           <span class="menu-card-icon">□</span>
           <strong>下書き</strong>
           <small>自分の下書き一覧</small>
         </button>
-        <button class="menu-card" type="button" data-action="show-saved" onclick="return kimikeaStylebookTap(event, 'show-saved')">
+        <button class="menu-card" type="button" data-action="show-saved">
           <span class="menu-card-icon">♡</span>
           <strong>保存したスタイル</strong>
           <small>お気に入り一覧</small>
         </button>
-        <button class="menu-card" type="button" data-action="show-mine" onclick="return kimikeaStylebookTap(event, 'show-mine')">
+        <button class="menu-card" type="button" data-action="show-mine">
           <span class="menu-card-icon">◎</span>
           <strong>自分の投稿</strong>
           <small>公開中と下書きを管理</small>
         </button>
-        <button id="menuAdminCard" class="menu-card admin-only" type="button" data-action="show-admin" onclick="return kimikeaStylebookTap(event, 'show-admin')" hidden>
+        <button id="menuAdminCard" class="menu-card admin-only" type="button" data-action="show-admin" hidden>
           <span class="menu-card-icon">⚙</span>
           <strong>管理</strong>
           <small>本部管理者のみ</small>
@@ -243,26 +243,7 @@
 
   </main>
 
-  <script>
-    window.__kimikeaStylebookQueuedAction = '';
-    window.kimikeaStylebookTap = function kimikeaStylebookTap(event, actionName) {
-      if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.currentTarget?.classList?.add('is-pressing');
-        window.setTimeout(function () {
-          event.currentTarget?.classList?.remove('is-pressing');
-        }, 140);
-      }
-      if (typeof window.__kimikeaStylebookRunAction === 'function') {
-        window.__kimikeaStylebookRunAction(actionName);
-      } else {
-        window.__kimikeaStylebookQueuedAction = actionName;
-      }
-      return false;
-    };
-  </script>
-  <script src="./script.js?v=20260714-color-restore-3"></script>
+  <script src="./script.js?v=20260715-fast-tap-1"></script>
   <script src="../shared-nav.js?v=20260714-nav-1"></script>
 </body>
 </html>

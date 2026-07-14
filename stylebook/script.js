@@ -39,6 +39,7 @@ const state = {
   historyReady: false,
   appHistory: [],
   isRestoringAppHistory: false,
+  immediateActionUntil: 0,
 };
 
 const el = {
@@ -389,6 +390,22 @@ async function loadDb() {
   state.db = seedData();
   state.backendMode = 'local';
   saveDb();
+}
+
+function primeDbForImmediateNavigation() {
+  if (state.db) return;
+  try {
+    const saved = localStorage.getItem(DB_KEY);
+    if (saved) {
+      state.db = JSON.parse(saved);
+      state.backendMode = hasRemoteApi() ? 'loading' : 'local';
+      return;
+    }
+  } catch (error) {
+    // 壊れた一時データは使わず、即時操作用の初期データへ進む。
+  }
+  state.db = seedData();
+  state.backendMode = hasRemoteApi() ? 'loading' : 'local';
 }
 
 function saveDb() {
@@ -1061,12 +1078,6 @@ function handleActionElement(action) {
     currentView: state.currentView,
     actionEventCount: state.actionEventCount,
   });
-  if (!state.db && ['open-gallery', 'show-post', 'show-saved', 'show-drafts', 'show-mine', 'show-admin'].includes(actionName)) {
-    state.pendingActionName = actionName;
-    debugStylebook('action queued while database loading', { actionName });
-    return true;
-  }
-
   if (actionName === 'detail') showDetail(id);
   else if (actionName === 'save') toggleSave(id);
   else if (actionName === 'edit') showPostForm(id);
@@ -1117,6 +1128,16 @@ function handleActionElement(action) {
     return false;
   }
   return true;
+}
+
+function runActionNow(action, event) {
+  if (!action) return false;
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  state.immediateActionUntil = Date.now() + 450;
+  action.classList.add('is-pressing');
+  window.setTimeout(() => action.classList.remove('is-pressing'), 110);
+  return handleActionElement(action);
 }
 
 window.__kimikeaStylebookRunAction = function runStylebookAction(actionName, id = '') {
@@ -1562,9 +1583,14 @@ function bindEvents() {
   el.cancelEditButton.addEventListener('click', clearPostForm);
   if (el.openAdminButton) el.openAdminButton.addEventListener('click', renderAdmin);
   document.addEventListener('pointerdown', event => {
+    const immediateAction = event.target.closest('.menu-card[data-action], .empty-gallery-state [data-action]');
+    if (immediateAction) {
+      runActionNow(immediateAction, event);
+      return;
+    }
     const action = event.target.closest('[data-action]');
     if (action) action.classList.add('is-pressing');
-  }, { passive: true });
+  }, { passive: false, capture: true });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(eventName => {
     document.addEventListener(eventName, event => {
       const action = event.target.closest('[data-action]');
@@ -1572,6 +1598,11 @@ function bindEvents() {
     }, { passive: true });
   });
   document.addEventListener('click', event => {
+    if (Date.now() < state.immediateActionUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     state.actionEventCount += 1;
     const actionCandidate = event.target.closest('[data-action]');
     if (actionCandidate) {
@@ -1624,10 +1655,7 @@ function bindEvents() {
     }
     const action = event.target.closest('[data-action]');
     if (!action) return;
-    event.preventDefault();
-    action.classList.add('is-pressing');
-    window.setTimeout(() => action.classList.remove('is-pressing'), 140);
-    handleActionElement(action);
+    runActionNow(action, event);
   });
   document.querySelectorAll('[data-admin-tab]').forEach(button => {
     button.addEventListener('click', () => {
@@ -1671,6 +1699,7 @@ async function init() {
   if (!state.db) {
     state.backendMode = hasRemoteApi() ? 'loading' : 'local';
   }
+  primeDbForImmediateNavigation();
   bindEvents();
   showView('menu', { push: false });
   replaceStylebookHistory('menu');
