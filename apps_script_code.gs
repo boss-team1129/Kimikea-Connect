@@ -26,6 +26,8 @@ const KCO_CONFIG = {
   SESSION_SECONDS: 21600,
 };
 
+const KCO_COST_PRICE_FRANCHISE_IDS = ['K-0', 'K-1'];
+
 const KCO_CATEGORY_PRICES = {
   'ダークカラー': { purchasePrice: 2750, salesPrice: 3300 },
   'ライトカラー': { purchasePrice: 3190, salesPrice: 3828 },
@@ -80,6 +82,9 @@ const KCO_ORDER_HEADERS = [
   '発送状況',
   '備考',
   '発送通知日時',
+  'priceType',
+  'invoiceShipping',
+  'invoiceTotal',
 ];
 
 const KCO_SETTING_HEADERS = [
@@ -132,6 +137,11 @@ const KCO_DETAIL_HEADERS = [
   '小計',
   '仕入単価',
   '利益',
+  '商品コード',
+  '商品名',
+  'priceType',
+  'invoiceUnitPrice',
+  'lineTotal',
 ];
 
 function doGet(event) {
@@ -486,6 +496,8 @@ function submitCartOrder(order) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
+  ensureOrderHeaders_(ordersSheet);
+  ensureOrderDetailHeaders_(detailsSheet);
   const productMap = getProductMap_();
   const franchise = getSessionFranchise_(order.sessionToken);
   const invoiceSettings = getInvoiceSettings_(ss);
@@ -494,6 +506,7 @@ function submitCartOrder(order) {
 
   const now = new Date();
   const orderNo = createOrderNumber_(now, ordersSheet.getLastRow());
+  const priceType = getInvoicePriceType_(franchise.franchiseId);
   let totalBags = 0;
   let productTotal = 0;
   const detailRows = [];
@@ -509,8 +522,9 @@ function submitCartOrder(order) {
     const qty = Number(item.quantity || 0);
     if (qty <= 0) return;
 
-    const subtotal = product.salesPrice * qty;
-    const profit = (product.salesPrice - product.purchasePrice) * qty;
+    const invoiceUnitPrice = getInvoiceUnitPrice_(product, priceType);
+    const subtotal = invoiceUnitPrice * qty;
+    const profit = (invoiceUnitPrice - product.purchasePrice) * qty;
     totalBags += qty;
     productTotal += subtotal;
 
@@ -519,10 +533,15 @@ function submitCartOrder(order) {
       product.category,
       product.color,
       qty,
-      product.salesPrice,
+      invoiceUnitPrice,
       subtotal,
       product.purchasePrice,
       profit,
+      product.productCode,
+      `${product.category} ${product.color}`,
+      priceType,
+      invoiceUnitPrice,
+      subtotal,
     ]);
 
     detailItems.push({
@@ -533,9 +552,13 @@ function submitCartOrder(order) {
       color: product.color,
       colorName: product.colorName || product.color,
       quantity: qty,
-      unitPrice: product.salesPrice,
+      unitPrice: invoiceUnitPrice,
+      invoiceUnitPrice,
+      lineTotal: subtotal,
       subtotal,
       purchasePrice: product.purchasePrice,
+      salesPrice: product.salesPrice,
+      priceType,
       profit,
     });
   });
@@ -562,6 +585,9 @@ function submitCartOrder(order) {
     '発送準備',
     order.note || '',
     '',
+    priceType,
+    shippingFee,
+    invoiceTotal,
   ]);
 
   detailsSheet
@@ -584,8 +610,10 @@ function submitCartOrder(order) {
     detailItems,
     totalBags,
     shippingFee,
+    invoiceShipping: shippingFee,
     productTotal,
     invoiceTotal,
+    priceType,
   }, invoiceSettings, orderRules);
 
   return {
@@ -711,9 +739,7 @@ function setupOrders_(ss) {
 
 function setupOrderDetails_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.ORDER_DETAILS);
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, KCO_DETAIL_HEADERS.length).setValues([KCO_DETAIL_HEADERS]);
-  }
+  ensureOrderDetailHeaders_(sheet);
   applyHeaderStyle_(sheet, KCO_DETAIL_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_DETAIL_HEADERS.length);
 }
@@ -868,6 +894,25 @@ function ensureOrderHeaders_(sheet) {
   sheet.getRange(1, 1, 1, KCO_ORDER_HEADERS.length).setValues([KCO_ORDER_HEADERS]);
 }
 
+function ensureOrderDetailHeaders_(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_DETAIL_HEADERS.length).setValues([KCO_DETAIL_HEADERS]);
+    return;
+  }
+
+  const currentHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((value) => String(value || '').trim());
+
+  KCO_DETAIL_HEADERS.forEach((header) => {
+    if (currentHeaders.indexOf(header) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    currentHeaders.push(header);
+  });
+}
+
 function getHeaderValues_(sheet) {
   const colCount = Math.max(sheet.getLastColumn(), KCO_ORDER_HEADERS.length);
   return sheet.getRange(1, 1, 1, colCount).getValues()[0].map((value) => String(value || '').trim());
@@ -894,6 +939,12 @@ function formatOrderSheets_(ss) {
   }
   if (details.getLastRow() > 1) {
     details.getRange(2, 5, details.getLastRow() - 1, 4).setNumberFormat('¥#,##0');
+    const detailHeaders = details.getRange(1, 1, 1, details.getLastColumn()).getValues()[0];
+    const detailIndex = createIndex_(detailHeaders);
+    ['invoiceUnitPrice', 'lineTotal'].forEach((header) => {
+      if (detailIndex[header] === undefined) return;
+      details.getRange(2, detailIndex[header] + 1, details.getLastRow() - 1, 1).setNumberFormat('¥#,##0');
+    });
   }
 }
 
@@ -943,8 +994,20 @@ function sendGrowOrderMail_(summary, settings) {
   const subject = `【Kimikea Connect】新しい注文が入りました／注文番号：${summary.orderNo}`;
   const body = buildGrowOrderEmailBody_(summary);
   const htmlBody = textToHtml_(body);
-  sendMailList_(settings.growEmails, subject, body, [], settings.senderName, htmlBody);
-  logMailInfo_('Grow通知送信成功', summary.orderNo, settings.growEmails);
+  settings.growEmails.forEach((email) => {
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject,
+        body,
+        htmlBody,
+        name: settings.senderName || 'Kimikea Connect Order',
+      });
+      logMailInfo_('Grow通知送信成功', summary.orderNo, [email]);
+    } catch (error) {
+      logMailError_('Grow通知送信失敗', summary.orderNo, [email], error);
+    }
+  });
 }
 
 function getNotificationSettings_(ss) {
@@ -1065,8 +1128,8 @@ function buildOrderItemsText_(summary) {
     `${item.category} / ${item.colorName || item.color}`,
     `商品コード：${item.productCode || ''}`,
     `数量：${item.quantity}袋`,
-    `単価：${formatYen_(item.unitPrice)}`,
-    `小計：${formatYen_(item.subtotal)}`,
+    `単価：${formatYen_(item.invoiceUnitPrice || item.unitPrice)}`,
+    `小計：${formatYen_(item.lineTotal || item.subtotal)}`,
   ].join('\n')).join('\n---\n');
 }
 
@@ -1078,24 +1141,27 @@ function buildGrowOrderItemsText_(summary) {
     `カラー名：${item.colorName || item.color}`,
     `商品コード：${item.productCode || ''}`,
     `数量：${item.quantity}袋`,
-    `単価：${formatYen_(item.unitPrice)}`,
-    `商品ごとの金額：${formatYen_(item.subtotal)}`,
+    `単価：${formatYen_(item.invoiceUnitPrice || item.unitPrice)}`,
+    `商品ごとの金額：${formatYen_(item.lineTotal || item.subtotal)}`,
   ].join('\n')).join('\n\n');
 }
 
 function getSummaryDetailItems_(summary) {
   if (Array.isArray(summary.detailItems) && summary.detailItems.length) return summary.detailItems;
   return (summary.details || []).map((row) => ({
-    productCode: '',
-    productName: `${row[1]} ${row[2]}`,
+    productCode: row[8] || '',
+    productName: row[9] || `${row[1]} ${row[2]}`,
     category: row[1],
     color: row[2],
     colorName: row[2],
     quantity: row[3],
     unitPrice: row[4],
+    invoiceUnitPrice: row[11] || row[4],
     subtotal: row[5],
+    lineTotal: row[12] || row[5],
     purchasePrice: row[6],
     profit: row[7],
+    priceType: row[10] || summary.priceType || '',
   }));
 }
 
@@ -1527,15 +1593,19 @@ function getInvoiceLogoBlob_(fileId) {
 function sendMailList_(emails, subject, body, attachments, senderName, htmlBody) {
   const uniqueEmails = parseEmailList_((emails || []).join(','));
   uniqueEmails.forEach((email) => {
-    const payload = {
-      to: email,
-      subject,
-      body,
-      attachments: attachments || [],
-      name: senderName || 'Kimikea Connect Order',
-    };
-    if (htmlBody) payload.htmlBody = htmlBody;
-    MailApp.sendEmail(payload);
+    try {
+      const payload = {
+        to: email,
+        subject,
+        body,
+        attachments: attachments || [],
+        name: senderName || 'Kimikea Connect Order',
+      };
+      if (htmlBody) payload.htmlBody = htmlBody;
+      MailApp.sendEmail(payload);
+    } catch (error) {
+      logMailError_('メール送信失敗', '', [email], error);
+    }
   });
 }
 
@@ -1564,17 +1634,22 @@ function logMailError_(message, orderNo, emails, error) {
 function testSendGrowMail() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const settings = getNotificationSettings_(ss);
-  const growEmail = settings.growEmails[0] || '';
-  if (!growEmail) {
+  if (!settings.growEmails.length) {
     throw new Error('grow通知メールが設定されていません');
   }
-  MailApp.sendEmail({
-    to: growEmail,
-    subject: '【Kimikea Connect】Grow通知テスト',
-    body: 'Grow通知メールのテスト送信です。',
-    name: settings.senderName || 'Kimikea Connect Order',
+  settings.growEmails.forEach((email) => {
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: '【Kimikea Connect】Grow通知テスト',
+        body: 'Grow通知メールのテスト送信です。',
+        name: settings.senderName || 'Kimikea Connect Order',
+      });
+      logMailInfo_('Grow通知テスト送信成功', 'test', [email]);
+    } catch (error) {
+      logMailError_('Grow通知テスト送信失敗', 'test', [email], error);
+    }
   });
-  logMailInfo_('Grow通知テスト送信成功', 'test', [growEmail]);
 }
 
 function ensureShipmentEditTrigger_(ss) {
@@ -1640,7 +1715,7 @@ function parseEmailList_(value) {
   const seen = {};
   return String(value || '')
     .normalize('NFKC')
-    .split(/[,、\n]/)
+    .split(/[,、，\n]/)
     .map((email) => email.trim())
     .filter((email) => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     .filter((email) => {
@@ -1658,6 +1733,18 @@ function isTruthy_(value) {
 
 function formatYen_(value) {
   return `¥${Number(value || 0).toLocaleString('ja-JP')}`;
+}
+
+function getInvoicePriceType_(franchiseId) {
+  const normalized = String(franchiseId || '').trim().toUpperCase();
+  return KCO_COST_PRICE_FRANCHISE_IDS.indexOf(normalized) !== -1 ? 'cost' : 'sale';
+}
+
+function getInvoiceUnitPrice_(product, priceType) {
+  if (priceType === 'cost') {
+    return Number(product.purchasePrice || 0);
+  }
+  return Number(product.salesPrice || 0);
 }
 
 function getProductMap_() {
@@ -1725,11 +1812,14 @@ function getFranchiseOrders_(franchiseId) {
       if (!orderNo) return;
       if (!detailsByOrder[orderNo]) detailsByOrder[orderNo] = [];
       detailsByOrder[orderNo].push({
+        productCode: detailIndex['商品コード'] === undefined ? '' : String(row[detailIndex['商品コード']] || ''),
+        productName: detailIndex['商品名'] === undefined ? '' : String(row[detailIndex['商品名']] || ''),
         category: String(row[detailIndex['商品カテゴリー']] || ''),
         color: String(row[detailIndex['カラー']] || ''),
         quantity: Number(row[detailIndex['数量']] || 0),
-        unitPrice: Number(row[detailIndex['単価']] || 0),
-        subtotal: Number(row[detailIndex['小計']] || 0),
+        unitPrice: Number(row[detailIndex['invoiceUnitPrice']] || row[detailIndex['単価']] || 0),
+        subtotal: Number(row[detailIndex['lineTotal']] || row[detailIndex['小計']] || 0),
+        priceType: detailIndex['priceType'] === undefined ? '' : String(row[detailIndex['priceType']] || ''),
       });
     });
   }
@@ -1745,9 +1835,10 @@ function getFranchiseOrders_(franchiseId) {
           ? Utilities.formatDate(orderDate, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')
           : String(orderDate || ''),
         totalBags: Number(row[orderIndex['合計袋数']] || 0),
-        shippingFee: Number(row[orderIndex['送料']] || 0),
+        shippingFee: Number(row[orderIndex['invoiceShipping']] || row[orderIndex['送料']] || 0),
         productTotal: Number(row[orderIndex['商品合計']] || 0),
-        invoiceTotal: Number(row[orderIndex['請求合計']] || 0),
+        invoiceTotal: Number(row[orderIndex['invoiceTotal']] || row[orderIndex['請求合計']] || 0),
+        priceType: orderIndex['priceType'] === undefined ? '' : String(row[orderIndex['priceType']] || ''),
         shippingStatus: String(row[orderIndex['発送状況']] || '発送準備'),
         note: String(row[orderIndex['備考']] || ''),
         items: detailsByOrder[orderNo] || [],
@@ -1772,18 +1863,38 @@ function getInvoicePdfData(sessionToken, orderNo) {
 
   const detailValues = detailsSheet.getDataRange().getValues();
   const detailIndex = createIndex_(detailValues[0]);
+  let usedLegacyPriceForReissue = false;
   const detailRows = detailValues.slice(1)
     .filter((row) => String(row[detailIndex['注文番号']] || '') === targetOrderNo)
-    .map((row) => [
-      targetOrderNo,
-      row[detailIndex['商品カテゴリー']],
-      row[detailIndex['カラー']],
-      Number(row[detailIndex['数量']] || 0),
-      Number(row[detailIndex['単価']] || 0),
-      Number(row[detailIndex['小計']] || 0),
-      Number(row[detailIndex['仕入単価']] || 0),
-      Number(row[detailIndex['利益']] || 0),
-    ]);
+    .map((row) => {
+      const savedUnitPrice = detailIndex['invoiceUnitPrice'] === undefined ? '' : row[detailIndex['invoiceUnitPrice']];
+      const savedLineTotal = detailIndex['lineTotal'] === undefined ? '' : row[detailIndex['lineTotal']];
+      if (savedUnitPrice === '' || savedUnitPrice === null || savedUnitPrice === undefined
+        || savedLineTotal === '' || savedLineTotal === null || savedLineTotal === undefined) {
+        usedLegacyPriceForReissue = true;
+      }
+      return [
+        targetOrderNo,
+        row[detailIndex['商品カテゴリー']],
+        row[detailIndex['カラー']],
+        Number(row[detailIndex['数量']] || 0),
+        Number(savedUnitPrice || row[detailIndex['単価']] || 0),
+        Number(savedLineTotal || row[detailIndex['小計']] || 0),
+        Number(row[detailIndex['仕入単価']] || 0),
+        Number(row[detailIndex['利益']] || 0),
+        detailIndex['商品コード'] === undefined ? '' : row[detailIndex['商品コード']],
+        detailIndex['商品名'] === undefined ? '' : row[detailIndex['商品名']],
+        detailIndex['priceType'] === undefined ? '' : row[detailIndex['priceType']],
+        Number(savedUnitPrice || row[detailIndex['単価']] || 0),
+        Number(savedLineTotal || row[detailIndex['小計']] || 0),
+      ];
+    });
+
+  if (usedLegacyPriceForReissue) {
+    const warning = `請求書再発行警告：注文時単価保存前の注文です。既存の単価・小計を使用しました。orderId=${targetOrderNo}`;
+    console.warn(warning);
+    Logger.log(warning);
+  }
 
   const orderDateValue = orderRow[orderIndex['注文日時']];
   const orderDate = orderDateValue instanceof Date ? orderDateValue : new Date(orderDateValue);
@@ -1799,9 +1910,10 @@ function getInvoicePdfData(sessionToken, orderNo) {
     note: String(orderRow[orderIndex['備考']] || ''),
     details: detailRows,
     totalBags: Number(orderRow[orderIndex['合計袋数']] || 0),
-    shippingFee: Number(orderRow[orderIndex['送料']] || 0),
+    shippingFee: Number(orderRow[orderIndex['invoiceShipping']] || orderRow[orderIndex['送料']] || 0),
     productTotal: Number(orderRow[orderIndex['商品合計']] || 0),
-    invoiceTotal: Number(orderRow[orderIndex['請求合計']] || 0),
+    invoiceTotal: Number(orderRow[orderIndex['invoiceTotal']] || orderRow[orderIndex['請求合計']] || 0),
+    priceType: orderIndex['priceType'] === undefined ? '' : String(orderRow[orderIndex['priceType']] || ''),
   };
   const pdf = createInvoicePdf_(summary, getInvoiceSettings_(ss), getOrderRules_(ss));
   return {
