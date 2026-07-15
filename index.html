@@ -5346,6 +5346,7 @@
       const view = params.get('view');
       if (view === 'search') openSearchPage();
       if (view === 'mypage') openMyPage();
+      if (view && publicPages[view]) openPublicPage(view);
     }
 
     window.KimikeaConnectNav = {
