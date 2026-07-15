@@ -1090,6 +1090,626 @@
       line-height: 1.55;
     }
     .public-actions { display: grid; gap: 10px; margin-top: 16px; }
+    .public-page.is-academy-page {
+      display: block;
+      padding: 0 0 96px;
+    }
+    .public-page.is-academy-page .public-panel {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: visible;
+    }
+    .public-page.is-academy-page #publicPageKicker,
+    .public-page.is-academy-page #publicPageTitle,
+    .public-page.is-academy-page #publicPageLead,
+    .public-page.is-academy-page #publicPageList {
+      display: none;
+    }
+    .public-page.is-academy-page .public-actions {
+      display: block;
+      margin: 0;
+    }
+    .academy-experience {
+      position: relative;
+      width: min(100%, 1120px);
+      margin: 0 auto;
+      color: #17130d;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .academy-experience::before,
+    .academy-experience::after {
+      position: fixed;
+      content: "";
+      z-index: -1;
+      width: 280px;
+      height: 280px;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(36px);
+      opacity: .34;
+      animation: academyAmbientGlow 10s ease-in-out infinite alternate;
+    }
+    .academy-experience::before {
+      top: 8%;
+      left: -90px;
+      background: rgba(214, 176, 95, .48);
+    }
+    .academy-experience::after {
+      right: -110px;
+      bottom: 18%;
+      background: rgba(177, 157, 130, .42);
+      animation-delay: -3s;
+    }
+    .academy-hero {
+      position: relative;
+      min-height: min(760px, calc(100svh - 84px));
+      display: grid;
+      align-items: center;
+      padding: 78px 20px 64px;
+      overflow: hidden;
+      border-radius: 0 0 34px 34px;
+      background:
+        radial-gradient(circle at 28% 20%, rgba(255,255,255,.92) 0 12%, transparent 34%),
+        radial-gradient(circle at 80% 34%, rgba(212, 174, 92, .3) 0 10%, transparent 36%),
+        linear-gradient(140deg, #fffaf0 0%, #f4ead9 42%, #efe1c6 100%);
+      box-shadow: 0 24px 70px rgba(75, 54, 24, .12);
+    }
+    .academy-hero::before {
+      position: absolute;
+      inset: -35% -25%;
+      content: "";
+      background:
+        linear-gradient(112deg, transparent 0 35%, rgba(255,255,255,.46) 44%, rgba(215,175,93,.26) 49%, transparent 60%),
+        radial-gradient(circle at 55% 45%, rgba(255,255,255,.54), transparent 34%);
+      transform: rotate(-7deg);
+      animation: academyLightSweep 8s cubic-bezier(.2,.7,.2,1) infinite;
+      pointer-events: none;
+    }
+    .academy-hero-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 20px;
+      justify-items: start;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .academy-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 7px 11px;
+      border: 1px solid rgba(160, 118, 38, .32);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .42);
+      color: #7d5a18;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .academy-hero h1 {
+      margin: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: clamp(42px, 14vw, 112px);
+      line-height: .88;
+      letter-spacing: .02em;
+      color: #18130d;
+    }
+    .academy-hero h1 span {
+      display: block;
+      margin-top: 14px;
+      color: #96722e;
+      font-size: clamp(22px, 6vw, 46px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+    .academy-hero-subtitle {
+      margin: 0;
+      max-width: 560px;
+      color: rgba(38, 31, 21, .76);
+      font-size: clamp(17px, 4.5vw, 24px);
+      font-weight: 650;
+      line-height: 1.8;
+    }
+    .academy-scroll-cue {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      color: rgba(34, 27, 17, .6);
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .academy-scroll-cue::before {
+      width: 42px;
+      height: 1px;
+      content: "";
+      background: linear-gradient(90deg, #9d732a, transparent);
+    }
+    .academy-section {
+      padding: 58px 18px 0;
+    }
+    .academy-section-head {
+      display: grid;
+      gap: 10px;
+      max-width: 760px;
+      margin: 0 auto 22px;
+      text-align: center;
+    }
+    .academy-section-head p,
+    .academy-card-expanded p,
+    .academy-flow-card p,
+    .academy-certificate-copy p,
+    .academy-final p {
+      margin: 0;
+      color: rgba(40, 34, 25, .68);
+      line-height: 1.75;
+    }
+    .academy-section-head h2,
+    .academy-final h2 {
+      margin: 0;
+      color: #17130d;
+      font-size: clamp(26px, 7vw, 42px);
+      line-height: 1.15;
+      letter-spacing: .03em;
+    }
+    .academy-course-stack {
+      display: grid;
+      gap: 16px;
+      max-width: 860px;
+      margin: 0 auto;
+      perspective: 1200px;
+    }
+    .academy-course-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .58);
+      border-radius: 28px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.64), rgba(255,255,255,.18)),
+        linear-gradient(135deg, rgba(244,237,222,.9), rgba(217,184,112,.3));
+      box-shadow: 0 22px 54px rgba(60, 44, 23, .16), inset 0 1px 0 rgba(255,255,255,.72);
+      backdrop-filter: blur(22px) saturate(1.25);
+      -webkit-backdrop-filter: blur(22px) saturate(1.25);
+      transform: translateZ(0);
+      transition: transform .32s ease, box-shadow .32s ease, border-color .32s ease;
+    }
+    .academy-course-card::before {
+      position: absolute;
+      inset: 0;
+      content: "";
+      background: linear-gradient(115deg, transparent 0 30%, rgba(255,255,255,.34) 44%, transparent 58%);
+      opacity: .78;
+      pointer-events: none;
+    }
+    .academy-course-card[open] {
+      transform: translateY(-4px) scale(1.012);
+      border-color: rgba(215, 174, 83, .48);
+      box-shadow: 0 32px 78px rgba(64, 43, 15, .22), inset 0 1px 0 rgba(255,255,255,.78);
+    }
+    .academy-course-card.standard {
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.62), rgba(255,255,255,.16)),
+        linear-gradient(135deg, #fff9e9, rgba(207,157,47,.5));
+    }
+    .academy-course-card.advance {
+      color: #fffaf0;
+      border-color: rgba(233, 194, 98, .44);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.03)),
+        radial-gradient(circle at 78% 8%, rgba(235,190,83,.28), transparent 34%),
+        linear-gradient(145deg, #1c1711 0%, #090806 100%);
+      box-shadow: 0 30px 82px rgba(18, 13, 7, .36), inset 0 1px 0 rgba(255,255,255,.18);
+    }
+    .academy-course-card summary {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      min-height: 142px;
+      padding: 22px;
+      cursor: pointer;
+      list-style: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .academy-course-card summary::-webkit-details-marker { display: none; }
+    .academy-card-title {
+      display: grid;
+      gap: 8px;
+    }
+    .academy-card-title small {
+      color: #9d732a;
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .18em;
+    }
+    .academy-course-card.advance .academy-card-title small,
+    .academy-course-card.advance .academy-card-price,
+    .academy-course-card.advance .academy-card-arrow {
+      color: #f1ce79;
+    }
+    .academy-card-title strong {
+      color: inherit;
+      font-size: clamp(21px, 5.7vw, 34px);
+      line-height: 1.05;
+      letter-spacing: .04em;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+    .academy-card-title span {
+      color: rgba(39, 32, 22, .62);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .academy-course-card.advance .academy-card-title span,
+    .academy-course-card.advance .academy-card-expanded p,
+    .academy-course-card.advance .academy-card-expanded li {
+      color: rgba(255, 250, 239, .75);
+    }
+    .academy-card-meta {
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+    }
+    .academy-card-price {
+      color: #775218;
+      font-size: 18px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .academy-card-arrow {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid rgba(157, 115, 42, .28);
+      border-radius: 999px;
+      background: rgba(255,255,255,.42);
+      color: #7d5a18;
+      font-size: 20px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: transform .24s ease;
+    }
+    .academy-course-card[open] .academy-card-arrow {
+      transform: rotate(45deg) scale(.96);
+    }
+    .academy-card-expanded {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 16px;
+      padding: 0 22px 24px;
+      animation: academyPanelIn .28s ease both;
+    }
+    .academy-detail-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .academy-detail {
+      padding: 12px;
+      border: 1px solid rgba(157, 115, 42, .18);
+      border-radius: 18px;
+      background: rgba(255,255,255,.38);
+    }
+    .academy-course-card.advance .academy-detail {
+      border-color: rgba(241, 206, 121, .24);
+      background: rgba(255,255,255,.08);
+    }
+    .academy-detail b {
+      display: block;
+      margin-bottom: 5px;
+      color: inherit;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+    .academy-detail span,
+    .academy-detail ul {
+      margin: 0;
+      padding: 0;
+      color: rgba(39, 32, 22, .72);
+      font-size: 13px;
+      line-height: 1.65;
+      list-style: none;
+    }
+    .academy-learning-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .academy-learning-item {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 13px;
+      border: 1px solid rgba(196, 166, 106, .2);
+      border-radius: 18px;
+      background: rgba(255,255,255,.66);
+      box-shadow: 0 14px 34px rgba(75, 54, 24, .08);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .academy-line-icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      border: 1px solid rgba(157, 115, 42, .22);
+      background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(239,223,186,.5));
+      color: #8a651f;
+      font-size: 13px;
+      font-weight: 950;
+      letter-spacing: .04em;
+    }
+    .academy-learning-item strong {
+      color: #1f1910;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .academy-flow {
+      display: grid;
+      gap: 10px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .academy-flow-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 15px;
+      border: 1px solid rgba(181, 143, 66, .18);
+      border-radius: 20px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 14px 38px rgba(62, 45, 21, .08);
+    }
+    .academy-flow-card:not(:last-child)::after {
+      position: absolute;
+      left: 36px;
+      bottom: -11px;
+      width: 1px;
+      height: 12px;
+      content: "";
+      background: linear-gradient(#c49a3e, transparent);
+    }
+    .academy-flow-number {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      background: linear-gradient(145deg, #e9c87b, #a97623);
+      color: white;
+      font-weight: 950;
+      box-shadow: 0 10px 24px rgba(151, 105, 32, .22);
+    }
+    .academy-flow-card strong {
+      display: block;
+      margin-bottom: 3px;
+      color: #17130d;
+      font-size: 15px;
+    }
+    .academy-certificate {
+      display: grid;
+      gap: 18px;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 32px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.7), rgba(255,255,255,.22)),
+        radial-gradient(circle at 72% 18%, rgba(212, 174, 92, .18), transparent 34%);
+      box-shadow: 0 26px 74px rgba(65, 47, 22, .14);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .academy-certificate-frame {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 255px;
+      overflow: hidden;
+      border: 1px solid rgba(180, 143, 68, .32);
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.86), rgba(243,230,199,.72)),
+        repeating-linear-gradient(90deg, transparent 0 26px, rgba(157,115,42,.05) 27px 28px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 18px 46px rgba(63, 45, 18, .12);
+    }
+    .academy-certificate-frame::before {
+      position: absolute;
+      inset: -45%;
+      content: "";
+      background: linear-gradient(112deg, transparent 0 42%, rgba(255,255,255,.52) 49%, transparent 58%);
+      animation: academyCertificateShine 7s ease-in-out infinite;
+    }
+    .academy-certificate-paper {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: min(86%, 520px);
+      min-height: 188px;
+      padding: 24px;
+      border: 1px solid rgba(157, 115, 42, .42);
+      outline: 6px solid rgba(255,255,255,.34);
+      background: #fffdf7;
+      text-align: center;
+      box-shadow: 0 20px 46px rgba(48, 35, 16, .16);
+    }
+    .academy-certificate-paper small {
+      color: #9d732a;
+      font-weight: 950;
+      letter-spacing: .18em;
+    }
+    .academy-certificate-paper strong {
+      margin: 10px 0;
+      color: #17130d;
+      font-size: clamp(24px, 7vw, 42px);
+      letter-spacing: .06em;
+    }
+    .academy-certificate-copy {
+      display: grid;
+      gap: 8px;
+      align-content: center;
+    }
+    .academy-certificate-copy h2 {
+      margin: 0;
+      color: #17130d;
+      font-size: clamp(24px, 6.8vw, 36px);
+      line-height: 1.2;
+    }
+    .academy-faq {
+      display: grid;
+      gap: 10px;
+      max-width: 840px;
+      margin: 0 auto;
+    }
+    .academy-faq-item {
+      border: 1px solid rgba(181, 143, 66, .18);
+      border-radius: 18px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 12px 34px rgba(60, 44, 23, .07);
+      overflow: hidden;
+    }
+    .academy-faq-item summary {
+      padding: 16px;
+      cursor: pointer;
+      color: #17130d;
+      font-weight: 850;
+      list-style: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .academy-faq-item summary::-webkit-details-marker { display: none; }
+    .academy-faq-item p {
+      margin: 0;
+      padding: 0 16px 16px;
+      color: rgba(40, 34, 25, .7);
+      line-height: 1.75;
+    }
+    .academy-final {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+      min-height: 74svh;
+      margin-top: 58px;
+      padding: 72px 20px;
+      overflow: hidden;
+      border-radius: 34px 34px 0 0;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,.48), transparent 35%),
+        linear-gradient(145deg, #17130d, #2a2114 52%, #8d6a28 140%);
+      text-align: center;
+      color: #fffaf0;
+      box-shadow: 0 -20px 70px rgba(38, 27, 13, .18);
+    }
+    .academy-final::before {
+      position: absolute;
+      inset: -40%;
+      content: "";
+      background: linear-gradient(120deg, transparent 0 42%, rgba(244,207,126,.2) 49%, transparent 58%);
+      animation: academyLightSweep 8.5s ease-in-out infinite;
+    }
+    .academy-final > * {
+      position: relative;
+      z-index: 1;
+    }
+    .academy-final h2 {
+      max-width: 760px;
+      color: #fffaf0;
+      font-size: clamp(31px, 9vw, 62px);
+      line-height: 1.18;
+    }
+    .academy-final p {
+      max-width: 620px;
+      color: rgba(255,250,239,.72);
+      font-size: 16px;
+    }
+    .academy-line-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 58px;
+      padding: 0 22px;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 999px;
+      background: linear-gradient(145deg, #06c755, #039d42);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 950;
+      box-shadow: 0 18px 42px rgba(0, 122, 52, .24);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .academy-line-cta:active {
+      transform: scale(.97);
+      box-shadow: 0 10px 28px rgba(0, 122, 52, .2);
+    }
+    @keyframes academyAmbientGlow {
+      from { transform: translate3d(0, 0, 0) scale(.96); }
+      to { transform: translate3d(22px, -18px, 0) scale(1.08); }
+    }
+    @keyframes academyLightSweep {
+      0%, 28% { transform: translate3d(-18%, 0, 0) rotate(-7deg); opacity: .2; }
+      52% { opacity: .86; }
+      78%, 100% { transform: translate3d(18%, 0, 0) rotate(-7deg); opacity: .18; }
+    }
+    @keyframes academyPanelIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes academyCertificateShine {
+      0%, 32% { transform: translateX(-22%) rotate(-8deg); opacity: .16; }
+      54% { opacity: .72; }
+      78%, 100% { transform: translateX(22%) rotate(-8deg); opacity: .12; }
+    }
+    @media (min-width: 760px) {
+      .academy-hero { border-radius: 34px; margin: 12px; padding-inline: 54px; }
+      .academy-course-stack { grid-template-columns: 1fr; }
+      .academy-learning-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .academy-flow { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+      .academy-flow-card { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+      .academy-flow-card:not(:last-child)::after {
+        top: 50%;
+        left: auto;
+        right: -9px;
+        bottom: auto;
+        width: 10px;
+        height: 1px;
+      }
+      .academy-certificate { grid-template-columns: 1.15fr .85fr; padding: 24px; }
+      .academy-final { border-radius: 34px; margin-inline: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .academy-experience::before,
+      .academy-experience::after,
+      .academy-hero::before,
+      .academy-certificate-frame::before,
+      .academy-final::before {
+        animation: none;
+      }
+      .academy-course-card,
+      .academy-line-cta {
+        transition: none;
+      }
+    }
     .color-chart-shell {
       display: grid;
       gap: 14px;
@@ -3167,6 +3787,191 @@
       window.open(NPO_LINE_URL, '_blank', 'noopener');
     }
 
+    function renderAcademyPage() {
+      const courses = [
+        {
+          tone: 'startup',
+          label: 'START UP COURSE',
+          title: 'スタートアップコース',
+          price: '￥33,000（税込）',
+          summary: 'エクステの基礎知識を学び、取り扱いを始めるための入口。',
+          target: '美容師経験者、またはエクステ販売員を目指す方',
+          time: '個別案内',
+          license: 'Kimikea Academy 受講修了',
+          learn: ['エクステの知識を学ぶ', 'エクステを取り扱えるようになる']
+        },
+        {
+          tone: 'standard',
+          label: 'STANDARD COURSE',
+          title: 'スタンダードコース',
+          price: '￥55,000（税込）',
+          summary: '知識と技術の両方を身につけ、仕事として提案できる土台を作る。',
+          target: 'エクステで仕事をしたい方',
+          time: '個別案内',
+          license: 'エクステコーディネーター認定',
+          learn: ['知識習得', '技術習得']
+        },
+        {
+          tone: 'advance',
+          label: 'ADVANCE COURSE',
+          title: 'アドバンスコース',
+          price: '￥88,000（税込）',
+          summary: '導入用エクステ付き。自分のメニューとして事業化したい方向けの上位コース。',
+          target: '自分でエクステ事業を始めたい方',
+          time: '個別案内',
+          license: '上位認定・導入スタートサポート',
+          learn: ['知識習得', '技術習得', '導入用エクステ3万円分付き']
+        }
+      ];
+
+      const learningItems = [
+        ['01', 'エクステ基礎知識'],
+        ['02', 'エクステの種類'],
+        ['03', '毛質'],
+        ['04', 'カラー知識'],
+        ['05', '販売方法'],
+        ['06', 'カウンセリング'],
+        ['07', '取り付け技術'],
+        ['08', '取り外し'],
+        ['09', 'メンテナンス'],
+        ['10', 'デザイン提案']
+      ];
+
+      const flowItems = [
+        ['01', '受講', '基礎から実務まで体系的に学びます'],
+        ['02', '知識・技術習得', '提案と施術に必要な判断力を整えます'],
+        ['03', '認定試験', '理解度と技術習得を確認します'],
+        ['04', '認定証取得', '修了者へ認定証を発行します'],
+        ['05', 'Kimikea Connect利用', '仕事アプリとして情報と注文を管理します'],
+        ['06', '活動開始', '加盟店・販売員として展開します'],
+        ['07', '仕事にする', 'エクステを継続的なメニューへ育てます']
+      ];
+
+      const faqs = [
+        ['美容師免許は必要ですか？', '施術内容や活動形態により必要な条件が変わるため、受講前に現在の状況を確認しながらご案内します。'],
+        ['初心者でも受講できますか？', 'はい。基礎から学べる構成です。未経験の方は、目的に合わせて受講コースをご相談ください。'],
+        ['講習時間はどれくらいですか？', 'コースと受講方法により異なります。日程とあわせて公式LINEで個別にご案内します。'],
+        ['持ち物はありますか？', '必要な道具や準備物は、受講コース確定後に事前案内します。'],
+        ['認定後は何ができますか？', 'エクステの提案、販売、施術導入、Kimikea Connectの活用など、仕事として展開する準備ができます。']
+      ];
+
+      return `
+        <article class="academy-experience" aria-label="Kimikea Academy">
+          <section class="academy-hero">
+            <div class="academy-hero-content">
+              <p class="academy-kicker">KIMIKEA CONNECT</p>
+              <h1>KIMIKEA ACADEMY<span>エクステコーディネーター養成講習</span></h1>
+              <p class="academy-hero-subtitle">知識と技術を身につけ、<br>エクステを仕事にする第一歩。</p>
+              <span class="academy-scroll-cue">Explore Courses</span>
+            </div>
+          </section>
+
+          <section class="academy-section" aria-labelledby="academyCourseTitle">
+            <div class="academy-section-head">
+              <h2 id="academyCourseTitle">Course Lineup</h2>
+              <p>目的に合わせて選べる3つの講習。カードを開くと、対象者・料金・講習内容を確認できます。</p>
+            </div>
+            <div class="academy-course-stack">
+              ${courses.map((course, index) => `
+                <details class="academy-course-card ${course.tone}" ${index === 1 ? 'open' : ''}>
+                  <summary>
+                    <span class="academy-card-title">
+                      <small>${course.label}</small>
+                      <strong>${course.title}</strong>
+                      <span>${course.summary}</span>
+                    </span>
+                    <span class="academy-card-meta">
+                      <span class="academy-card-price">${course.price}</span>
+                      <span class="academy-card-arrow" aria-hidden="true">+</span>
+                    </span>
+                  </summary>
+                  <div class="academy-card-expanded">
+                    <div class="academy-detail-grid">
+                      <div class="academy-detail"><b>対象者</b><span>${course.target}</span></div>
+                      <div class="academy-detail"><b>料金</b><span>${course.price}</span></div>
+                      <div class="academy-detail"><b>講習時間</b><span>${course.time}</span></div>
+                      <div class="academy-detail"><b>取得できる資格</b><span>${course.license}</span></div>
+                    </div>
+                    <div class="academy-detail">
+                      <b>学べる内容</b>
+                      <ul>${course.learn.map(item => `<li>${item}</li>`).join('')}</ul>
+                    </div>
+                  </div>
+                </details>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="academy-section" aria-labelledby="academyLearningTitle">
+            <div class="academy-section-head">
+              <h2 id="academyLearningTitle">学べる内容</h2>
+              <p>販売・カウンセリング・技術・デザイン提案まで、エクステを仕事にするための基礎を整理します。</p>
+            </div>
+            <div class="academy-learning-grid">
+              ${learningItems.map(([number, title]) => `
+                <div class="academy-learning-item">
+                  <span class="academy-line-icon" aria-hidden="true">${number}</span>
+                  <strong>${title}</strong>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="academy-section" aria-labelledby="academyFlowTitle">
+            <div class="academy-section-head">
+              <h2 id="academyFlowTitle">受講後の流れ</h2>
+              <p>学んで終わりではなく、認定後にKimikea Connectを活用し、実際の仕事へつなげます。</p>
+            </div>
+            <div class="academy-flow">
+              ${flowItems.map(([number, title, text]) => `
+                <div class="academy-flow-card">
+                  <span class="academy-flow-number">${number}</span>
+                  <p><strong>${title}</strong>${text}</p>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="academy-section" aria-labelledby="academyCertificateTitle">
+            <div class="academy-certificate">
+              <div class="academy-certificate-frame" aria-label="認定証イメージ">
+                <div class="academy-certificate-paper">
+                  <small>KIMIKEA ACADEMY</small>
+                  <strong>認定証</strong>
+                  <small>Extension Coordinator Certificate</small>
+                </div>
+              </div>
+              <div class="academy-certificate-copy">
+                <h2 id="academyCertificateTitle">修了された方にはこちらの認定証を発行します</h2>
+                <p>認定証は、学んだ知識と技術を仕事へつなげるための大切な証明です。ガラスケースに飾られたような上質な見え方で、Kimikea Academyの価値を表現しています。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="academy-section" aria-labelledby="academyFaqTitle">
+            <div class="academy-section-head">
+              <h2 id="academyFaqTitle">FAQ</h2>
+              <p>受講前によくいただく質問をまとめました。</p>
+            </div>
+            <div class="academy-faq">
+              ${faqs.map(([question, answer]) => `
+                <details class="academy-faq-item">
+                  <summary>${question}</summary>
+                  <p>${answer}</p>
+                </details>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="academy-final">
+            <h2>エクステを仕事にする第一歩を<br>今日から始めませんか？</h2>
+            <p>講習内容・日程・受講方法など、お気軽にお問い合わせください。</p>
+            <button type="button" class="academy-line-cta" onclick="openNpoLine()">LINEで講習について相談する</button>
+          </section>
+        </article>
+      `;
+    }
+
     const publicPages = {
       colorChart: {
         title: 'カラーチャート',
@@ -3197,7 +4002,8 @@
       coordinator: {
         title: 'コーディネーター講習案内',
         lead: '未経験者、加盟希望者向けに、シールエクステの知識と販売・施術レシピを学ぶ講習です。',
-        items: ['講習内容：シールエクステ基礎、カラー提案、装着レシピ、開業サポート', '開催日：第2・第4木曜 11:00／第3日曜 13:00', '開催方法：Zoomまたは対面', '参加対象：未経験者、加盟希望者、コーディネーター希望者']
+        items: [],
+        renderActions: renderAcademyPage
       }
     };
 
@@ -3205,47 +4011,16 @@
       rememberKimikeaRoute('public', pageKey);
       currentPublicPageKey = pageKey;
       const page = publicPages[pageKey] || publicPages.notice;
+      const publicPageView = document.getElementById('publicPageView');
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
-      document.getElementById('publicPageView').hidden = false;
+      publicPageView.hidden = false;
+      publicPageView.classList.toggle('is-academy-page', pageKey === 'coordinator');
       document.getElementById('publicPageTitle').textContent = page.title;
       document.getElementById('publicPageLead').textContent = page.lead;
       document.getElementById('publicPageList').innerHTML = (page.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
       document.getElementById('publicPageActions').innerHTML = typeof page.renderActions === 'function'
         ? page.renderActions()
-        : pageKey === 'coordinator'
-        ? `
-          <form id="coordinatorApplyForm" class="coordinator-form" onsubmit="submitCoordinatorApplication(event)">
-            <label class="field">
-              <span>お名前</span>
-              <input id="coordinatorName" type="text" placeholder="例：山田 花子" required>
-            </label>
-            <label class="field">
-              <span>連絡先</span>
-              <input id="coordinatorContact" type="text" placeholder="電話番号またはメールアドレス" required>
-            </label>
-            <label class="field">
-              <span>希望日</span>
-              <select id="coordinatorDate" required>
-                <option value="">選択してください</option>
-                <option>第2木曜 11:00</option>
-                <option>第4木曜 11:00</option>
-                <option>第3日曜 13:00</option>
-                <option>個別相談希望</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>希望方法</span>
-              <select id="coordinatorMethod" required>
-                <option>Zoom</option>
-                <option>対面</option>
-                <option>相談して決めたい</option>
-              </select>
-            </label>
-            <button type="submit" class="button button-gold">講習に申し込む</button>
-            <p id="coordinatorApplyMessage" class="message" aria-live="polite"></p>
-          </form>
-        `
         : '';
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
