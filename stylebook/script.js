@@ -7,7 +7,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260715-save-permission-1';
+const STYLEBOOK_ASSET_VERSION = '20260715-save-permission-2';
 
 const roles = {
   member: 'member',
@@ -1144,6 +1144,19 @@ function renderCurrentAfterSave(postId) {
   else renderGallery();
 }
 
+function renderCurrentViewAfterDataLoad() {
+  if (!state.db) return;
+  renderUserSelect();
+  renderFilterControls();
+  renderSelectOptions();
+  if (state.currentView === 'saved') renderSaved();
+  else if (state.currentView === 'drafts') showDrafts({ push: false });
+  else if (state.currentView === 'mine') showMine({ push: false });
+  else if (state.currentView === 'admin') renderAdmin({ push: false });
+  else if (state.currentView === 'detail' && state.currentDetailId) showDetail(state.currentDetailId, { push: false });
+  else renderGallery();
+}
+
 function renderSaved() {
   const ids = savedPostIds();
   const savedMap = new Map(state.db.savedStyles
@@ -1923,10 +1936,7 @@ async function init() {
   }
   await loadDb();
   if (!normalizeUserId(state.currentUserId) && state.db.users[0]?.id) state.currentUserId = state.db.users[0].id;
-  renderUserSelect();
-  renderFilterControls();
-  renderSelectOptions();
-  renderGallery();
+  renderCurrentViewAfterDataLoad();
   if (state.pendingActionName) {
     const queuedAction = state.pendingActionName;
     state.pendingActionName = '';
