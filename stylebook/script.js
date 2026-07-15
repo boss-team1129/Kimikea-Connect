@@ -7,7 +7,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-network-map-1';
+const STYLEBOOK_ASSET_VERSION = '20260716-network-map-2';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
@@ -360,6 +360,21 @@ async function loadRemoteDb() {
   const data = await requestJson(`${STYLEBOOK_API_URL}?action=${action}&userId=${encodeURIComponent(state.currentUserId)}&shopId=${encodeURIComponent(scopedShopId)}&t=${Date.now()}`, {
     cache: 'no-store',
   });
+  if (scopedShopId && !data.ok) {
+    console.warn('shopDatabase endpoint is not deployed yet. Falling back to database response for compatibility.');
+    const fallback = await requestJson(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    if (!fallback.ok || !fallback.database) throw new Error(fallback.message || data.message || 'スタイル図鑑データを取得できませんでした。');
+    state.db = normalizeDatabase(fallback.database);
+    state.db.stylePosts = state.db.stylePosts.filter(post => String(post.shopId || '').trim() === scopedShopId);
+    state.backendMode = 'remote';
+    debugStylebook('API database compatibility fallback counts', {
+      shopId: scopedShopId,
+      posts: state.db.stylePosts?.length || 0,
+    });
+    return;
+  }
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
   state.db = normalizeDatabase(data.database);
   state.backendMode = 'remote';
