@@ -93,6 +93,7 @@ const KCO_DEFAULT_SETTINGS = [
   ['管理者メール', '', '協会に届く注文通知。複数の場合はカンマ区切り', true],
   ['送信元名', 'Kimikea Connect Order', '注文・発送メールに表示する送信者名', true],
   ['加盟店メール送信', 'TRUE', '加盟店にも控えメールを送る', true],
+  ['grow通知メール', '', 'Growへ送る発注通知メール。複数の場合はカンマ区切り', true],
   ['メーカー通知メール', '', '提携メーカーへ送る注文メール。複数の場合はカンマ区切り', false],
   ['振込先銀行名', '静岡銀行', '請求書に表示する銀行名', true],
   ['振込先支店名', '富士駅南支店', '請求書に表示する支店名', true],
@@ -219,6 +220,7 @@ function onOpen() {
     .createMenu('Kimikea Connect')
     .addItem('初期設定・管理シート作成', 'setupKimikeaConnectOrder')
     .addItem('請求書PDFの権限を取得', 'authorizeDocumentApp')
+    .addItem('Grow通知テストメール送信', 'testSendGrowMail')
     .addItem('表示商品を再取得テスト', 'showProductCount_')
     .addToUi();
 }
@@ -495,6 +497,7 @@ function submitCartOrder(order) {
   let totalBags = 0;
   let productTotal = 0;
   const detailRows = [];
+  const detailItems = [];
 
   order.items.forEach((item) => {
     const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
@@ -521,6 +524,20 @@ function submitCartOrder(order) {
       product.purchasePrice,
       profit,
     ]);
+
+    detailItems.push({
+      orderNo,
+      productCode: product.productCode,
+      productName: `${product.category} ${product.color}`,
+      category: product.category,
+      color: product.color,
+      colorName: product.colorName || product.color,
+      quantity: qty,
+      unitPrice: product.salesPrice,
+      subtotal,
+      purchasePrice: product.purchasePrice,
+      profit,
+    });
   });
 
   if (detailRows.length === 0) {
@@ -561,9 +578,10 @@ function submitCartOrder(order) {
     contactName: franchise.contactName,
     franchiseEmail: franchise.email,
     franchisePhone: franchise.phone,
-    franchiseAddress: franchise.address,
+    franchiseAddress: franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' ') || franchise.address,
     note: order.note || '',
     details: detailRows,
+    detailItems,
     totalBags,
     shippingFee,
     productTotal,
@@ -886,13 +904,47 @@ function sendOrderNotificationEmails_(ss, summary, invoiceSettings, orderRules) 
   const franchiseBody = buildFranchiseEmailBody_(summary, invoiceSettings);
   const invoicePdf = createInvoicePdf_(summary, invoiceSettings, orderRules);
 
-  sendMailList_(settings.adminEmails, subject, adminBody, [invoicePdf], settings.senderName);
-  if (settings.sendFranchiseEmail && summary.franchiseEmail) {
-    sendMailList_([summary.franchiseEmail], subject, franchiseBody, [invoicePdf], settings.senderName);
+  try {
+    sendGrowOrderMail_(summary, settings);
+  } catch (error) {
+    logMailError_('Grow通知送信失敗', summary.orderNo, settings.growEmails, error);
   }
-  if (settings.sendManufacturerEmail) {
-    sendMailList_(settings.manufacturerEmails, subject, adminBody, [], settings.senderName);
+
+  try {
+    sendAdminOrderMail_(summary, settings, subject, adminBody, invoicePdf);
+  } catch (error) {
+    logMailError_('管理者メール送信失敗', summary.orderNo, settings.adminEmails, error);
   }
+
+  try {
+    sendFranchiseOrderMail_(summary, settings, subject, franchiseBody, invoicePdf);
+  } catch (error) {
+    logMailError_('加盟店メール送信失敗', summary.orderNo, [summary.franchiseEmail], error);
+  }
+}
+
+function sendAdminOrderMail_(summary, settings, subject, body, invoicePdf) {
+  sendMailList_(settings.adminEmails, subject, body, [invoicePdf], settings.senderName);
+  logMailInfo_('管理者メール送信成功', summary.orderNo, settings.adminEmails);
+}
+
+function sendFranchiseOrderMail_(summary, settings, subject, body, invoicePdf) {
+  if (!settings.sendFranchiseEmail || !summary.franchiseEmail) return;
+  sendMailList_([summary.franchiseEmail], subject, body, [invoicePdf], settings.senderName);
+  logMailInfo_('加盟店メール送信成功', summary.orderNo, [summary.franchiseEmail]);
+}
+
+function sendGrowOrderMail_(summary, settings) {
+  if (!settings.growEmails.length) {
+    console.error('grow通知メールが設定されていません');
+    Logger.log('grow通知メールが設定されていません');
+    return;
+  }
+  const subject = `【Kimikea Connect】新しい注文が入りました／注文番号：${summary.orderNo}`;
+  const body = buildGrowOrderEmailBody_(summary);
+  const htmlBody = textToHtml_(body);
+  sendMailList_(settings.growEmails, subject, body, [], settings.senderName, htmlBody);
+  logMailInfo_('Grow通知送信成功', summary.orderNo, settings.growEmails);
 }
 
 function getNotificationSettings_(ss) {
@@ -901,8 +953,7 @@ function getNotificationSettings_(ss) {
     adminEmails: [],
     senderName: 'Kimikea Connect Order',
     sendFranchiseEmail: true,
-    sendManufacturerEmail: false,
-    manufacturerEmails: [],
+    growEmails: [],
   };
   if (!sheet || sheet.getLastRow() <= 1) return settings;
 
@@ -922,9 +973,8 @@ function getNotificationSettings_(ss) {
     if (item === '加盟店メール送信') {
       settings.sendFranchiseEmail = enabled && isTruthy_(value);
     }
-    if ((item === 'メーカー通知メール') && enabled) {
-      settings.sendManufacturerEmail = true;
-      settings.manufacturerEmails = parseEmailList_(value);
+    if (item === 'grow通知メール') {
+      settings.growEmails = parseEmailList_(value);
     }
   });
   return settings;
@@ -940,6 +990,8 @@ function buildOrderEmailBody_(summary) {
     `加盟店名：${summary.franchiseName}`,
     `担当者名：${summary.contactName}`,
     `メールアドレス：${summary.franchiseEmail}`,
+    `電話番号：${summary.franchisePhone || ''}`,
+    `配送先：${summary.franchiseAddress || ''}`,
     '',
     '【注文商品一覧】',
     buildOrderItemsText_(summary),
@@ -951,6 +1003,34 @@ function buildOrderEmailBody_(summary) {
     `備考：${summary.note || ''}`,
     '',
     '請求書PDFを添付しています。',
+  ].join('\n');
+}
+
+function buildGrowOrderEmailBody_(summary) {
+  return [
+    'Kimikea Connectに新しい注文が入りました。',
+    '',
+    '【注文情報】',
+    `注文番号：${summary.orderNo}`,
+    `注文日時：${Utilities.formatDate(summary.orderDate, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')}`,
+    '',
+    '【加盟店情報】',
+    `加盟店ID：${summary.franchiseId}`,
+    `加盟店名：${summary.franchiseName}`,
+    `注文者名：${summary.contactName}`,
+    `加盟店メールアドレス：${summary.franchiseEmail || ''}`,
+    `電話番号：${summary.franchisePhone || ''}`,
+    `配送先：${summary.franchiseAddress || ''}`,
+    '',
+    '【注文商品】',
+    buildGrowOrderItemsText_(summary),
+    '',
+    '【合計】',
+    `合計袋数：${summary.totalBags}`,
+    `小計：${formatYen_(summary.productTotal)}`,
+    `送料：${formatYen_(summary.shippingFee)}`,
+    `合計金額：${formatYen_(summary.invoiceTotal)}`,
+    `備考：${summary.note || ''}`,
   ].join('\n');
 }
 
@@ -981,12 +1061,42 @@ function buildFranchiseEmailBody_(summary, invoiceSettings) {
 }
 
 function buildOrderItemsText_(summary) {
-  return summary.details.map((row) => [
-    `${row[1]} / ${row[2]}`,
-    `数量：${row[3]}袋`,
-    `単価：${formatYen_(row[4])}`,
-    `小計：${formatYen_(row[5])}`,
+  return getSummaryDetailItems_(summary).map((item) => [
+    `${item.category} / ${item.colorName || item.color}`,
+    `商品コード：${item.productCode || ''}`,
+    `数量：${item.quantity}袋`,
+    `単価：${formatYen_(item.unitPrice)}`,
+    `小計：${formatYen_(item.subtotal)}`,
   ].join('\n')).join('\n---\n');
+}
+
+function buildGrowOrderItemsText_(summary) {
+  return getSummaryDetailItems_(summary).map((item, index) => [
+    `■ ${index + 1}`,
+    `商品名：${item.productName || `${item.category} ${item.colorName || item.color}`}`,
+    `商品カテゴリ：${item.category}`,
+    `カラー名：${item.colorName || item.color}`,
+    `商品コード：${item.productCode || ''}`,
+    `数量：${item.quantity}袋`,
+    `単価：${formatYen_(item.unitPrice)}`,
+    `商品ごとの金額：${formatYen_(item.subtotal)}`,
+  ].join('\n')).join('\n\n');
+}
+
+function getSummaryDetailItems_(summary) {
+  if (Array.isArray(summary.detailItems) && summary.detailItems.length) return summary.detailItems;
+  return (summary.details || []).map((row) => ({
+    productCode: '',
+    productName: `${row[1]} ${row[2]}`,
+    category: row[1],
+    color: row[2],
+    colorName: row[2],
+    quantity: row[3],
+    unitPrice: row[4],
+    subtotal: row[5],
+    purchasePrice: row[6],
+    profit: row[7],
+  }));
 }
 
 function getInvoiceSettings_(ss) {
@@ -1414,17 +1524,57 @@ function getInvoiceLogoBlob_(fileId) {
   }
 }
 
-function sendMailList_(emails, subject, body, attachments, senderName) {
-  const uniqueEmails = Array.from(new Set((emails || []).filter(Boolean)));
+function sendMailList_(emails, subject, body, attachments, senderName, htmlBody) {
+  const uniqueEmails = parseEmailList_((emails || []).join(','));
   uniqueEmails.forEach((email) => {
-    MailApp.sendEmail({
+    const payload = {
       to: email,
       subject,
       body,
       attachments: attachments || [],
       name: senderName || 'Kimikea Connect Order',
-    });
+    };
+    if (htmlBody) payload.htmlBody = htmlBody;
+    MailApp.sendEmail(payload);
   });
+}
+
+function textToHtml_(body) {
+  return String(body || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+
+function logMailInfo_(message, orderNo, emails) {
+  const to = parseEmailList_((emails || []).join(',')).join(',');
+  const text = `${message} orderId=${orderNo || ''} to=${to}`;
+  console.log(text);
+  Logger.log(text);
+}
+
+function logMailError_(message, orderNo, emails, error) {
+  const to = parseEmailList_((emails || []).join(',')).join(',');
+  const text = `${message} orderId=${orderNo || ''} to=${to} error=${error && error.message ? error.message : String(error)}`;
+  console.error(text);
+  Logger.log(text);
+}
+
+function testSendGrowMail() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settings = getNotificationSettings_(ss);
+  const growEmail = settings.growEmails[0] || '';
+  if (!growEmail) {
+    throw new Error('grow通知メールが設定されていません');
+  }
+  MailApp.sendEmail({
+    to: growEmail,
+    subject: '【Kimikea Connect】Grow通知テスト',
+    body: 'Grow通知メールのテスト送信です。',
+    name: settings.senderName || 'Kimikea Connect Order',
+  });
+  logMailInfo_('Grow通知テスト送信成功', 'test', [growEmail]);
 }
 
 function ensureShipmentEditTrigger_(ss) {
@@ -1487,10 +1637,18 @@ function handleOrderStatusEdit(event) {
 }
 
 function parseEmailList_(value) {
+  const seen = {};
   return String(value || '')
+    .normalize('NFKC')
     .split(/[,、\n]/)
     .map((email) => email.trim())
-    .filter(Boolean);
+    .filter((email) => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    .filter((email) => {
+      const key = email.toLowerCase();
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
 }
 
 function isTruthy_(value) {

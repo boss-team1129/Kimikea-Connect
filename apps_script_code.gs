@@ -48,6 +48,21 @@ const KCO_PRODUCT_HEADERS = [
   '販売価格',
   '在庫',
   '表示',
+  '色系統',
+];
+
+const KCO_COLOR_GROUPS = [
+  'ブラウン・ナチュラル',
+  'ベージュ・ブロンド',
+  'グレー・アッシュ',
+  'ピンク・レッド',
+  'パープル',
+  'ブルー',
+  'グリーン',
+  'イエロー・オレンジ',
+  'ブラック・ホワイト',
+  'ミックス・特殊色',
+  '未分類',
 ];
 
 const KCO_ORDER_HEADERS = [
@@ -78,6 +93,7 @@ const KCO_DEFAULT_SETTINGS = [
   ['管理者メール', '', '協会に届く注文通知。複数の場合はカンマ区切り', true],
   ['送信元名', 'Kimikea Connect Order', '注文・発送メールに表示する送信者名', true],
   ['加盟店メール送信', 'TRUE', '加盟店にも控えメールを送る', true],
+  ['grow通知メール', '', 'Growへ送る発注通知メール。複数の場合はカンマ区切り', true],
   ['メーカー通知メール', '', '提携メーカーへ送る注文メール。複数の場合はカンマ区切り', false],
   ['振込先銀行名', '静岡銀行', '請求書に表示する銀行名', true],
   ['振込先支店名', '富士駅南支店', '請求書に表示する支店名', true],
@@ -130,6 +146,11 @@ function doGet(event) {
 function handleJsonpApi_(event) {
   const callback = String(event.parameter.callback || '').trim();
   const apiName = String(event.parameter.api || '').trim();
+  logOrderDebug_('JSONP request received', {
+    apiName,
+    hasArgs: Boolean(event.parameter.args),
+    callback,
+  });
   if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
     return ContentService
       .createTextOutput(JSON.stringify({ ok: false, error: 'Invalid callback.' }))
@@ -140,6 +161,7 @@ function handleJsonpApi_(event) {
     getAppAppearance,
     loginFranchise,
     completeInitialPasswordSetup,
+    getPublicProducts,
     getPortalData,
     updateMemberEmail,
     changeMemberPassword,
@@ -160,6 +182,10 @@ function handleJsonpApi_(event) {
     }
     payload = { ok: true, data: allowedApi[apiName].apply(null, args) };
   } catch (error) {
+    logOrderDebug_('JSONP request failed', {
+      apiName,
+      error: error && error.message ? error.message : String(error),
+    });
     payload = { ok: false, error: error && error.message ? error.message : String(error) };
   }
 
@@ -194,6 +220,7 @@ function onOpen() {
     .createMenu('Kimikea Connect')
     .addItem('初期設定・管理シート作成', 'setupKimikeaConnectOrder')
     .addItem('請求書PDFの権限を取得', 'authorizeDocumentApp')
+    .addItem('Grow通知テストメール送信', 'testSendGrowMail')
     .addItem('表示商品を再取得テスト', 'showProductCount_')
     .addToUi();
 }
@@ -238,15 +265,60 @@ function loginFranchise(credentials) {
     credentials && credentials.password,
     credentials && credentials.loginPassword
   ));
+  logOrderDebug_('loginFranchise received', {
+    receivedLoginId: loginId,
+    receivedPasswordLength: password.length,
+    receivedPasswordNormalized: password,
+  });
   if (!loginId || !password) {
+    logOrderDebug_('loginFranchise failed', {
+      reason: 'missing_login_id_or_password',
+      receivedLoginId: loginId,
+      receivedPasswordLength: password.length,
+    });
     throw new Error('会員IDまたはメールアドレスとパスワードを入力してください。');
   }
 
-  const franchise = getFranchiseMasterRecords_().find((item) => (
+  const franchises = getFranchiseMasterRecords_();
+  logOrderDebug_('loginFranchise franchise records loaded', {
+    searchedFranchiseCount: franchises.length,
+    loginId,
+    candidates: franchises.map((item) => ({
+      rowNumber: item.rowNumber,
+      franchiseId: item.franchiseId,
+      franchiseName: item.franchiseName,
+      email: normalizeEmail_(item.email),
+      visible: item.visible,
+      membershipStatus: item.membershipStatus,
+      hasPasswordHash: Boolean(item.passwordHash),
+      initialPassword: item.initialPassword,
+    })),
+  });
+  const franchise = franchises.find((item) => (
     item.visible
     && isMatchingFranchiseLoginId_(item, loginId)
   ));
-  if (!franchise || !isValidFranchisePassword_(franchise, password)) {
+  const passwordResult = franchise ? getFranchisePasswordCheckResult_(franchise, password) : {
+    ok: false,
+    reason: 'no_matching_user',
+  };
+  logOrderDebug_('loginFranchise match result', {
+    loginId,
+    matchedUser: franchise ? {
+      rowNumber: franchise.rowNumber,
+      franchiseId: franchise.franchiseId,
+      franchiseName: franchise.franchiseName,
+      email: normalizeEmail_(franchise.email),
+      visible: franchise.visible,
+      membershipStatus: franchise.membershipStatus,
+    } : null,
+    passwordComparison: passwordResult,
+  });
+  if (!franchise || !passwordResult.ok) {
+    logOrderDebug_('loginFranchise failed', {
+      reason: franchise ? passwordResult.reason : 'no_matching_user',
+      loginId,
+    });
     throw new Error('会員IDまたはメールアドレス、またはパスワードが正しくありません。');
   }
 
@@ -343,6 +415,10 @@ function getPortalData(sessionToken) {
   };
 }
 
+function getPublicProducts() {
+  return getClientProducts_();
+}
+
 function getVisibleProducts(sessionToken) {
   getSessionFranchise_(sessionToken);
   return getClientProducts_();
@@ -353,7 +429,13 @@ function getClientProducts_() {
     productCode: product.productCode,
     category: product.category,
     color: product.color,
+    colorCode: product.colorCode,
+    colorName: product.colorName,
+    colorGroup: product.colorGroup,
+    swatchImageUrl: product.swatchImageUrl,
     salesPrice: product.salesPrice,
+    sortOrder: product.sortOrder,
+    visible: true,
   }));
 }
 
@@ -368,14 +450,20 @@ function getVisibleProducts_() {
   const index = createIndex_(headers);
 
   return values.slice(1)
-    .filter((row) => isVisible_(row[index['表示']]))
-    .map((row) => ({
+    .map((row, rowIndex) => ({ row, rowIndex }))
+    .filter(({ row }) => isVisible_(row[index['表示']]))
+    .map(({ row, rowIndex }) => ({
       productCode: String(row[index['商品コード']] || '').trim(),
       category: String(row[index['商品カテゴリー']] || ''),
       color: String(row[index['カラー']] || ''),
+      colorCode: String(row[index['カラー']] || '').trim(),
+      colorName: String(getRowValueByHeader_(row, index, ['カラー名', '色名']) || '').trim(),
+      colorGroup: String(row[index['色系統']] || '').trim() || '未分類',
+      swatchImageUrl: String(getRowValueByHeader_(row, index, ['色見本画像URL', '画像URL', 'imageUrl']) || '').trim(),
       purchasePrice: Number(row[index['仕入価格']] || 0),
       salesPrice: Number(row[index['販売価格']] || 0),
       stock: row[index['在庫']],
+      sortOrder: rowIndex + 1,
     }))
     .filter((product) => product.productCode && product.category && product.color && product.salesPrice > 0);
 }
@@ -409,6 +497,7 @@ function submitCartOrder(order) {
   let totalBags = 0;
   let productTotal = 0;
   const detailRows = [];
+  const detailItems = [];
 
   order.items.forEach((item) => {
     const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
@@ -435,6 +524,20 @@ function submitCartOrder(order) {
       product.purchasePrice,
       profit,
     ]);
+
+    detailItems.push({
+      orderNo,
+      productCode: product.productCode,
+      productName: `${product.category} ${product.color}`,
+      category: product.category,
+      color: product.color,
+      colorName: product.colorName || product.color,
+      quantity: qty,
+      unitPrice: product.salesPrice,
+      subtotal,
+      purchasePrice: product.purchasePrice,
+      profit,
+    });
   });
 
   if (detailRows.length === 0) {
@@ -475,9 +578,10 @@ function submitCartOrder(order) {
     contactName: franchise.contactName,
     franchiseEmail: franchise.email,
     franchisePhone: franchise.phone,
-    franchiseAddress: franchise.address,
+    franchiseAddress: franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' ') || franchise.address,
     note: order.note || '',
     details: detailRows,
+    detailItems,
     totalBags,
     shippingFee,
     productTotal,
@@ -512,6 +616,7 @@ function setupProductMaster_(ss) {
     ensureProductMasterColumns_(sheet);
     fillMissingProductCodes_(sheet);
   }
+  applyProductMasterDropdowns_(sheet);
   applyHeaderStyle_(sheet, KCO_PRODUCT_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_PRODUCT_HEADERS.length);
 }
@@ -526,6 +631,7 @@ function createProductRows_(category, colors) {
     price.salesPrice,
     100,
     true,
+    '',
   ]);
 }
 
@@ -541,6 +647,23 @@ function ensureProductMasterColumns_(sheet) {
     sheet.getRange(1, sheet.getLastColumn()).setValue(header);
     existingHeaders.push(normalizeMasterHeader_(header));
   });
+  applyProductMasterDropdowns_(sheet);
+}
+
+function applyProductMasterDropdowns_(sheet) {
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const colorGroupIndex = findMasterHeaderIndex_(headers, ['色系統', 'colorGroup']);
+  if (colorGroupIndex < 0) return;
+
+  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(KCO_COLOR_GROUPS, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, colorGroupIndex + 1, maxRows, 1).setDataValidation(rule);
 }
 
 function fillMissingProductCodes_(sheet) {
@@ -572,6 +695,7 @@ function createDefaultProductCode_(category, sequence) {
     'ダークカラー': 'DC',
     'ライトカラー': 'LC',
     '原色': 'OR',
+    'その他': 'OT',
   };
   const prefix = prefixes[category] || 'EX';
   return `${prefix}${String(sequence).padStart(3, '0')}`;
@@ -780,13 +904,47 @@ function sendOrderNotificationEmails_(ss, summary, invoiceSettings, orderRules) 
   const franchiseBody = buildFranchiseEmailBody_(summary, invoiceSettings);
   const invoicePdf = createInvoicePdf_(summary, invoiceSettings, orderRules);
 
-  sendMailList_(settings.adminEmails, subject, adminBody, [invoicePdf], settings.senderName);
-  if (settings.sendFranchiseEmail && summary.franchiseEmail) {
-    sendMailList_([summary.franchiseEmail], subject, franchiseBody, [invoicePdf], settings.senderName);
+  try {
+    sendGrowOrderMail_(summary, settings);
+  } catch (error) {
+    logMailError_('Grow通知送信失敗', summary.orderNo, settings.growEmails, error);
   }
-  if (settings.sendManufacturerEmail) {
-    sendMailList_(settings.manufacturerEmails, subject, adminBody, [], settings.senderName);
+
+  try {
+    sendAdminOrderMail_(summary, settings, subject, adminBody, invoicePdf);
+  } catch (error) {
+    logMailError_('管理者メール送信失敗', summary.orderNo, settings.adminEmails, error);
   }
+
+  try {
+    sendFranchiseOrderMail_(summary, settings, subject, franchiseBody, invoicePdf);
+  } catch (error) {
+    logMailError_('加盟店メール送信失敗', summary.orderNo, [summary.franchiseEmail], error);
+  }
+}
+
+function sendAdminOrderMail_(summary, settings, subject, body, invoicePdf) {
+  sendMailList_(settings.adminEmails, subject, body, [invoicePdf], settings.senderName);
+  logMailInfo_('管理者メール送信成功', summary.orderNo, settings.adminEmails);
+}
+
+function sendFranchiseOrderMail_(summary, settings, subject, body, invoicePdf) {
+  if (!settings.sendFranchiseEmail || !summary.franchiseEmail) return;
+  sendMailList_([summary.franchiseEmail], subject, body, [invoicePdf], settings.senderName);
+  logMailInfo_('加盟店メール送信成功', summary.orderNo, [summary.franchiseEmail]);
+}
+
+function sendGrowOrderMail_(summary, settings) {
+  if (!settings.growEmails.length) {
+    console.error('grow通知メールが設定されていません');
+    Logger.log('grow通知メールが設定されていません');
+    return;
+  }
+  const subject = `【Kimikea Connect】新しい注文が入りました／注文番号：${summary.orderNo}`;
+  const body = buildGrowOrderEmailBody_(summary);
+  const htmlBody = textToHtml_(body);
+  sendMailList_(settings.growEmails, subject, body, [], settings.senderName, htmlBody);
+  logMailInfo_('Grow通知送信成功', summary.orderNo, settings.growEmails);
 }
 
 function getNotificationSettings_(ss) {
@@ -795,8 +953,7 @@ function getNotificationSettings_(ss) {
     adminEmails: [],
     senderName: 'Kimikea Connect Order',
     sendFranchiseEmail: true,
-    sendManufacturerEmail: false,
-    manufacturerEmails: [],
+    growEmails: [],
   };
   if (!sheet || sheet.getLastRow() <= 1) return settings;
 
@@ -816,9 +973,8 @@ function getNotificationSettings_(ss) {
     if (item === '加盟店メール送信') {
       settings.sendFranchiseEmail = enabled && isTruthy_(value);
     }
-    if ((item === 'メーカー通知メール') && enabled) {
-      settings.sendManufacturerEmail = true;
-      settings.manufacturerEmails = parseEmailList_(value);
+    if (item === 'grow通知メール') {
+      settings.growEmails = parseEmailList_(value);
     }
   });
   return settings;
@@ -834,6 +990,8 @@ function buildOrderEmailBody_(summary) {
     `加盟店名：${summary.franchiseName}`,
     `担当者名：${summary.contactName}`,
     `メールアドレス：${summary.franchiseEmail}`,
+    `電話番号：${summary.franchisePhone || ''}`,
+    `配送先：${summary.franchiseAddress || ''}`,
     '',
     '【注文商品一覧】',
     buildOrderItemsText_(summary),
@@ -845,6 +1003,34 @@ function buildOrderEmailBody_(summary) {
     `備考：${summary.note || ''}`,
     '',
     '請求書PDFを添付しています。',
+  ].join('\n');
+}
+
+function buildGrowOrderEmailBody_(summary) {
+  return [
+    'Kimikea Connectに新しい注文が入りました。',
+    '',
+    '【注文情報】',
+    `注文番号：${summary.orderNo}`,
+    `注文日時：${Utilities.formatDate(summary.orderDate, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')}`,
+    '',
+    '【加盟店情報】',
+    `加盟店ID：${summary.franchiseId}`,
+    `加盟店名：${summary.franchiseName}`,
+    `注文者名：${summary.contactName}`,
+    `加盟店メールアドレス：${summary.franchiseEmail || ''}`,
+    `電話番号：${summary.franchisePhone || ''}`,
+    `配送先：${summary.franchiseAddress || ''}`,
+    '',
+    '【注文商品】',
+    buildGrowOrderItemsText_(summary),
+    '',
+    '【合計】',
+    `合計袋数：${summary.totalBags}`,
+    `小計：${formatYen_(summary.productTotal)}`,
+    `送料：${formatYen_(summary.shippingFee)}`,
+    `合計金額：${formatYen_(summary.invoiceTotal)}`,
+    `備考：${summary.note || ''}`,
   ].join('\n');
 }
 
@@ -875,12 +1061,42 @@ function buildFranchiseEmailBody_(summary, invoiceSettings) {
 }
 
 function buildOrderItemsText_(summary) {
-  return summary.details.map((row) => [
-    `${row[1]} / ${row[2]}`,
-    `数量：${row[3]}袋`,
-    `単価：${formatYen_(row[4])}`,
-    `小計：${formatYen_(row[5])}`,
+  return getSummaryDetailItems_(summary).map((item) => [
+    `${item.category} / ${item.colorName || item.color}`,
+    `商品コード：${item.productCode || ''}`,
+    `数量：${item.quantity}袋`,
+    `単価：${formatYen_(item.unitPrice)}`,
+    `小計：${formatYen_(item.subtotal)}`,
   ].join('\n')).join('\n---\n');
+}
+
+function buildGrowOrderItemsText_(summary) {
+  return getSummaryDetailItems_(summary).map((item, index) => [
+    `■ ${index + 1}`,
+    `商品名：${item.productName || `${item.category} ${item.colorName || item.color}`}`,
+    `商品カテゴリ：${item.category}`,
+    `カラー名：${item.colorName || item.color}`,
+    `商品コード：${item.productCode || ''}`,
+    `数量：${item.quantity}袋`,
+    `単価：${formatYen_(item.unitPrice)}`,
+    `商品ごとの金額：${formatYen_(item.subtotal)}`,
+  ].join('\n')).join('\n\n');
+}
+
+function getSummaryDetailItems_(summary) {
+  if (Array.isArray(summary.detailItems) && summary.detailItems.length) return summary.detailItems;
+  return (summary.details || []).map((row) => ({
+    productCode: '',
+    productName: `${row[1]} ${row[2]}`,
+    category: row[1],
+    color: row[2],
+    colorName: row[2],
+    quantity: row[3],
+    unitPrice: row[4],
+    subtotal: row[5],
+    purchasePrice: row[6],
+    profit: row[7],
+  }));
 }
 
 function getInvoiceSettings_(ss) {
@@ -1308,17 +1524,57 @@ function getInvoiceLogoBlob_(fileId) {
   }
 }
 
-function sendMailList_(emails, subject, body, attachments, senderName) {
-  const uniqueEmails = Array.from(new Set((emails || []).filter(Boolean)));
+function sendMailList_(emails, subject, body, attachments, senderName, htmlBody) {
+  const uniqueEmails = parseEmailList_((emails || []).join(','));
   uniqueEmails.forEach((email) => {
-    MailApp.sendEmail({
+    const payload = {
       to: email,
       subject,
       body,
       attachments: attachments || [],
       name: senderName || 'Kimikea Connect Order',
-    });
+    };
+    if (htmlBody) payload.htmlBody = htmlBody;
+    MailApp.sendEmail(payload);
   });
+}
+
+function textToHtml_(body) {
+  return String(body || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+
+function logMailInfo_(message, orderNo, emails) {
+  const to = parseEmailList_((emails || []).join(',')).join(',');
+  const text = `${message} orderId=${orderNo || ''} to=${to}`;
+  console.log(text);
+  Logger.log(text);
+}
+
+function logMailError_(message, orderNo, emails, error) {
+  const to = parseEmailList_((emails || []).join(',')).join(',');
+  const text = `${message} orderId=${orderNo || ''} to=${to} error=${error && error.message ? error.message : String(error)}`;
+  console.error(text);
+  Logger.log(text);
+}
+
+function testSendGrowMail() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settings = getNotificationSettings_(ss);
+  const growEmail = settings.growEmails[0] || '';
+  if (!growEmail) {
+    throw new Error('grow通知メールが設定されていません');
+  }
+  MailApp.sendEmail({
+    to: growEmail,
+    subject: '【Kimikea Connect】Grow通知テスト',
+    body: 'Grow通知メールのテスト送信です。',
+    name: settings.senderName || 'Kimikea Connect Order',
+  });
+  logMailInfo_('Grow通知テスト送信成功', 'test', [growEmail]);
 }
 
 function ensureShipmentEditTrigger_(ss) {
@@ -1381,10 +1637,18 @@ function handleOrderStatusEdit(event) {
 }
 
 function parseEmailList_(value) {
+  const seen = {};
   return String(value || '')
+    .normalize('NFKC')
     .split(/[,、\n]/)
     .map((email) => email.trim())
-    .filter(Boolean);
+    .filter((email) => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    .filter((email) => {
+      const key = email.toLowerCase();
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
 }
 
 function isTruthy_(value) {
@@ -1568,6 +1832,24 @@ function getFranchiseMasterRecords_() {
   const createdAtIndex = findHeaderIndex(['createdAt', '作成日', '登録日']);
   const updatedAtIndex = findHeaderIndex(['updatedAt', '更新日']);
   const visibleIndex = findHeaderIndex(['表示']);
+  logOrderDebug_('getFranchiseMasterRecords headers', {
+    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    spreadsheetName: SpreadsheetApp.getActiveSpreadsheet().getName(),
+    sheetName: sheet.getName(),
+    totalRowsIncludingHeader: values.length,
+    rawHeaders: values[0].map(String),
+    normalizedHeaders: headers,
+    indexes: {
+      franchiseIdIndex,
+      franchiseNameIndex,
+      emailIndex,
+      phoneIndex,
+      passwordIndex,
+      passwordHashIndex,
+      membershipStatusIndex,
+      visibleIndex,
+    },
+  });
 
   const requiredHeaders = [
     ['memberId', franchiseIdIndex],
@@ -1582,7 +1864,7 @@ function getFranchiseMasterRecords_() {
     throw new Error(`加盟店マスタに必要なヘッダーがありません：${missingHeaders.join('、')}`);
   }
 
-  return values.slice(1)
+  const records = values.slice(1)
     .map((row, offset) => {
       const rawStatus = membershipStatusIndex === -1 ? '' : String(row[membershipStatusIndex] || '').trim();
       const visible = visibleIndex === -1 ? true : isVisible_(row[visibleIndex]);
@@ -1614,6 +1896,20 @@ function getFranchiseMasterRecords_() {
     })
     .filter((franchise) => franchise.visible)
     .filter((franchise) => franchise.franchiseId && franchise.franchiseName);
+  logOrderDebug_('getFranchiseMasterRecords result', {
+    activeRecordCount: records.length,
+    records: records.map((item) => ({
+      rowNumber: item.rowNumber,
+      franchiseId: item.franchiseId,
+      franchiseName: item.franchiseName,
+      email: normalizeEmail_(item.email),
+      visible: item.visible,
+      membershipStatus: item.membershipStatus,
+      initialPassword: item.initialPassword,
+      hasPasswordHash: Boolean(item.passwordHash),
+    })),
+  });
+  return records;
 }
 
 function getVisibleFranchises(sessionToken) {
@@ -1729,12 +2025,36 @@ function isInitialPasswordLogin_(franchise, password) {
 }
 
 function isValidFranchisePassword_(franchise, password) {
+  return getFranchisePasswordCheckResult_(franchise, password).ok;
+}
+
+function getFranchisePasswordCheckResult_(franchise, password) {
   const normalizedPassword = normalizeLoginPassword_(password);
-  if (!normalizedPassword) return false;
-  if (franchise.passwordHash) {
-    return franchise.passwordHash === hashPassword_(normalizedPassword);
+  if (!normalizedPassword) {
+    return { ok: false, reason: 'empty_password' };
   }
-  return isInitialPasswordLogin_(franchise, normalizedPassword);
+  if (!franchise) {
+    return { ok: false, reason: 'missing_franchise' };
+  }
+  if (franchise.passwordHash) {
+    const loginHash = hashPassword_(normalizedPassword);
+    return {
+      ok: franchise.passwordHash === loginHash,
+      reason: franchise.passwordHash === loginHash ? 'changed_password_match' : 'changed_password_mismatch',
+      mode: 'passwordHash',
+      loginHashPrefix: loginHash.slice(0, 10),
+      storedHashPrefix: String(franchise.passwordHash).slice(0, 10),
+    };
+  }
+  const storedInitialPassword = normalizeInitialPasswordValue_(franchise.initialPassword);
+  const initialMatch = isInitialPasswordLogin_(franchise, normalizedPassword);
+  return {
+    ok: initialMatch,
+    reason: initialMatch ? 'initial_password_match' : 'initial_password_mismatch',
+    mode: 'initialPassword',
+    storedInitialPassword,
+    normalizedLoginPassword: normalizedPassword,
+  };
 }
 
 function validateNewPassword_(newPassword, confirmPassword) {
@@ -1876,6 +2196,15 @@ function createIndex_(headers) {
   return index;
 }
 
+function getRowValueByHeader_(row, index, names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(index, name)) {
+      return row[index[name]];
+    }
+  }
+  return '';
+}
+
 function applyHeaderStyle_(sheet, colCount) {
   sheet.getRange(1, 1, 1, colCount)
     .setFontWeight('bold')
@@ -1887,6 +2216,14 @@ function applyHeaderStyle_(sheet, colCount) {
 function isVisible_(value) {
   const text = String(value || '').trim().toUpperCase();
   return value === true || text === 'TRUE' || text === 'ON' || value === '表示' || value === '表示する';
+}
+
+function logOrderDebug_(label, data) {
+  try {
+    Logger.log(`[KCO DEBUG] ${label}: ${JSON.stringify(data)}`);
+  } catch (error) {
+    Logger.log(`[KCO DEBUG] ${label}: ${String(data)}`);
+  }
 }
 
 function normalize_(value) {
