@@ -50,9 +50,10 @@ const KC_POST_HEADERS = [
   'deletedAt',
   'deletedByUserId',
   'deleteReason',
+  'authorId',
 ];
 
-const KC_SAVE_HEADERS = ['id', 'userId', 'stylePostId', 'createdAt'];
+const KC_SAVE_HEADERS = ['id', 'userId', 'stylePostId', 'createdAt', 'styleId'];
 const KC_PRODUCT_MASTER_HEADERS = ['商品コード', '商品カテゴリー', 'カラー', '仕入価格', '販売価格', '在庫', '表示'];
 const KC_TYPE_HEADERS = ['id', 'name', 'isActive', 'sortOrder'];
 const KC_SHOP_HEADERS = ['id', 'name', 'address', 'imageUrl', 'isActive'];
@@ -108,7 +109,7 @@ function getStylebookDatabase_(userId) {
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
-  const saves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES));
+  const saves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
   const colors = getProductMasterColors_(ss);
   const types = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES)).map(normalizeBooleans_);
   const shops = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS)).map(normalizeBooleans_);
@@ -174,7 +175,7 @@ function savePost_(post, userId) {
     staffId: post.staffId || '',
     salonName: post.salonName || getShopName_(post.shopId) || '',
     staffName: post.staffName || getStaffName_(post.staffId) || '',
-    createdByUserId: existing ? existing.object.createdByUserId : user.id,
+    createdByUserId: existing ? (existing.object.createdByUserId || existing.object.authorId || user.id) : user.id,
     createdAt: existing ? existing.object.createdAt : now,
     updatedAt: now,
     saveCount: existing ? Number(existing.object.saveCount || 0) : 0,
@@ -183,6 +184,7 @@ function savePost_(post, userId) {
     deletedAt: existing ? existing.object.deletedAt : '',
     deletedByUserId: existing ? existing.object.deletedByUserId : '',
     deleteReason: existing ? existing.object.deleteReason : '',
+    authorId: existing ? postAuthorId_(existing.object) : user.id,
   };
   upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
   return { ok: true, id, database: getStylebookDatabase_(user.id) };
@@ -206,7 +208,7 @@ function deletePost_(postId, userId, reason) {
   const user = getUser_(userId);
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
-  if (!canManagePost_(found.object, user)) throw new Error('この投稿を削除する権限がありません。');
+  if (!canDeletePost_(found.object, user)) throw new Error('この投稿を削除する権限がありません。');
   found.object.status = 'deleted';
   found.object.isPublished = false;
   found.object.deletedAt = new Date().toISOString();
@@ -238,7 +240,7 @@ function hardDeletePost_(postId, userId) {
   if (!isHeadquartersAdmin_(user)) throw new Error('本部管理者のみ完全削除できます。');
   const ss = getKimikeaConnectSpreadsheet_();
   deleteRowsByValue_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS), 'id', postId);
-  deleteRowsByValue_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), 'stylePostId', postId);
+  deleteRowsBySaveStyleId_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), postId);
   return { ok: true, id: postId };
 }
 
@@ -246,14 +248,21 @@ function toggleSave_(postId, userId) {
   const ss = getKimikeaConnectSpreadsheet_();
   const saveSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES);
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
-  const existing = rowsToObjects_(saveSheet).find(save => save.userId === userId && save.stylePostId === postId);
+  setHeaders_(saveSheet, KC_SAVE_HEADERS);
+  const existing = rowsToObjects_(saveSheet).map(normalizeSave_).find(save => save.userId === userId && saveStyleId_(save) === postId);
   const post = findRowObject_(postSheet, 'id', postId);
   if (!post) throw new Error('投稿が見つかりません。');
   if (existing) {
     deleteRowsByValue_(saveSheet, 'id', existing.id);
     post.object.saveCount = Math.max(0, Number(post.object.saveCount || 0) - 1);
   } else {
-    saveSheet.appendRow([`save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, userId, postId, new Date().toISOString()]);
+    appendObjectByHeaders_(saveSheet, {
+      id: `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId,
+      stylePostId: postId,
+      styleId: postId,
+      createdAt: new Date().toISOString(),
+    });
     post.object.saveCount = Number(post.object.saveCount || 0) + 1;
   }
   upsertObject_(postSheet, KC_POST_HEADERS, post.object, 'id');
@@ -298,7 +307,20 @@ function defaultTypes_() {
 function canManagePost_(post, user) {
   if (!user) return false;
   if (isHeadquartersAdmin_(user)) return true;
-  return post.createdByUserId === user.id;
+  return postAuthorId_(post) === user.id;
+}
+
+function canDeletePost_(post, user) {
+  if (!user) return false;
+  return postAuthorId_(post) === user.id;
+}
+
+function postAuthorId_(post) {
+  return String((post && (post.authorId || post.createdByUserId || post.userId)) || '').trim();
+}
+
+function saveStyleId_(save) {
+  return String((save && (save.styleId || save.stylePostId || save.postId)) || '').trim();
 }
 
 function isHeadquartersAdmin_(user) {
@@ -531,6 +553,18 @@ function normalizePost_(row) {
     deletedAt: row.deletedAt || '',
     deletedByUserId: row.deletedByUserId || '',
     deleteReason: row.deleteReason || '',
+    authorId: row.authorId || row.createdByUserId || '',
+  };
+}
+
+function normalizeSave_(row) {
+  const styleId = saveStyleId_(row);
+  return {
+    id: row.id || '',
+    userId: row.userId || '',
+    stylePostId: row.stylePostId || styleId,
+    styleId,
+    createdAt: row.createdAt || '',
   };
 }
 
@@ -683,6 +717,15 @@ function upsertObject_(sheet, headers, object, key) {
   }
 }
 
+function appendObjectByHeaders_(sheet, object) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  sheet.appendRow(headers.map(header => {
+    const value = object[header];
+    if (Array.isArray(value)) return value.join('\n');
+    return value == null ? '' : value;
+  }));
+}
+
 function deleteRowsByValue_(sheet, key, value) {
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return;
@@ -690,6 +733,19 @@ function deleteRowsByValue_(sheet, key, value) {
   const keyIndex = headers.indexOf(key);
   for (let row = values.length - 1; row >= 1; row -= 1) {
     if (values[row][keyIndex] === value) sheet.deleteRow(row + 1);
+  }
+}
+
+function deleteRowsBySaveStyleId_(sheet, postId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+  const headers = values[0].map(String);
+  const stylePostIndex = headers.indexOf('stylePostId');
+  const styleIndex = headers.indexOf('styleId');
+  for (let row = values.length - 1; row >= 1; row -= 1) {
+    const stylePostId = stylePostIndex >= 0 ? String(values[row][stylePostIndex] || '') : '';
+    const styleId = styleIndex >= 0 ? String(values[row][styleIndex] || '') : '';
+    if (stylePostId === postId || styleId === postId) sheet.deleteRow(row + 1);
   }
 }
 

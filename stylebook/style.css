@@ -922,3 +922,275 @@ body,
 @media (min-width: 980px) {
   .gallery-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
+
+/* 2026-07-15: premium recipe-book polish */
+:root {
+  --bg: #f5f0e7;
+  --paper: #fffdf8;
+  --ink: #1d2224;
+  --muted: #6f7779;
+  --line: rgba(40, 45, 46, 0.12);
+  --gold: #b8924d;
+  --gold-soft: #efe1bd;
+  --shadow: 0 18px 48px rgba(38, 34, 28, 0.10);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(255,255,255,.95), transparent 28%),
+    radial-gradient(circle at 88% 0%, rgba(218, 206, 184, .28), transparent 34%),
+    linear-gradient(180deg, #fbf8f1 0%, #f2ece1 100%);
+}
+
+.stylebook-app {
+  padding-inline: 12px;
+}
+
+.topbar {
+  max-width: 960px;
+  margin: 0 auto 8px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 0 0 22px 22px;
+  background: rgba(251, 248, 241, 0.82);
+  box-shadow: 0 10px 32px rgba(42, 37, 30, .06);
+}
+
+.stylebook-menu-view {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  gap: 14px;
+  padding: 12px 0 32px;
+}
+
+.menu-hero {
+  min-height: 126px;
+  padding: 22px 18px;
+  border: 1px solid rgba(255,255,255,.78);
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.90), rgba(255,251,242,.70)),
+    radial-gradient(circle at 18% 6%, rgba(184,146,77,.16), transparent 34%),
+    radial-gradient(circle at 94% 8%, rgba(157,176,181,.18), transparent 38%);
+  box-shadow: 0 20px 52px rgba(41,35,27,.10);
+  backdrop-filter: blur(14px);
+}
+
+.menu-hero h2 {
+  font-size: clamp(24px, 7vw, 38px);
+  letter-spacing: 0;
+}
+
+.menu-hero span {
+  max-width: 34em;
+  line-height: 1.65;
+}
+
+.menu-card-grid {
+  gap: 10px;
+}
+
+.menu-card {
+  min-height: 104px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  column-gap: 12px;
+  row-gap: 3px;
+  padding: 14px;
+  border-color: rgba(255,255,255,.78);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.92), rgba(252,248,240,.80));
+  box-shadow: 0 14px 36px rgba(39,35,30,.08);
+  backdrop-filter: blur(12px);
+}
+
+.menu-card.primary {
+  min-height: 116px;
+  grid-template-columns: 50px minmax(0, 1fr);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.96), rgba(238,246,247,.78)),
+    radial-gradient(circle at 92% 18%, rgba(184,146,77,.18), transparent 34%);
+}
+
+.menu-card-icon {
+  grid-row: 1 / 3;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(184,146,77,.18);
+  border-radius: 15px;
+  background: linear-gradient(145deg, #fff8e8, #f2e2bc);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 10px 24px rgba(116,83,30,.10);
+}
+
+.menu-card.primary .menu-card-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 18px;
+}
+
+.menu-card-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: #9a7134;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menu-card strong {
+  align-self: end;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.menu-card.primary strong {
+  font-size: 21px;
+}
+
+.menu-card small {
+  align-self: start;
+  color: #747a79;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.menu-card:active,
+.menu-card.is-pressing,
+.ghost-button:active,
+.primary-button:active,
+.danger-button:active,
+.save-button:active,
+.save-pill:active {
+  transform: translateY(1px) scale(.982);
+  box-shadow: 0 8px 18px rgba(39,35,30,.07);
+}
+
+.view-section {
+  animation: viewEnter .24s ease both;
+}
+
+@keyframes viewEnter {
+  from { opacity: 0; transform: translateY(8px) scale(.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.compact-search {
+  top: 58px;
+  max-width: 980px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: rgba(251,248,241,.88);
+}
+
+.gallery-grid {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  gap: 10px;
+  padding: 0 0 22px;
+}
+
+.gallery-item {
+  border: 1px solid rgba(255,255,255,.74);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(35,45,49,.10);
+  transform: translateZ(0);
+  transition: transform .22s ease, box-shadow .22s ease;
+}
+
+.gallery-item:active {
+  transform: scale(.985);
+  box-shadow: 0 10px 22px rgba(35,45,49,.10);
+}
+
+.gallery-item::before {
+  padding-top: 150%;
+}
+
+.photo-button img {
+  will-change: opacity;
+}
+
+.photo-meta {
+  padding: 40px 10px 10px;
+  font-size: 11px;
+}
+
+.save-button {
+  right: 8px;
+  top: 8px;
+  width: 32px;
+  height: 32px;
+}
+
+.detail-card,
+.post-form,
+.admin-view > div:not(.admin-denied),
+.admin-denied,
+.manage-card {
+  border-color: rgba(255,255,255,.74);
+  border-radius: 22px;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 18px 44px rgba(35,45,49,.09);
+}
+
+.manage-card {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.manage-card:active {
+  transform: scale(.99);
+}
+
+@media (max-width: 430px) {
+  .stylebook-app {
+    padding-inline: 10px;
+  }
+  .topbar {
+    margin-inline: -2px;
+  }
+  .menu-card-grid {
+    padding: 0;
+    gap: 9px;
+  }
+  .menu-card {
+    min-height: 100px;
+    padding: 13px;
+    border-radius: 20px;
+  }
+  .menu-card.primary {
+    min-height: 112px;
+  }
+  .menu-card strong {
+    font-size: 16px;
+  }
+  .menu-card.primary strong {
+    font-size: 20px;
+  }
+  .gallery-grid {
+    gap: 9px;
+  }
+}
+
+@media (max-width: 340px) {
+  .stylebook-app {
+    padding-inline: 8px;
+  }
+  .menu-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+    min-height: 96px;
+    padding: 11px;
+  }
+  .menu-card-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .menu-card small {
+    font-size: 10px;
+  }
+}

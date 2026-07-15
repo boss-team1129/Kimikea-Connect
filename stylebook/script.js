@@ -432,13 +432,35 @@ function canManageAll() {
   return currentUser()?.role === roles.headquarters_admin;
 }
 
-function canManagePost(post) {
+function postAuthorId(post) {
+  return String(post?.authorId || post?.createdByUserId || post?.userId || '').trim();
+}
+
+function saveStyleId(save) {
+  return String(save?.styleId || save?.stylePostId || save?.postId || '').trim();
+}
+
+function isPostAuthor(post) {
+  const user = currentUser();
+  if (!user) return false;
+  return postAuthorId(post) === user.id;
+}
+
+function canEditPost(post) {
   const user = currentUser();
   if (!user) return false;
   if (user.role === roles.headquarters_admin) return true;
-  if (post.createdByUserId === user.id) return true;
+  if (isPostAuthor(post)) return true;
   // 店舗管理者の店舗内管理は将来拡張用。現時点では本人投稿のみ編集できます。
   return false;
+}
+
+function canDeletePost(post) {
+  return isPostAuthor(post);
+}
+
+function canManagePost(post) {
+  return canEditPost(post);
 }
 
 function getById(collection, id) {
@@ -456,7 +478,7 @@ function activePosts({ includePrivate = false, includeDeleted = false } = {}) {
 function savedPostIds() {
   const userId = currentUser()?.id;
   if (!userId) return new Set();
-  return new Set(state.db.savedStyles.filter(save => save.userId === userId).map(save => save.stylePostId));
+  return new Set(state.db.savedStyles.filter(save => save.userId === userId).map(saveStyleId).filter(Boolean));
 }
 
 function isSaved(postId) {
@@ -492,7 +514,7 @@ function filteredPosts() {
     if (state.sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt);
     if (state.sort === 'saved') return b.saveCount - a.saveCount;
     if (state.sort === 'savedDate') {
-      const savedMap = new Map(state.db.savedStyles.filter(save => save.userId === currentUser().id).map(save => [save.stylePostId, save.createdAt]));
+      const savedMap = new Map(state.db.savedStyles.filter(save => save.userId === currentUser().id).map(save => [saveStyleId(save), save.createdAt]));
       return new Date(savedMap.get(b.id) || 0) - new Date(savedMap.get(a.id) || 0);
     }
     return (b.saveCount * 2 + new Date(b.createdAt).getTime() / 1000000000) - (a.saveCount * 2 + new Date(a.createdAt).getTime() / 1000000000);
@@ -687,6 +709,8 @@ function renderManageItem(post, mode = 'mine') {
   const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
   const dateLabel = new Date(post.updatedAt || post.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const photoUrl = imageUrlFromPost(post);
+  const editButton = canEditPost(post) ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : '';
+  const deleteButton = canDeletePost(post) ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : '';
   return `
     <article class="manage-card">
       <button type="button" class="manage-thumb" data-action="detail" data-id="${post.id}">
@@ -698,9 +722,9 @@ function renderManageItem(post, mode = 'mine') {
         <small>${escapeHtml(salonName)} / ${escapeHtml(staffName)}</small>
         <small>${mode === 'drafts' ? '保存日時' : '更新'}：${dateLabel}</small>
         <div class="manage-actions">
-          <button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>
+          ${editButton}
           ${isDraft ? `<button type="button" class="primary-button" data-action="publish" data-id="${post.id}">投稿する</button>` : ''}
-          <button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>
+          ${deleteButton}
         </div>
       </div>
     </article>`;
@@ -896,8 +920,9 @@ function showDetail(postId, options = {}) {
   state.currentDetailId = postId;
   const salonName = displaySalonName(post);
   const staffName = displayStaffName(post);
-  const creator = getById('users', post.createdByUserId);
-  const canEdit = canManagePost(post);
+  const creator = getById('users', postAuthorId(post));
+  const canEdit = canEditPost(post);
+  const canDelete = canDeletePost(post);
   el.detailView.innerHTML = `
     <article class="detail-card">
       <div class="detail-photo-wrap">
@@ -925,8 +950,8 @@ function showDetail(postId, options = {}) {
         <div class="detail-actions">
           <button type="button" class="ghost-button" data-action="share" data-id="${post.id}">共有</button>
           <button type="button" class="ghost-button" data-action="similar" data-id="${post.id}">似ているスタイルを見る</button>
-          ${canEdit ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>
-          <button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : ''}
+          ${canEdit ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : ''}
+          ${canDelete ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : ''}
         </div>
       </div>
     </article>`;
@@ -939,7 +964,8 @@ async function toggleSave(postId) {
     alert('保存するにはログインユーザーが必要です。');
     return;
   }
-  const existing = state.db.savedStyles.find(save => save.userId === userId && save.stylePostId === postId);
+  const existingIndex = state.db.savedStyles.findIndex(save => save.userId === userId && saveStyleId(save) === postId);
+  const existing = existingIndex >= 0 ? state.db.savedStyles[existingIndex] : null;
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post) return;
   try {
@@ -947,11 +973,11 @@ async function toggleSave(postId) {
       await apiRequest('toggleSave', { postId });
       await refreshRemoteDb();
     } else if (existing) {
-      state.db.savedStyles = state.db.savedStyles.filter(save => save.id !== existing.id);
+      state.db.savedStyles.splice(existingIndex, 1);
       post.saveCount = Math.max(0, Number(post.saveCount || 0) - 1);
       saveDb();
     } else {
-      state.db.savedStyles.push({ id: uid('save'), userId, stylePostId: postId, createdAt: new Date().toISOString() });
+      state.db.savedStyles.push({ id: uid('save'), userId, styleId: postId, stylePostId: postId, createdAt: new Date().toISOString() });
       post.saveCount = Number(post.saveCount || 0) + 1;
       saveDb();
     }
@@ -987,7 +1013,7 @@ function ownPosts({ draftsOnly = false } = {}) {
   const user = currentUser();
   if (!user) return [];
   return state.db.stylePosts
-    .filter(post => !post.deletedAt && post.createdByUserId === user.id)
+    .filter(post => !post.deletedAt && postAuthorId(post) === user.id)
     .filter(post => {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
       return draftsOnly ? isDraft : true;
@@ -1140,6 +1166,13 @@ function runActionNow(action, event) {
   return handleActionElement(action);
 }
 
+function closestFromEvent(event, selector) {
+  const target = event?.target;
+  if (target?.closest) return target.closest(selector);
+  const path = typeof event?.composedPath === 'function' ? event.composedPath() : [];
+  return path.find(node => node?.matches?.(selector)) || null;
+}
+
 window.__kimikeaStylebookRunAction = function runStylebookAction(actionName, id = '') {
   return handleActionElement({ dataset: { action: actionName, id } });
 };
@@ -1290,7 +1323,8 @@ async function submitPost(event) {
     staffId: matchedStaff?.id || '',
     salonName,
     staffName,
-    createdByUserId: editing?.createdByUserId || currentUser().id,
+    authorId: editing ? postAuthorId(editing) : currentUser().id,
+    createdByUserId: editing?.createdByUserId || editing?.authorId || currentUser().id,
     createdAt: editing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     saveCount: editing?.saveCount || 0,
@@ -1352,12 +1386,12 @@ async function publishPost(postId) {
 
 async function logicalDeletePost(postId) {
   const post = state.db.stylePosts.find(item => item.id === postId);
-  if (!post || !canManagePost(post)) {
+  if (!post || !canDeletePost(post)) {
     alert('この投稿を削除する権限がありません。');
     return;
   }
-  const reason = prompt('削除理由を入力してください。', '管理上の理由') || '';
-  if (!confirm('この投稿を非表示にします。よろしいですか？')) return;
+  if (!confirm('この投稿を削除します。よろしいですか？')) return;
+  const reason = '投稿者本人による削除';
   try {
     if (state.backendMode === 'remote') {
       await apiRequest('deletePost', { postId, reason });
@@ -1410,7 +1444,7 @@ async function hardDeletePost(postId) {
       await refreshRemoteDb();
     } else {
       state.db.stylePosts = state.db.stylePosts.filter(post => post.id !== postId);
-      state.db.savedStyles = state.db.savedStyles.filter(save => save.stylePostId !== postId);
+      state.db.savedStyles = state.db.savedStyles.filter(save => saveStyleId(save) !== postId);
       saveDb();
     }
     renderAdmin();
@@ -1441,8 +1475,9 @@ function adminRowsFor(tab) {
     return activePosts({ includePrivate: true }).map(post => {
       const salonName = displaySalonName(post);
       const staffName = displayStaffName(post);
-      const creator = getById('users', post.createdByUserId);
-      return `<tr><td>${imageTag(imageUrlFromPost(post), post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(salonName)}</td><td>${escapeHtml(staffName)}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button><button data-action="delete" data-id="${post.id}">削除</button></td></tr>`;
+      const creator = getById('users', postAuthorId(post));
+      const deleteButton = canDeletePost(post) ? `<button data-action="delete" data-id="${post.id}">削除</button>` : '';
+      return `<tr><td>${imageTag(imageUrlFromPost(post), post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(salonName)}</td><td>${escapeHtml(staffName)}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${post.saveCount}</td><td><button data-action="edit" data-id="${post.id}">編集</button>${deleteButton}</td></tr>`;
     }).join('');
   }
   if (tab === 'colors') {
@@ -1583,17 +1618,17 @@ function bindEvents() {
   el.cancelEditButton.addEventListener('click', clearPostForm);
   if (el.openAdminButton) el.openAdminButton.addEventListener('click', renderAdmin);
   document.addEventListener('pointerdown', event => {
-    const immediateAction = event.target.closest('.menu-card[data-action], .empty-gallery-state [data-action]');
+    const immediateAction = closestFromEvent(event, '.menu-card[data-action], .empty-gallery-state [data-action]');
     if (immediateAction) {
       runActionNow(immediateAction, event);
       return;
     }
-    const action = event.target.closest('[data-action]');
+    const action = closestFromEvent(event, '[data-action]');
     if (action) action.classList.add('is-pressing');
   }, { passive: false, capture: true });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(eventName => {
     document.addEventListener(eventName, event => {
-      const action = event.target.closest('[data-action]');
+      const action = closestFromEvent(event, '[data-action]');
       if (action) action.classList.remove('is-pressing');
     }, { passive: true });
   });
@@ -1604,7 +1639,7 @@ function bindEvents() {
       return;
     }
     state.actionEventCount += 1;
-    const actionCandidate = event.target.closest('[data-action]');
+    const actionCandidate = closestFromEvent(event, '[data-action]');
     if (actionCandidate) {
       debugStylebook('document click action candidate', {
         eventType: event.type,
@@ -1618,21 +1653,21 @@ function bindEvents() {
         path: event.composedPath ? event.composedPath().slice(0, 6).map(node => node.id || node.className || node.tagName).join(' > ') : '',
       });
     }
-    const colorButton = event.target.closest('[data-filter-color]');
+    const colorButton = closestFromEvent(event, '[data-filter-color]');
     if (colorButton) {
       const id = colorButton.dataset.filterColor;
       state.selectedColorIds.has(id) ? state.selectedColorIds.delete(id) : state.selectedColorIds.add(id);
       renderGallery();
       return;
     }
-    const styleButton = event.target.closest('[data-filter-style]');
+    const styleButton = closestFromEvent(event, '[data-filter-style]');
     if (styleButton) {
       const id = styleButton.dataset.filterStyle;
       state.selectedStyleTypeIds.has(id) ? state.selectedStyleTypeIds.delete(id) : state.selectedStyleTypeIds.add(id);
       renderGallery();
       return;
     }
-    const chip = event.target.closest('[data-chip-type]');
+    const chip = closestFromEvent(event, '[data-chip-type]');
     if (chip) {
       const { chipType, chipId } = chip.dataset;
       if (chipType === 'color') state.selectedColorIds.delete(chipId);
@@ -1643,7 +1678,7 @@ function bindEvents() {
       renderGallery();
       return;
     }
-    const colorChoice = event.target.closest('[data-color-choice]');
+    const colorChoice = closestFromEvent(event, '[data-color-choice]');
     if (colorChoice) {
       const id = colorChoice.dataset.colorChoice;
       const option = Array.from(el.colorSelect?.options || []).find(item => item.value === id);
@@ -1653,7 +1688,7 @@ function bindEvents() {
       }
       return;
     }
-    const action = event.target.closest('[data-action]');
+    const action = closestFromEvent(event, '[data-action]');
     if (!action) return;
     runActionNow(action, event);
   });
@@ -1664,12 +1699,12 @@ function bindEvents() {
     });
   });
   el.adminTable.addEventListener('click', event => {
-    const button = event.target.closest('[data-admin-action]');
+    const button = closestFromEvent(event, '[data-admin-action]');
     if (!button) return;
     if (button.dataset.adminAction === 'toggle-type') toggleAdminActive('styleTypes', button.dataset.id);
   });
   el.adminTable.addEventListener('change', event => {
-    const field = event.target.closest('[data-admin-action="change-role"]');
+    const field = closestFromEvent(event, '[data-admin-action="change-role"]');
     if (!field || !canManageAll()) return;
     const user = state.db.users.find(item => item.id === field.dataset.id);
     if (!user) return;
