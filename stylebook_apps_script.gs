@@ -72,6 +72,9 @@ function doGet(e) {
   if (action === 'database' || action === 'list') {
     return json_({ ok: true, database: getStylebookDatabase_(userId) });
   }
+  if (action === 'shopDatabase') {
+    return json_({ ok: true, database: getStylebookDatabase_(userId, { shopId: e.parameter.shopId || '' }) });
+  }
   if (action === 'myPosts') {
     return json_({ ok: true, posts: getOwnStylebookPosts_(userId, e.parameter.draftsOnly === 'true') });
   }
@@ -109,11 +112,14 @@ function setupKimikeaStylebook() {
   getOrCreateImageFolder_();
 }
 
-function getStylebookDatabase_(userId) {
+function getStylebookDatabase_(userId, options) {
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   const normalizedUserId = normalizeUserId_(userId);
-  const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
+  const scopedShopId = String((options && options.shopId) || '').trim();
+  const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
+    .map(normalizePost_)
+    .filter(post => !scopedShopId || String(post.shopId || '').trim() === scopedShopId);
   const allSaves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
   const ownSaves = allSaves.filter(save => sameUserId_(save.userId, normalizedUserId));
   const saveSummaries = buildSaveSummaries_(posts, allSaves);
@@ -127,6 +133,7 @@ function getStylebookDatabase_(userId) {
     spreadsheetId: ss.getId(),
     spreadsheetName: ss.getName(),
     userId,
+    shopId: scopedShopId,
     posts: posts.length,
     saves: ownSaves.length,
     saveSummaries: saveSummaries.length,

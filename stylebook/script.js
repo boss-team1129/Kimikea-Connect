@@ -7,7 +7,10 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260715-save-permission-2';
+const STYLEBOOK_ASSET_VERSION = '20260716-network-map-1';
+const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
+const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
+const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
 
 const roles = {
   member: 'member',
@@ -43,6 +46,9 @@ const state = {
   isRestoringAppHistory: false,
   immediateActionUntil: 0,
   savingPostIds: new Set(),
+  externalShopId: STYLEBOOK_INITIAL_SHOP_ID,
+  externalShopName: STYLEBOOK_INITIAL_SHOP_NAME,
+  externalShopScopeApplied: false,
 };
 
 const el = {
@@ -59,6 +65,7 @@ const el = {
   clearFiltersButton: document.getElementById('clearFiltersButton'),
   resultCount: document.getElementById('resultCount'),
   stylebookPostCount: document.getElementById('stylebookPostCount'),
+  shopScopeNotice: document.getElementById('shopScopeNotice'),
   galleryGrid: document.getElementById('galleryGrid'),
   savedGrid: document.getElementById('savedGrid'),
   draftsGrid: document.getElementById('draftsGrid'),
@@ -343,11 +350,14 @@ async function apiRequest(action, payload = {}) {
 }
 
 async function loadRemoteDb() {
+  const scopedShopId = String(state.externalShopId || '').trim();
+  const action = scopedShopId ? 'shopDatabase' : 'database';
   debugStylebook('API database request', {
     url: STYLEBOOK_API_URL,
     userId: state.currentUserId,
+    shopId: scopedShopId,
   });
-  const data = await requestJson(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&t=${Date.now()}`, {
+  const data = await requestJson(`${STYLEBOOK_API_URL}?action=${action}&userId=${encodeURIComponent(state.currentUserId)}&shopId=${encodeURIComponent(scopedShopId)}&t=${Date.now()}`, {
     cache: 'no-store',
   });
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
@@ -370,6 +380,46 @@ async function loadRemoteDb() {
       productColor: color.productColor,
     })),
   });
+}
+
+function currentExternalShopName() {
+  if (!state.externalShopId) return '';
+  const shop = getById('shops', state.externalShopId);
+  return shop?.name || state.externalShopName || '';
+}
+
+function applyExternalShopScope() {
+  const shopId = String(state.externalShopId || '').trim();
+  if (!shopId || state.externalShopScopeApplied) return;
+  state.selectedShopIds = new Set([shopId]);
+  state.visibleCount = PAGE_SIZE;
+  state.currentView = 'gallery';
+  state.externalShopScopeApplied = true;
+}
+
+function updateStylebookHeading() {
+  const heading = document.querySelector('.topbar-title h1');
+  if (!heading) return;
+  const shopName = currentExternalShopName();
+  heading.textContent = shopName ? `${shopName}のスタイル` : 'スタイル図鑑';
+}
+
+function renderShopScopeNotice() {
+  if (!el.shopScopeNotice) return;
+  const shopName = currentExternalShopName();
+  if (!state.externalShopId || !shopName) {
+    el.shopScopeNotice.hidden = true;
+    el.shopScopeNotice.innerHTML = '';
+    return;
+  }
+  el.shopScopeNotice.hidden = false;
+  el.shopScopeNotice.innerHTML = `
+    <div>
+      <strong>${escapeHtml(shopName)}のスタイル</strong>
+      <span>店舗IDで絞り込んで表示しています。</span>
+    </div>
+    <a href="./">すべてのスタイルへ戻る</a>
+  `;
 }
 
 function normalizeDatabase(database) {
@@ -875,6 +925,8 @@ function renderActiveChips() {
 }
 
 function renderGallery() {
+  updateStylebookHeading();
+  renderShopScopeNotice();
   const posts = filteredPosts();
   const visible = posts.slice(0, state.visibleCount);
   el.galleryGrid.innerHTML = visible.map(renderGalleryItem).join('');
@@ -1016,6 +1068,7 @@ function showView(name, options = {}) {
   const { push = true, id = '' } = options;
   if (push) rememberStylebookRoute(name, id);
   state.currentView = name;
+  updateStylebookHeading();
   ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'mineView', 'adminView'].forEach(key => {
     const view = document.getElementById(key);
     if (view) view.hidden = key !== `${name}View`;
@@ -1936,6 +1989,11 @@ async function init() {
   }
   await loadDb();
   if (!normalizeUserId(state.currentUserId) && state.db.users[0]?.id) state.currentUserId = state.db.users[0].id;
+  applyExternalShopScope();
+  if (state.externalShopId) {
+    showView('gallery', { push: false });
+    replaceStylebookHistory('gallery');
+  }
   renderCurrentViewAfterDataLoad();
   if (state.pendingActionName) {
     const queuedAction = state.pendingActionName;

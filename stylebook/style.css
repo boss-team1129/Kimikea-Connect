@@ -137,6 +137,47 @@ img { display: block; max-width: 100%; }
   backdrop-filter: blur(16px);
 }
 
+.shop-scope-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, 980px);
+  margin: 0 auto 10px;
+  padding: 12px 13px;
+  border: 1px solid rgba(184, 143, 57, .22);
+  border-radius: 18px;
+  background: rgba(255, 252, 246, .86);
+  box-shadow: 0 14px 34px rgba(45, 37, 24, .08);
+}
+.shop-scope-notice strong,
+.shop-scope-notice span {
+  display: block;
+}
+.shop-scope-notice strong {
+  color: #15120d;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.shop-scope-notice span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.shop-scope-notice a {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 9px 11px;
+  border: 1px solid rgba(184, 143, 57, .25);
+  border-radius: 999px;
+  background: #fff;
+  color: #75551b;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .mini-button { min-height: 36px; padding: 0 12px; }
 .sort-select { width: 118px; min-height: 36px; padding: 0 8px; font-size: 13px; }
 
