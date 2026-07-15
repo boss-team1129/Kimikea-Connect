@@ -96,8 +96,7 @@ img { display: block; max-width: 100%; }
 .field input,
 .field select,
 .field textarea,
-.filter-panel select,
-.search-input input {
+.filter-panel select {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line);
@@ -125,33 +124,21 @@ img { display: block; max-width: 100%; }
   transform: scale(0.985);
 }
 
-.compact-search {
+.gallery-toolbar {
   position: sticky;
   top: 58px;
   z-index: 24;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 6px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 5px 6px 7px;
   background: rgba(247, 244, 238, 0.82);
   backdrop-filter: blur(16px);
 }
 
-.search-input {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255,255,255,0.86);
-}
-.search-input span { color: var(--muted); text-align: center; }
-.search-input input { min-height: 32px; border: 0; background: transparent; outline: none; }
 .mini-button { min-height: 36px; padding: 0 12px; }
-.sort-select { width: 86px; min-height: 36px; padding: 0 8px; font-size: 13px; }
+.sort-select { width: 118px; min-height: 36px; padding: 0 8px; font-size: 13px; }
 
 .filter-panel {
   display: grid;
@@ -748,16 +735,13 @@ img { display: block; max-width: 100%; }
 .menu-card strong { font-size: 20px; line-height: 1.1; }
 .menu-card small { color: var(--muted); font-size: 12px; font-weight: 800; }
 .quick-actions { display: none !important; }
-.compact-search {
+.gallery-toolbar {
   top: 56px;
-  grid-template-columns: 1fr 42px 76px;
   padding: 4px 4px 5px;
 }
-.search-input { min-height: 32px; padding: 0 6px; }
-.search-input input { min-height: 30px; font-size: 14px; }
 .mini-button { min-height: 32px; width: 42px; padding: 0; font-size: 0; }
 .mini-button::before { content: "☰"; font-size: 16px; }
-.sort-select { width: 76px; min-height: 32px; font-size: 12px; }
+.sort-select { width: 112px; min-height: 32px; font-size: 12px; }
 .result-meta { min-height: 24px; padding: 0 5px 4px; }
 .result-actions { font-size: 10px; gap: 4px; }
 .result-actions .text-button { display: none; }
@@ -1080,7 +1064,7 @@ body {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.compact-search {
+.gallery-toolbar {
   top: 58px;
   max-width: 980px;
   margin: 0 auto;

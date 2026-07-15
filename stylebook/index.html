@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="../icon-512.png">
   <link rel="stylesheet" href="../shared-nav.css?v=20260714-nav-1">
-  <link rel="stylesheet" href="./style.css?v=20260715-luxury-secure-1">
+  <link rel="stylesheet" href="./style.css?v=20260715-stylebook-permissions-2">
 </head>
 <body>
   <main class="stylebook-app">
@@ -69,18 +69,12 @@
     </section>
 
     <section id="galleryView" class="view-section" hidden>
-      <div class="compact-search">
-        <label class="search-input">
-          <span aria-hidden="true">⌕</span>
-          <input id="keywordInput" type="search" placeholder="スタイルを検索">
-        </label>
+      <div class="gallery-toolbar">
         <button id="filterToggle" class="mini-button" type="button">絞込</button>
         <select id="sortSelect" class="sort-select" aria-label="並び替え">
-          <option value="recommended">おすすめ</option>
-          <option value="popular">人気順</option>
           <option value="new">新着順</option>
+          <option value="salon">サロン別</option>
           <option value="saved">保存数順</option>
-          <option value="savedDate">保存した順</option>
         </select>
       </div>
 
@@ -230,6 +224,7 @@
         <section id="adminStats" class="admin-stats"></section>
         <nav class="admin-tabs" aria-label="管理メニュー">
           <button class="active" type="button" data-admin-tab="posts">投稿管理</button>
+          <button type="button" data-admin-tab="saves">保存集計</button>
           <button type="button" data-admin-tab="colors">商品マスタ</button>
           <button type="button" data-admin-tab="types">施術管理</button>
           <button type="button" data-admin-tab="shops">店舗管理</button>
@@ -243,7 +238,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260715-own-posts-swipe-1"></script>
+  <script src="./script.js?v=20260715-stylebook-permissions-2"></script>
   <script src="../shared-nav.js?v=20260714-nav-1"></script>
 </body>
 </html>

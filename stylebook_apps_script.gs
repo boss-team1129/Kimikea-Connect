@@ -112,8 +112,11 @@ function setupKimikeaStylebook() {
 function getStylebookDatabase_(userId) {
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
+  const normalizedUserId = normalizeUserId_(userId);
   const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
-  const saves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
+  const allSaves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
+  const ownSaves = allSaves.filter(save => sameUserId_(save.userId, normalizedUserId));
+  const saveSummaries = buildSaveSummaries_(posts, allSaves);
   const colors = getProductMasterColors_(ss);
   const types = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES)).map(normalizeBooleans_);
   const shops = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS)).map(normalizeBooleans_);
@@ -125,7 +128,8 @@ function getStylebookDatabase_(userId) {
     spreadsheetName: ss.getName(),
     userId,
     posts: posts.length,
-    saves: saves.length,
+    saves: ownSaves.length,
+    saveSummaries: saveSummaries.length,
     colors: colors.length,
     types: types.length,
     shops: shops.length,
@@ -134,7 +138,8 @@ function getStylebookDatabase_(userId) {
   });
   return {
     stylePosts: posts,
-    savedStyles: saves,
+    savedStyles: ownSaves,
+    saveSummaries,
     extensionColors: colors,
     styleTypes: types,
     shops,
@@ -157,6 +162,26 @@ function getOwnStylebookPosts_(userId, draftsOnly) {
       return draftsOnly ? isDraft : true;
     })
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+}
+
+function buildSaveSummaries_(posts, saves) {
+  return posts.map(post => {
+    const postSaves = saves.filter(save => saveStyleId_(save) === post.id);
+    const lastSavedAt = postSaves
+      .map(save => save.createdAt)
+      .filter(Boolean)
+      .sort()
+      .pop() || '';
+    return {
+      styleId: post.id,
+      saveCount: postSaves.length,
+      lastSavedAt,
+      isPublished: post.isPublished,
+      salonName: post.salonName || getShopName_(post.shopId) || '',
+      staffName: post.staffName || getStaffName_(post.staffId) || '',
+      createdAt: post.createdAt || '',
+    };
+  });
 }
 
 function savePost_(post, userId) {
@@ -269,7 +294,8 @@ function toggleSave_(postId, userId) {
   const saveSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES);
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   setHeaders_(saveSheet, KC_SAVE_HEADERS);
-  const existing = rowsToObjects_(saveSheet).map(normalizeSave_).find(save => save.userId === userId && saveStyleId_(save) === postId);
+  const normalizedUserId = normalizeUserId_(userId);
+  const existing = rowsToObjects_(saveSheet).map(normalizeSave_).find(save => sameUserId_(save.userId, normalizedUserId) && saveStyleId_(save) === postId);
   const post = findRowObject_(postSheet, 'id', postId);
   if (!post) throw new Error('投稿が見つかりません。');
   if (existing) {
@@ -278,7 +304,7 @@ function toggleSave_(postId, userId) {
   } else {
     appendObjectByHeaders_(saveSheet, {
       id: `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      userId,
+      userId: normalizedUserId,
       stylePostId: postId,
       styleId: postId,
       createdAt: new Date().toISOString(),
