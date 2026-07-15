@@ -2797,6 +2797,11 @@
       if (!stage || !cards.length) return;
       buildCarouselDots();
 
+      const isClearHorizontalSwipe = (dx, dy) => (
+        Math.abs(dx) >= 70 &&
+        Math.abs(dx) > Math.abs(dy) * 1.5
+      );
+
       if (stage.dataset.ready !== 'true') {
         stage.dataset.ready = 'true';
         const saved = Number(localStorage.getItem(ORBIT_STORAGE_KEY));
@@ -2814,6 +2819,7 @@
             velocity: 0,
             startIndex: activeCarouselIndex,
             didDrag: false,
+            horizontalIntent: false,
           };
           stage.setPointerCapture?.(event.pointerId);
         });
@@ -2823,7 +2829,9 @@
           const dx = event.clientX - orbitDrag.startX;
           const dy = event.clientY - orbitDrag.startY;
           if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-          if (Math.abs(dx) > Math.abs(dy)) {
+          if (!orbitDrag.horizontalIntent && Math.abs(dy) > Math.abs(dx)) return;
+          if (!orbitDrag.horizontalIntent && isClearHorizontalSwipe(dx, dy)) orbitDrag.horizontalIntent = true;
+          if (orbitDrag.horizontalIntent) {
             event.preventDefault();
             orbitDrag.didDrag = true;
             const now = performance.now();
@@ -2838,10 +2846,16 @@
         const finishDrag = (event) => {
           if (!orbitDrag || orbitDrag.id !== event.pointerId) return;
           const dx = event.clientX - orbitDrag.startX;
+          const dy = event.clientY - orbitDrag.startY;
+          const horizontalSwipe = orbitDrag.horizontalIntent && isClearHorizontalSwipe(dx, dy);
+          const didDrag = horizontalSwipe && orbitDrag.didDrag;
+          if (!horizontalSwipe) {
+            orbitDrag = null;
+            return;
+          }
           const movement = -dx / 118;
           const flick = -orbitDrag.velocity * 7;
-          const target = Math.abs(dx) > 24 ? Math.round(orbitDrag.startIndex + movement + flick) : orbitDrag.startIndex;
-          const didDrag = orbitDrag.didDrag;
+          const target = Math.round(orbitDrag.startIndex + movement + flick);
           orbitDrag = { didDrag };
           animateOrbitTo(target, true);
           window.setTimeout(() => { orbitDrag = null; }, 120);
@@ -2862,6 +2876,7 @@
             velocity: 0,
             startIndex: activeCarouselIndex,
             didDrag: false,
+            horizontalIntent: false,
           };
         }, { passive: true });
 
@@ -2872,7 +2887,9 @@
           const dx = touch.clientX - orbitDrag.startX;
           const dy = touch.clientY - orbitDrag.startY;
           if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-          if (Math.abs(dx) > Math.abs(dy)) {
+          if (!orbitDrag.horizontalIntent && Math.abs(dy) > Math.abs(dx)) return;
+          if (!orbitDrag.horizontalIntent && isClearHorizontalSwipe(dx, dy)) orbitDrag.horizontalIntent = true;
+          if (orbitDrag.horizontalIntent) {
             event.preventDefault();
             orbitDrag.didDrag = true;
             const now = performance.now();
@@ -2888,10 +2905,16 @@
           if (!orbitDrag || orbitDrag.id !== 'touch') return;
           const touch = event.changedTouches[0];
           const dx = touch ? touch.clientX - orbitDrag.startX : 0;
+          const dy = touch ? touch.clientY - orbitDrag.startY : 0;
+          const horizontalSwipe = orbitDrag.horizontalIntent && isClearHorizontalSwipe(dx, dy);
+          const didDrag = horizontalSwipe && orbitDrag.didDrag;
+          if (!horizontalSwipe) {
+            orbitDrag = null;
+            return;
+          }
           const movement = -dx / 118;
           const flick = -orbitDrag.velocity * 7;
-          const target = Math.abs(dx) > 24 ? Math.round(orbitDrag.startIndex + movement + flick) : orbitDrag.startIndex;
-          const didDrag = orbitDrag.didDrag;
+          const target = Math.round(orbitDrag.startIndex + movement + flick);
           orbitDrag = { didDrag };
           animateOrbitTo(target, true);
           window.setTimeout(() => { orbitDrag = null; }, 120);

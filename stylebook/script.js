@@ -368,6 +368,16 @@ async function loadRemoteDb() {
   });
 }
 
+async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
+  if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
+  const userId = normalizeUserId(currentUser()?.id || state.currentUserId);
+  if (!userId) return [];
+  const url = `${STYLEBOOK_API_URL}?action=myPosts&userId=${encodeURIComponent(userId)}&draftsOnly=${draftsOnly ? 'true' : 'false'}&t=${Date.now()}`;
+  const data = await requestJson(url, { cache: 'no-store' });
+  if (!data.ok) throw new Error(data.message || '自分の投稿を取得できませんでした。');
+  return Array.isArray(data.posts) ? data.posts : [];
+}
+
 async function loadDb() {
   if (hasRemoteApi()) {
     try {
@@ -439,6 +449,16 @@ function postAuthorId(post) {
   return String(post?.authorId || post?.createdByUserId || post?.userId || '').trim();
 }
 
+function normalizeUserId(value) {
+  return String(value ?? '').trim();
+}
+
+function isSameUserId(left, right) {
+  const a = normalizeUserId(left);
+  const b = normalizeUserId(right);
+  return Boolean(a && b && a === b);
+}
+
 function saveStyleId(save) {
   return String(save?.styleId || save?.stylePostId || save?.postId || '').trim();
 }
@@ -446,7 +466,7 @@ function saveStyleId(save) {
 function isPostAuthor(post) {
   const user = currentUser();
   if (!user) return false;
-  return postAuthorId(post) === user.id;
+  return isSameUserId(postAuthorId(post), user.id);
 }
 
 function canEditPost(post) {
@@ -1017,7 +1037,7 @@ function ownPosts({ draftsOnly = false } = {}) {
   const user = currentUser();
   if (!user) return [];
   return state.db.stylePosts
-    .filter(post => !post.deletedAt && postAuthorId(post) === user.id)
+    .filter(post => !post.deletedAt && isSameUserId(postAuthorId(post), user.id))
     .filter(post => {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
       return draftsOnly ? isDraft : true;
@@ -1025,19 +1045,25 @@ function ownPosts({ draftsOnly = false } = {}) {
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
-function renderDrafts() {
-  const posts = ownPosts({ draftsOnly: true });
+function renderDrafts(posts = ownPosts({ draftsOnly: true })) {
   el.draftsGrid.innerHTML = posts.length ? posts.map(post => renderManageItem(post, 'drafts')).join('') : '<p class="empty-state">下書きはまだありません。</p>';
 }
 
-function showDrafts(options = {}) {
+async function showDrafts(options = {}) {
   const { push = true } = options;
-  renderDrafts();
   showView('drafts', { push });
+  el.draftsGrid.innerHTML = '<p class="empty-state">下書きを読み込んでいます...</p>';
+  try {
+    const posts = state.backendMode === 'remote'
+      ? await fetchOwnPostsFromApi({ draftsOnly: true })
+      : ownPosts({ draftsOnly: true });
+    renderDrafts(posts);
+  } catch (error) {
+    el.draftsGrid.innerHTML = `<p class="empty-state">${escapeHtml(error.message || '下書きを取得できませんでした。')}</p>`;
+  }
 }
 
-function renderMine() {
-  const posts = ownPosts();
+function renderMine(posts = ownPosts()) {
   const published = posts.filter(post => post.isPublished && post.status === 'published');
   const drafts = posts.filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished);
   el.mineGrid.innerHTML = posts.length ? `
@@ -1048,10 +1074,18 @@ function renderMine() {
   ` : '<p class="empty-state">自分の投稿はまだありません。</p>';
 }
 
-function showMine(options = {}) {
+async function showMine(options = {}) {
   const { push = true } = options;
-  renderMine();
   showView('mine', { push });
+  el.mineGrid.innerHTML = '<p class="empty-state">自分の投稿を読み込んでいます...</p>';
+  try {
+    const posts = state.backendMode === 'remote'
+      ? await fetchOwnPostsFromApi({ draftsOnly: false })
+      : ownPosts();
+    renderMine(posts);
+  } catch (error) {
+    el.mineGrid.innerHTML = `<p class="empty-state">${escapeHtml(error.message || '自分の投稿を取得できませんでした。')}</p>`;
+  }
 }
 
 function selectedValues(select) {
@@ -1572,6 +1606,12 @@ function bindEvents() {
     el.userSelect.addEventListener('change', async () => {
       state.currentUserId = el.userSelect.value;
       localStorage.setItem(SESSION_KEY, state.currentUserId);
+      localStorage.removeItem(DB_KEY);
+      state.selectedColorIds.clear();
+      state.selectedStyleTypeIds.clear();
+      state.selectedShopIds.clear();
+      state.selectedStaffIds.clear();
+      state.savedOnly = false;
       if (state.backendMode === 'remote') {
         await refreshRemoteDb();
       } else {

@@ -72,6 +72,9 @@ function doGet(e) {
   if (action === 'database' || action === 'list') {
     return json_({ ok: true, database: getStylebookDatabase_(userId) });
   }
+  if (action === 'myPosts') {
+    return json_({ ok: true, posts: getOwnStylebookPosts_(userId, e.parameter.draftsOnly === 'true') });
+  }
   return json_({ ok: false, message: '未対応の処理です。' });
 }
 
@@ -138,6 +141,22 @@ function getStylebookDatabase_(userId) {
     staff,
     users,
   };
+}
+
+function getOwnStylebookPosts_(userId, draftsOnly) {
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const normalizedUserId = normalizeUserId_(userId);
+  if (!normalizedUserId) return [];
+  return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
+    .map(normalizePost_)
+    .filter(post => !post.deletedAt)
+    .filter(post => sameUserId_(postAuthorId_(post), normalizedUserId))
+    .filter(post => {
+      const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
+      return draftsOnly ? isDraft : true;
+    })
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
 function savePost_(post, userId) {
@@ -307,16 +326,26 @@ function defaultTypes_() {
 
 function canManagePost_(post, user) {
   if (!user) return false;
-  return postAuthorId_(post) === user.id;
+  return sameUserId_(postAuthorId_(post), user.id);
 }
 
 function canDeletePost_(post, user) {
   if (!user) return false;
-  return postAuthorId_(post) === user.id;
+  return sameUserId_(postAuthorId_(post), user.id);
 }
 
 function postAuthorId_(post) {
   return String((post && (post.authorId || post.createdByUserId || post.userId)) || '').trim();
+}
+
+function normalizeUserId_(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function sameUserId_(left, right) {
+  const a = normalizeUserId_(left);
+  const b = normalizeUserId_(right);
+  return Boolean(a && b && a === b);
 }
 
 function saveStyleId_(save) {
