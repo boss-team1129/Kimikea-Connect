@@ -332,7 +332,6 @@ function toggleSave_(postId, userId) {
     saved: Boolean(ownSave),
     saveCount,
     lastSavedAt: ownSave ? ownSave.createdAt : '',
-    database: getStylebookDatabase_(normalizedUserId),
   };
 }
 
