@@ -295,24 +295,45 @@ function toggleSave_(postId, userId) {
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   setHeaders_(saveSheet, KC_SAVE_HEADERS);
   const normalizedUserId = normalizeUserId_(userId);
-  const existing = rowsToObjects_(saveSheet).map(normalizeSave_).find(save => sameUserId_(save.userId, normalizedUserId) && saveStyleId_(save) === postId);
-  const post = findRowObject_(postSheet, 'id', postId);
+  const normalizedPostId = String(postId || '').trim();
+  if (!normalizedUserId) throw new Error('ログインユーザーが見つかりません。');
+  if (!normalizedPostId) throw new Error('保存する投稿が指定されていません。');
+  const user = getUser_(normalizedUserId);
+  if (!user) throw new Error('ログインユーザーが見つかりません。');
+  const saves = rowsToObjects_(saveSheet).map(normalizeSave_);
+  const existing = saves.find(save => sameUserId_(save.userId, normalizedUserId) && saveStyleId_(save) === normalizedPostId);
+  const post = findRowObject_(postSheet, 'id', normalizedPostId);
   if (!post) throw new Error('投稿が見つかりません。');
   if (existing) {
-    deleteRowsByValue_(saveSheet, 'id', existing.id);
-    post.object.saveCount = Math.max(0, Number(post.object.saveCount || 0) - 1);
+    deleteSaveRowsForUserAndPost_(saveSheet, normalizedUserId, normalizedPostId);
   } else {
     appendObjectByHeaders_(saveSheet, {
       id: `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId: normalizedUserId,
-      stylePostId: postId,
-      styleId: postId,
+      stylePostId: normalizedPostId,
+      styleId: normalizedPostId,
       createdAt: new Date().toISOString(),
     });
-    post.object.saveCount = Number(post.object.saveCount || 0) + 1;
   }
+  const refreshedSaves = rowsToObjects_(saveSheet).map(normalizeSave_);
+  const saveCount = refreshedSaves.filter(save => saveStyleId_(save) === normalizedPostId).length;
+  const ownSave = refreshedSaves.find(save => sameUserId_(save.userId, normalizedUserId) && saveStyleId_(save) === normalizedPostId);
+  post.object.saveCount = saveCount;
   upsertObject_(postSheet, KC_POST_HEADERS, post.object, 'id');
-  return { ok: true, id: postId };
+  logStylebookDebug_('toggleSave result', {
+    userId: normalizedUserId,
+    postId: normalizedPostId,
+    saved: Boolean(ownSave),
+    saveCount,
+  });
+  return {
+    ok: true,
+    id: normalizedPostId,
+    saved: Boolean(ownSave),
+    saveCount,
+    lastSavedAt: ownSave ? ownSave.createdAt : '',
+    database: getStylebookDatabase_(normalizedUserId),
+  };
 }
 
 function setupSheetsIfNeeded_(ss) {
@@ -352,12 +373,12 @@ function defaultTypes_() {
 
 function canManagePost_(post, user) {
   if (!user) return false;
-  return sameUserId_(postAuthorId_(post), user.id);
+  return isHeadquartersAdmin_(user) || sameUserId_(postAuthorId_(post), user.id);
 }
 
 function canDeletePost_(post, user) {
   if (!user) return false;
-  return sameUserId_(postAuthorId_(post), user.id);
+  return isHeadquartersAdmin_(user) || sameUserId_(postAuthorId_(post), user.id);
 }
 
 function postAuthorId_(post) {
@@ -383,7 +404,10 @@ function isHeadquartersAdmin_(user) {
 }
 
 function getUser_(userId) {
-  return rowsToObjects_(getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.USERS)).find(user => user.id === userId) || null;
+  const normalizedUserId = normalizeUserId_(userId);
+  if (!normalizedUserId) return null;
+  return rowsToObjects_(getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.USERS))
+    .find(user => sameUserId_(user.id, normalizedUserId)) || null;
 }
 
 function getShopName_(shopId) {
@@ -806,6 +830,23 @@ function deleteRowsBySaveStyleId_(sheet, postId) {
     const stylePostId = stylePostIndex >= 0 ? String(values[row][stylePostIndex] || '') : '';
     const styleId = styleIndex >= 0 ? String(values[row][styleIndex] || '') : '';
     if (stylePostId === postId || styleId === postId) sheet.deleteRow(row + 1);
+  }
+}
+
+function deleteSaveRowsForUserAndPost_(sheet, userId, postId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+  const headers = values[0].map(String);
+  const userIndex = headers.indexOf('userId');
+  const stylePostIndex = headers.indexOf('stylePostId');
+  const styleIndex = headers.indexOf('styleId');
+  for (let row = values.length - 1; row >= 1; row -= 1) {
+    const rowUserId = userIndex >= 0 ? values[row][userIndex] : '';
+    const stylePostId = stylePostIndex >= 0 ? String(values[row][stylePostIndex] || '') : '';
+    const styleId = styleIndex >= 0 ? String(values[row][styleIndex] || '') : '';
+    if (sameUserId_(rowUserId, userId) && (stylePostId === postId || styleId === postId)) {
+      sheet.deleteRow(row + 1);
+    }
   }
 }
 

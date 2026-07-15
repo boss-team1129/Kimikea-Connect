@@ -263,19 +263,40 @@ img { display: block; max-width: 100%; }
   position: absolute;
   right: 5px;
   top: 5px;
-  display: grid;
-  width: 30px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 28px;
+  padding: 0 9px;
   place-items: center;
   border: 1px solid rgba(255,255,255,.7);
-  border-radius: 50%;
+  border-radius: 999px;
   background: rgba(255,255,255,.72);
   color: #4f5e64;
+  font-size: 11px;
   font-weight: 900;
   backdrop-filter: blur(8px);
 }
 .save-button.saved,
 .save-pill.saved { color: #b58d3d; background: #fff5d8; }
+.save-button.is-saving,
+.save-pill.is-saving {
+  opacity: .82;
+  cursor: wait;
+}
+.save-button.is-saving::before,
+.save-pill.is-saving::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border: 2px solid rgba(181,141,61,.28);
+  border-top-color: #b58d3d;
+  border-radius: 50%;
+  animation: saveSpin .75s linear infinite;
+}
+@keyframes saveSpin { to { transform: rotate(360deg); } }
 .empty-state {
   grid-column: 1 / -1;
   display: grid;
@@ -750,7 +771,7 @@ img { display: block; max-width: 100%; }
 .gallery-grid { gap: 2px; padding: 0; }
 .gallery-item { border-radius: 4px; }
 .photo-meta { padding: 14px 5px 5px; font-size: 9px; opacity: .92; }
-.save-button { width: 27px; height: 27px; right: 4px; top: 4px; }
+.save-button { min-width: 44px; height: 26px; right: 4px; top: 4px; padding: 0 7px; font-size: 10px; }
 .view-section { animation: fadeIn .2s ease both; }
 .view-head { padding-top: 12px; }
 

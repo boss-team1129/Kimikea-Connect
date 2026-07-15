@@ -7,6 +7,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
+const STYLEBOOK_ASSET_VERSION = '20260715-save-permission-1';
 
 const roles = {
   member: 'member',
@@ -41,6 +42,7 @@ const state = {
   appHistory: [],
   isRestoringAppHistory: false,
   immediateActionUntil: 0,
+  savingPostIds: new Set(),
 };
 
 const el = {
@@ -286,6 +288,10 @@ function hasRemoteApi() {
   return Boolean(STYLEBOOK_API_URL && STYLEBOOK_API_URL.startsWith('https://'));
 }
 
+function dbStorageKeyForCurrentUser() {
+  return `${DB_KEY}_${normalizeUserId(state.currentUserId) || 'anonymous'}`;
+}
+
 function requestJson(url, options = {}) {
   if (typeof fetch === 'function') {
     return fetch(url, options).then(response => response.json());
@@ -421,7 +427,7 @@ async function loadDb() {
       return;
     }
   }
-  const saved = localStorage.getItem(DB_KEY);
+  const saved = localStorage.getItem(dbStorageKeyForCurrentUser());
   if (saved) {
     state.db = normalizeDatabase(JSON.parse(saved));
     const posts = state.db.stylePosts || [];
@@ -430,7 +436,7 @@ async function loadDb() {
       state.db.stylePosts = [];
       state.db.savedStyles = [];
       state.db.saveSummaries = [];
-      localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+      localStorage.setItem(dbStorageKeyForCurrentUser(), JSON.stringify(state.db));
     }
     state.backendMode = 'local';
     return;
@@ -443,7 +449,7 @@ async function loadDb() {
 function primeDbForImmediateNavigation() {
   if (state.db) return;
   try {
-    const saved = localStorage.getItem(DB_KEY);
+    const saved = localStorage.getItem(dbStorageKeyForCurrentUser());
     if (saved) {
       state.db = normalizeDatabase(JSON.parse(saved));
       state.backendMode = hasRemoteApi() ? 'loading' : 'local';
@@ -458,7 +464,7 @@ function primeDbForImmediateNavigation() {
 
 function saveDb() {
   if (state.db) state.db.saveSummaries = buildSaveSummariesFromSaves(state.db.stylePosts, state.db.savedStyles);
-  localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+  localStorage.setItem(dbStorageKeyForCurrentUser(), JSON.stringify(state.db));
 }
 
 async function refreshRemoteDb() {
@@ -470,7 +476,9 @@ async function refreshRemoteDb() {
 }
 
 function currentUser() {
-  return state.db?.users?.find(user => user.id === state.currentUserId) || null;
+  const currentId = normalizeUserId(state.currentUserId);
+  if (!currentId) return null;
+  return state.db?.users?.find(user => isSameUserId(user.id, currentId)) || null;
 }
 
 function canPost() {
@@ -508,13 +516,13 @@ function isPostAuthor(post) {
 function canEditPost(post) {
   const user = currentUser();
   if (!user) return false;
+  if (canManageAll()) return true;
   if (isPostAuthor(post)) return true;
-  // 店舗管理者・本部管理者の代行編集は将来拡張用。現時点では投稿者本人のみ編集できます。
   return false;
 }
 
 function canDeletePost(post) {
-  return isPostAuthor(post);
+  return canManageAll() || isPostAuthor(post);
 }
 
 function canManagePost(post) {
@@ -553,6 +561,28 @@ function saveCountForPost(post) {
   const summary = saveSummaryForPost(post.id);
   if (summary) return Number(summary.saveCount || 0);
   return state.db.savedStyles.filter(save => saveStyleId(save) === post.id).length || Number(post.saveCount || 0);
+}
+
+function setSaveSummaryForPost(postId, saveCount, lastSavedAt = '') {
+  const id = String(postId || '').trim();
+  if (!id) return;
+  state.db.saveSummaries = Array.isArray(state.db.saveSummaries) ? state.db.saveSummaries : [];
+  const existing = state.db.saveSummaries.find(summary => String(summary.styleId || '').trim() === id);
+  if (existing) {
+    existing.saveCount = Math.max(0, Number(saveCount || 0));
+    if (lastSavedAt) existing.lastSavedAt = lastSavedAt;
+    return;
+  }
+  const post = state.db.stylePosts.find(item => item.id === id);
+  state.db.saveSummaries.push({
+    styleId: id,
+    saveCount: Math.max(0, Number(saveCount || 0)),
+    lastSavedAt,
+    isPublished: Boolean(post?.isPublished),
+    salonName: post ? displaySalonName(post) : '',
+    staffName: post ? displayStaffName(post) : '',
+    createdAt: post?.createdAt || '',
+  });
 }
 
 function latestSaveAtForPost(post) {
@@ -774,16 +804,22 @@ function renderGalleryItem(post) {
   const salonName = displaySalonName(post);
   const staffName = displayStaffName(post);
   const photoUrl = imageUrlFromPost(post);
+  const saveLabel = saveButtonLabel(post.id);
   return `
     <article class="gallery-item" data-id="${post.id}">
       <button class="photo-button" type="button" data-action="detail" data-id="${post.id}">
         ${imageTag(photoUrl, post.title || 'スタイル写真')}
         <span class="photo-meta">${escapeHtml(salonName)}<br>${escapeHtml(staffName)}</span>
       </button>
-      <button class="save-button ${isSaved(post.id) ? 'saved' : ''}" type="button" data-action="save" data-id="${post.id}" aria-label="保存">
-        ${isSaved(post.id) ? '●' : '○'}
+      <button class="save-button ${isSaved(post.id) ? 'saved' : ''} ${state.savingPostIds.has(post.id) ? 'is-saving' : ''}" type="button" data-action="save" data-id="${post.id}" aria-label="${escapeHtml(saveLabel)}" ${state.savingPostIds.has(post.id) ? 'disabled' : ''}>
+        ${escapeHtml(saveLabel)}
       </button>
     </article>`;
+}
+
+function saveButtonLabel(postId) {
+  if (state.savingPostIds.has(postId)) return '保存中…';
+  return isSaved(postId) ? '保存済み' : '保存';
 }
 
 function renderManageItem(post, mode = 'mine') {
@@ -1016,8 +1052,8 @@ function showDetail(postId, options = {}) {
       <div class="detail-body">
         <div class="detail-title-row">
           <h2>${escapeHtml(post.title)}</h2>
-          <button class="save-pill ${isSaved(post.id) ? 'saved' : ''}" type="button" data-action="save" data-id="${post.id}">
-            ${isSaved(post.id) ? '保存済み' : '保存'}
+          <button class="save-pill ${isSaved(post.id) ? 'saved' : ''} ${state.savingPostIds.has(post.id) ? 'is-saving' : ''}" type="button" data-action="save" data-id="${post.id}" ${state.savingPostIds.has(post.id) ? 'disabled' : ''}>
+            ${escapeHtml(saveButtonLabel(post.id))}
           </button>
         </div>
         <p>${escapeHtml(post.description)}</p>
@@ -1048,29 +1084,63 @@ async function toggleSave(postId) {
     alert('保存するにはログインユーザーが必要です。');
     return;
   }
+  if (state.savingPostIds.has(postId)) return;
   const existingIndex = state.db.savedStyles.findIndex(save => isSameUserId(save.userId, userId) && saveStyleId(save) === postId);
   const existing = existingIndex >= 0 ? state.db.savedStyles[existingIndex] : null;
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post) return;
+  const snapshot = {
+    savedStyles: state.db.savedStyles.map(save => ({ ...save })),
+    saveSummaries: (state.db.saveSummaries || []).map(summary => ({ ...summary })),
+    saveCount: Number(post.saveCount || 0),
+  };
+  const nextSaved = !existing;
+  const previousSaveCount = saveCountForPost(post);
+  const changedAt = new Date().toISOString();
+  state.savingPostIds.add(postId);
+  let succeeded = false;
+
+  if (existing) {
+    state.db.savedStyles.splice(existingIndex, 1);
+    setSaveSummaryForPost(postId, previousSaveCount - 1);
+    post.saveCount = Math.max(0, Number(post.saveCount || 0) - 1);
+  } else {
+    state.db.savedStyles.push({ id: uid('save'), userId, styleId: postId, stylePostId: postId, createdAt: changedAt });
+    setSaveSummaryForPost(postId, previousSaveCount + 1, changedAt);
+    post.saveCount = Number(post.saveCount || 0) + 1;
+  }
+  renderCurrentAfterSave(postId);
   try {
     if (state.backendMode === 'remote') {
-      await apiRequest('toggleSave', { postId });
-      await refreshRemoteDb();
-    } else if (existing) {
-      state.db.savedStyles.splice(existingIndex, 1);
-      post.saveCount = Math.max(0, Number(post.saveCount || 0) - 1);
-      saveDb();
+      const result = await apiRequest('toggleSave', { postId });
+      if (result.database) {
+        state.db = normalizeDatabase(result.database);
+      } else if (typeof result.saveCount !== 'undefined') {
+        const refreshedPost = state.db.stylePosts.find(item => item.id === postId);
+        if (refreshedPost) refreshedPost.saveCount = Number(result.saveCount || 0);
+        setSaveSummaryForPost(postId, result.saveCount, result.lastSavedAt || changedAt);
+      }
     } else {
-      state.db.savedStyles.push({ id: uid('save'), userId, styleId: postId, stylePostId: postId, createdAt: new Date().toISOString() });
-      post.saveCount = Number(post.saveCount || 0) + 1;
       saveDb();
     }
+    succeeded = true;
   } catch (error) {
+    state.db.savedStyles = snapshot.savedStyles;
+    state.db.saveSummaries = snapshot.saveSummaries;
+    post.saveCount = snapshot.saveCount;
     alert(error.message || '保存状態を変更できませんでした。');
-    return;
+  } finally {
+    state.savingPostIds.delete(postId);
+    renderCurrentAfterSave(postId);
   }
-  if (state.currentView === 'detail') showDetail(postId);
+  if (!succeeded) return;
+  debugStylebook('save toggled', { postId, userId, saved: nextSaved });
+}
+
+function renderCurrentAfterSave(postId) {
+  if (state.currentView === 'detail') showDetail(postId, { push: false });
   else if (state.currentView === 'saved') renderSaved();
+  else if (state.currentView === 'mine') showMine({ push: false });
   else renderGallery();
 }
 
@@ -1675,6 +1745,7 @@ function bindEvents() {
       state.currentUserId = el.userSelect.value;
       localStorage.setItem(SESSION_KEY, state.currentUserId);
       localStorage.removeItem(DB_KEY);
+      localStorage.removeItem(dbStorageKeyForCurrentUser());
       state.selectedColorIds.clear();
       state.selectedStyleTypeIds.clear();
       state.selectedShopIds.clear();
@@ -1725,7 +1796,7 @@ function bindEvents() {
   el.cancelEditButton.addEventListener('click', clearPostForm);
   if (el.openAdminButton) el.openAdminButton.addEventListener('click', renderAdmin);
   document.addEventListener('pointerdown', event => {
-    const immediateAction = closestFromEvent(event, '.menu-card[data-action], .empty-gallery-state [data-action]');
+    const immediateAction = closestFromEvent(event, '.menu-card[data-action], .empty-gallery-state [data-action], .save-button[data-action], .save-pill[data-action]');
     if (immediateAction) {
       runActionNow(immediateAction, event);
       return;
@@ -1851,7 +1922,7 @@ async function init() {
     window.__kimikeaStylebookQueuedAction = '';
   }
   await loadDb();
-  if (!currentUser()) state.currentUserId = state.db.users[0]?.id || '';
+  if (!normalizeUserId(state.currentUserId) && state.db.users[0]?.id) state.currentUserId = state.db.users[0].id;
   renderUserSelect();
   renderFilterControls();
   renderSelectOptions();
