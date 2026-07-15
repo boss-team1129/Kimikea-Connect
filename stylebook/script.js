@@ -1,5 +1,6 @@
 const DB_KEY = 'kimikea_stylebook_gallery_db_v1';
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
+const CONNECT_FRANCHISE_KEY = 'kimikeaFranchise';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
 const DEBUG_STYLEBOOK = false;
@@ -7,10 +8,23 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-network-map-2';
+const STYLEBOOK_ASSET_VERSION = '20260716-mine-auth-1';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
+
+function readConnectFranchiseSession() {
+  try {
+    const raw = localStorage.getItem(CONNECT_FRANCHISE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function stylebookUserIdFromFranchise(franchise) {
+  return normalizeUserId(franchise?.memberId || franchise?.franchiseId || '');
+}
 
 const roles = {
   member: 'member',
@@ -23,7 +37,7 @@ const EXTENSION_COLOR_CATEGORIES = new Set(['ダークカラー', 'ライトカ�
 
 const state = {
   db: null,
-  currentUserId: localStorage.getItem(SESSION_KEY) || 'user-member',
+  currentUserId: stylebookUserIdFromFranchise(readConnectFranchiseSession()) || localStorage.getItem(SESSION_KEY) || 'user-member',
   selectedColorIds: new Set(),
   selectedStyleTypeIds: new Set(),
   selectedShopIds: new Set(),
@@ -299,6 +313,17 @@ function dbStorageKeyForCurrentUser() {
   return `${DB_KEY}_${normalizeUserId(state.currentUserId) || 'anonymous'}`;
 }
 
+function clearStylebookUserCaches(userId) {
+  const normalized = normalizeUserId(userId);
+  if (!normalized) return;
+  [
+    `${DB_KEY}_${normalized}`,
+    `myPosts_${normalized}`,
+    `myDrafts_${normalized}`,
+    `savedStyles_${normalized}`,
+  ].forEach(key => localStorage.removeItem(key));
+}
+
 function requestJson(url, options = {}) {
   if (typeof fetch === 'function') {
     return fetch(url, options).then(response => response.json());
@@ -403,6 +428,45 @@ function currentExternalShopName() {
   return shop?.name || state.externalShopName || '';
 }
 
+function shopIdFromFranchise(franchise) {
+  const memberId = String(franchise?.memberId || franchise?.franchiseId || '').trim();
+  if (memberId === 'K-1') return 'shop-team';
+  return memberId || '';
+}
+
+function userFromConnectFranchise(franchise) {
+  const id = stylebookUserIdFromFranchise(franchise);
+  if (!id) return null;
+  return {
+    id,
+    name: franchise?.salonName || franchise?.franchiseName || id,
+    email: franchise?.email || '',
+    role: roles.member,
+    shopId: shopIdFromFranchise(franchise),
+    staffId: '',
+  };
+}
+
+function syncCurrentUserFromConnectSession() {
+  const franchise = readConnectFranchiseSession();
+  const user = userFromConnectFranchise(franchise);
+  if (!user || !state.db) return false;
+  const previousUserId = normalizeUserId(state.currentUserId);
+  const existing = state.db.users.find(item => isSameUserId(item.id, user.id));
+  if (existing) {
+    existing.name = user.name || existing.name;
+    existing.email = user.email || existing.email;
+    existing.shopId = user.shopId || existing.shopId;
+    existing.staffId = user.staffId || existing.staffId;
+    existing.role = user.role || existing.role || roles.member;
+  } else {
+    state.db.users.push(user);
+  }
+  state.currentUserId = user.id;
+  localStorage.setItem(SESSION_KEY, user.id);
+  return previousUserId !== normalizeUserId(user.id);
+}
+
 function applyExternalShopScope() {
   const shopId = String(state.externalShopId || '').trim();
   if (!shopId || state.externalShopScopeApplied) return;
@@ -477,7 +541,8 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
   const url = `${STYLEBOOK_API_URL}?action=myPosts&userId=${encodeURIComponent(userId)}&draftsOnly=${draftsOnly ? 'true' : 'false'}&t=${Date.now()}`;
   const data = await requestJson(url, { cache: 'no-store' });
   if (!data.ok) throw new Error(data.message || '自分の投稿を取得できませんでした。');
-  return Array.isArray(data.posts) ? data.posts : [];
+  const posts = Array.isArray(data.posts) ? data.posts : [];
+  return posts.filter(post => isSameUserId(postAuthorId(post), userId));
 }
 
 async function loadDb() {
@@ -1823,10 +1888,12 @@ function bindEvents() {
   });
   if (el.userSelect) {
     el.userSelect.addEventListener('change', async () => {
+      const previousUserId = state.currentUserId;
       state.currentUserId = el.userSelect.value;
       localStorage.setItem(SESSION_KEY, state.currentUserId);
       localStorage.removeItem(DB_KEY);
-      localStorage.removeItem(dbStorageKeyForCurrentUser());
+      clearStylebookUserCaches(previousUserId);
+      clearStylebookUserCaches(state.currentUserId);
       state.selectedColorIds.clear();
       state.selectedStyleTypeIds.clear();
       state.selectedShopIds.clear();
@@ -2003,6 +2070,11 @@ async function init() {
     window.__kimikeaStylebookQueuedAction = '';
   }
   await loadDb();
+  const syncedUserChanged = syncCurrentUserFromConnectSession();
+  if (syncedUserChanged && hasRemoteApi()) {
+    await loadRemoteDb();
+    syncCurrentUserFromConnectSession();
+  }
   if (!normalizeUserId(state.currentUserId) && state.db.users[0]?.id) state.currentUserId = state.db.users[0].id;
   applyExternalShopScope();
   if (state.externalShopId) {

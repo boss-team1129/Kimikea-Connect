@@ -3378,6 +3378,7 @@
 
     function clearSession() {
       localStorage.removeItem('kimikeaSessionToken');
+      localStorage.removeItem('kimikeaFranchise');
       state.sessionToken = '';
       state.franchise = null;
       state.products = [];
@@ -3517,6 +3518,7 @@
           state.sessionToken = response.sessionToken;
           localStorage.setItem('kimikeaSessionToken', state.sessionToken);
           state.franchise = response.franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.orderUnlocked = true;
           state.pendingOpenOrder = true;
           showDashboard();
@@ -3558,6 +3560,7 @@
       callServer('completeInitialPasswordSetup', state.sessionToken, newPassword, confirmPassword)
         .then((response) => {
           state.franchise = response.franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           document.getElementById('newPassword').value = '';
           document.getElementById('confirmPassword').value = '';
           state.orderUnlocked = true;
@@ -3594,6 +3597,7 @@
       callServer('getPortalData', state.sessionToken)
         .then((data) => {
           state.franchise = data.franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.products = data.products || [];
           state.orders = data.orders || [];
           state.orderSettings = data.orderSettings || state.orderSettings;
@@ -5262,6 +5266,7 @@
       callServer('updateMemberEmail', state.sessionToken, newEmail)
         .then((franchise) => {
           state.franchise = franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           renderProfile();
           setMessage('mypageMessage', 'メールアドレスを更新しました。', false);
         })
