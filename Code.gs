@@ -677,6 +677,7 @@ function createDefaultProductCode_(category, sequence) {
     'ダークカラー': 'DC',
     'ライトカラー': 'LC',
     '原色': 'OR',
+    'その他': 'OT',
   };
   const prefix = prefixes[category] || 'EX';
   return `${prefix}${String(sequence).padStart(3, '0')}`;

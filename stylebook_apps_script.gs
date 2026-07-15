@@ -59,6 +59,7 @@ const KC_TYPE_HEADERS = ['id', 'name', 'isActive', 'sortOrder'];
 const KC_SHOP_HEADERS = ['id', 'name', 'address', 'imageUrl', 'isActive'];
 const KC_STAFF_HEADERS = ['id', 'name', 'shopId', 'profileImageUrl', 'isActive'];
 const KC_USER_HEADERS = ['id', 'name', 'email', 'role', 'shopId', 'staffId'];
+const KC_EXTENSION_COLOR_CATEGORIES = ['ダークカラー', 'ライトカラー', '原色'];
 
 function doGet(e) {
   const action = e.parameter.action || 'database';
@@ -402,6 +403,10 @@ function getProductMasterColors_(ss) {
       diagnostics.skippedBlankCategory += 1;
       return;
     }
+    if (KC_EXTENSION_COLOR_CATEGORIES.indexOf(category) === -1) {
+      diagnostics.skippedNonColorCategory = Number(diagnostics.skippedNonColorCategory || 0) + 1;
+      return;
+    }
     if (!colorValue) {
       diagnostics.skippedBlankColor += 1;
       return;
@@ -478,6 +483,7 @@ function createDefaultProductCode_(category, sequence) {
     'ダークカラー': 'DC',
     'ライトカラー': 'LC',
     '原色': 'OR',
+    'その他': 'OT',
   };
   const prefix = prefixes[category] || 'EX';
   return `${prefix}${String(sequence).padStart(3, '0')}`;

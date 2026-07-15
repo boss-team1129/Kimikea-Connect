@@ -15,6 +15,8 @@ const roles = {
   headquarters_admin: 'headquarters_admin',
 };
 
+const EXTENSION_COLOR_CATEGORIES = new Set(['ダークカラー', 'ライトカラー', '原色']);
+
 const state = {
   db: null,
   currentUserId: localStorage.getItem(SESSION_KEY) || 'user-member',
@@ -182,6 +184,7 @@ function colorSwatchStyle(color) {
 function activeColors() {
   return (state.db.extensionColors || [])
     .filter(color => color.isActive)
+    .filter(color => EXTENSION_COLOR_CATEGORIES.has(String(color.category || '').trim()))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 }
 
