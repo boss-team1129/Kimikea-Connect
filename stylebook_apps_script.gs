@@ -307,7 +307,6 @@ function defaultTypes_() {
 
 function canManagePost_(post, user) {
   if (!user) return false;
-  if (isHeadquartersAdmin_(user)) return true;
   return postAuthorId_(post) === user.id;
 }
 

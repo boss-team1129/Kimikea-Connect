@@ -1194,3 +1194,158 @@ body {
     font-size: 10px;
   }
 }
+
+/* 2026-07-15: elevated glassmorphism finish */
+body::before,
+body::after {
+  position: fixed;
+  inset: auto;
+  z-index: -1;
+  width: 360px;
+  height: 360px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(184, 146, 77, .18), transparent 66%);
+  filter: blur(10px);
+  content: "";
+  pointer-events: none;
+}
+
+body::before {
+  top: -140px;
+  right: -120px;
+}
+
+body::after {
+  bottom: 4vh;
+  left: -170px;
+  background: radial-gradient(circle, rgba(155, 177, 184, .20), transparent 68%);
+}
+
+.topbar,
+.menu-hero,
+.menu-card,
+.detail-card,
+.post-form,
+.manage-card,
+.filter-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.72), rgba(255,250,240,.50));
+  border: 1px solid rgba(255,255,255,.68);
+  box-shadow:
+    0 22px 60px rgba(40, 34, 26, .10),
+    inset 0 1px 0 rgba(255,255,255,.86);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.menu-hero::before,
+.menu-card::before,
+.detail-card::before,
+.post-form::before,
+.manage-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,.16) 34%, rgba(255,255,255,0) 62%);
+  content: "";
+  pointer-events: none;
+}
+
+.menu-hero > *,
+.menu-card > *,
+.detail-card > *,
+.post-form > *,
+.manage-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.menu-hero {
+  border-radius: 30px;
+  box-shadow:
+    0 28px 80px rgba(45, 37, 28, .13),
+    inset 0 1px 0 rgba(255,255,255,.92);
+}
+
+.menu-hero p {
+  color: #9a7438;
+}
+
+.menu-hero h2 {
+  color: #191d1f;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75);
+}
+
+.menu-card {
+  transform: translateZ(0);
+  will-change: transform, box-shadow;
+  box-shadow:
+    0 18px 45px rgba(40, 34, 26, .09),
+    inset 0 1px 0 rgba(255,255,255,.88);
+}
+
+.menu-card.primary {
+  background:
+    radial-gradient(circle at 88% 14%, rgba(184,146,77,.18), transparent 36%),
+    linear-gradient(145deg, rgba(255,255,255,.78), rgba(238,247,248,.54));
+  box-shadow:
+    0 24px 70px rgba(35, 43, 45, .12),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.menu-card:hover {
+  transform: translateY(-2px) scale(1.006);
+  box-shadow:
+    0 24px 58px rgba(40, 34, 26, .12),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.menu-card:active,
+.menu-card.is-pressing {
+  transform: translateY(2px) scale(.976);
+  box-shadow:
+    0 9px 22px rgba(40, 34, 26, .08),
+    inset 0 1px 0 rgba(255,255,255,.78);
+}
+
+.menu-card-icon {
+  background:
+    linear-gradient(145deg, rgba(255,252,243,.96), rgba(238,220,176,.86));
+  box-shadow:
+    0 11px 24px rgba(141, 103, 42, .13),
+    inset 0 1px 0 rgba(255,255,255,.95);
+}
+
+.menu-card-icon svg {
+  stroke-width: 1.55;
+}
+
+.gallery-item {
+  box-shadow:
+    0 18px 44px rgba(34, 38, 40, .12),
+    inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.gallery-item:hover {
+  transform: translateY(-2px);
+}
+
+.ghost-button,
+.primary-button,
+.danger-button,
+.mini-button,
+.text-button,
+.save-pill,
+.save-button {
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+@media (hover: none) {
+  .menu-card:hover,
+  .gallery-item:hover {
+    transform: none;
+  }
+}

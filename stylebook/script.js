@@ -424,7 +424,7 @@ async function refreshRemoteDb() {
 }
 
 function currentUser() {
-  return state.db?.users?.find(user => user.id === state.currentUserId) || state.db?.users?.[0] || null;
+  return state.db?.users?.find(user => user.id === state.currentUserId) || null;
 }
 
 function canPost() {
@@ -452,9 +452,8 @@ function isPostAuthor(post) {
 function canEditPost(post) {
   const user = currentUser();
   if (!user) return false;
-  if (user.role === roles.headquarters_admin) return true;
   if (isPostAuthor(post)) return true;
-  // 店舗管理者の店舗内管理は将来拡張用。現時点では本人投稿のみ編集できます。
+  // 店舗管理者・本部管理者の代行編集は将来拡張用。現時点では投稿者本人のみ編集できます。
   return false;
 }
 
@@ -517,7 +516,8 @@ function filteredPosts() {
     if (state.sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt);
     if (state.sort === 'saved') return b.saveCount - a.saveCount;
     if (state.sort === 'savedDate') {
-      const savedMap = new Map(state.db.savedStyles.filter(save => save.userId === currentUser().id).map(save => [saveStyleId(save), save.createdAt]));
+      const userId = currentUser()?.id || '';
+      const savedMap = new Map(state.db.savedStyles.filter(save => save.userId === userId).map(save => [saveStyleId(save), save.createdAt]));
       return new Date(savedMap.get(b.id) || 0) - new Date(savedMap.get(a.id) || 0);
     }
     return (b.saveCount * 2 + new Date(b.createdAt).getTime() / 1000000000) - (a.saveCount * 2 + new Date(a.createdAt).getTime() / 1000000000);
@@ -530,8 +530,9 @@ function renderUserSelect() {
     updateRoleVisibility();
     return;
   }
+  const userId = currentUser()?.id || '';
   el.userSelect.innerHTML = state.db.users.map(user => (
-    `<option value="${user.id}" ${user.id === currentUser().id ? 'selected' : ''}>${escapeHtml(user.name)} / ${user.role}</option>`
+    `<option value="${user.id}" ${user.id === userId ? 'selected' : ''}>${escapeHtml(user.name)} / ${user.role}</option>`
   )).join('');
   updateRoleVisibility();
 }
