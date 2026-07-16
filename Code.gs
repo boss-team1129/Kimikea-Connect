@@ -177,6 +177,7 @@ function handleJsonpApi_(event) {
     loginFranchise,
     completeInitialPasswordSetup,
     getPublicProducts,
+    getPublicColorRankings,
     getPortalData,
     updateMemberEmail,
     changeMemberPassword,
@@ -432,6 +433,71 @@ function getPortalData(sessionToken) {
 
 function getPublicProducts() {
   return getClientProducts_();
+}
+
+function getPublicColorRankings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const colorProducts = getVisibleProducts_().filter((product) => (
+    KCO_CATEGORY_PRICES[product.category] && product.productCode
+  ));
+  const colorProductCodes = {};
+  colorProducts.forEach((product) => {
+    colorProductCodes[createProductCodeKey_(product.productCode)] = true;
+  });
+
+  const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
+  const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
+  const purchaseCounts = {};
+  let countedOrders = 0;
+  let countedLines = 0;
+
+  if (ordersSheet && detailsSheet && ordersSheet.getLastRow() > 1 && detailsSheet.getLastRow() > 1) {
+    const orderValues = ordersSheet.getDataRange().getValues();
+    const orderIndex = createIndex_(orderValues[0]);
+    const validOrderNos = {};
+    orderValues.slice(1).forEach((row) => {
+      const orderNo = String(row[orderIndex['注文番号']] || '').trim();
+      const orderDate = parseDateValue_(row[orderIndex['注文日時']]);
+      const status = String(row[orderIndex['発送状況']] || '').trim();
+      if (!orderNo || !orderDate) return;
+      if (orderDate < periodStart || orderDate > periodEnd) return;
+      if (status === 'キャンセル') return;
+      validOrderNos[orderNo] = true;
+      countedOrders += 1;
+    });
+
+    const detailValues = detailsSheet.getDataRange().getValues();
+    const detailIndex = createIndex_(detailValues[0]);
+    detailValues.slice(1).forEach((row) => {
+      const orderNo = String(row[detailIndex['注文番号']] || '').trim();
+      if (!validOrderNos[orderNo]) return;
+      const productCode = String(row[detailIndex['商品コード']] || '').trim();
+      if (!productCode || !colorProductCodes[createProductCodeKey_(productCode)]) return;
+      const quantity = Number(row[detailIndex['数量']] || 0);
+      if (quantity <= 0) return;
+      purchaseCounts[productCode] = Number(purchaseCounts[productCode] || 0) + quantity;
+      countedLines += 1;
+    });
+  }
+
+  return {
+    periodStart: Utilities.formatDate(periodStart, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm'),
+    periodEnd: Utilities.formatDate(periodEnd, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm'),
+    periodLabel: Utilities.formatDate(periodStart, Session.getScriptTimeZone(), 'yyyy年M月'),
+    purchaseCounts,
+    countedOrders,
+    countedLines,
+  };
+}
+
+function parseDateValue_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) return value;
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function getVisibleProducts(sessionToken) {
