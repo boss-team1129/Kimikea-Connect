@@ -1040,29 +1040,15 @@ function buildOrderEmailBody_(summary) {
 
 function buildGrowOrderEmailBody_(summary) {
   return [
-    'Kimikea Connectに新しい注文が入りました。',
-    '',
-    '【注文情報】',
-    `注文番号：${summary.orderNo}`,
-    `注文日時：${Utilities.formatDate(summary.orderDate, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm')}`,
-    '',
-    '【加盟店情報】',
-    `加盟店ID：${summary.franchiseId}`,
     `加盟店名：${summary.franchiseName}`,
-    `注文者名：${summary.contactName}`,
-    `加盟店メールアドレス：${summary.franchiseEmail || ''}`,
+    `担当者名：${summary.contactName}`,
+    `発送先住所：${summary.franchiseAddress || ''}`,
     `電話番号：${summary.franchisePhone || ''}`,
-    `配送先：${summary.franchiseAddress || ''}`,
     '',
-    '【注文商品】',
+    '【注文内容】',
     buildGrowOrderItemsText_(summary),
     '',
-    '【合計】',
     `合計袋数：${summary.totalBags}`,
-    `小計：${formatYen_(summary.productTotal)}`,
-    `送料：${formatYen_(summary.shippingFee)}`,
-    `合計金額：${formatYen_(summary.invoiceTotal)}`,
-    `備考：${summary.note || ''}`,
   ].join('\n');
 }
 
@@ -1103,16 +1089,10 @@ function buildOrderItemsText_(summary) {
 }
 
 function buildGrowOrderItemsText_(summary) {
-  return getSummaryDetailItems_(summary).map((item, index) => [
-    `■ ${index + 1}`,
-    `商品名：${item.productName || `${item.category} ${item.colorName || item.color}`}`,
-    `商品カテゴリ：${item.category}`,
-    `カラー名：${item.colorName || item.color}`,
-    `商品コード：${item.productCode || ''}`,
-    `数量：${item.quantity}袋`,
-    `単価：${formatYen_(item.invoiceUnitPrice || item.unitPrice)}`,
-    `商品ごとの金額：${formatYen_(item.lineTotal || item.subtotal)}`,
-  ].join('\n')).join('\n\n');
+  return getSummaryDetailItems_(summary).map((item) => {
+    const colorName = item.colorName || item.color || '';
+    return `・${colorName} × ${item.quantity}袋`;
+  }).join('\n');
 }
 
 function getSummaryDetailItems_(summary) {
