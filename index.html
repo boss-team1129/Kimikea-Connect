@@ -4894,15 +4894,37 @@
       });
     }
 
+    function resolveWithTimeout(promise, timeoutMs, fallbackValue, label) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const timer = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          if (label) console.warn(`${label} timed out`);
+          resolve(fallbackValue);
+        }, timeoutMs);
+        Promise.resolve(promise)
+          .then((value) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timer);
+            resolve(value);
+          })
+          .catch((error) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timer);
+            if (label) console.warn(`${label} unavailable:`, getErrorMessage(error));
+            resolve(fallbackValue);
+          });
+      });
+    }
+
     function loadPublicProductsForColorChart() {
       if (state.products.length || !canUseOrderApi()) return;
-      callServer('getPublicProducts')
+      resolveWithTimeout(callServer('getPublicProducts'), 5000, [], 'Color products')
         .then((products) => {
           state.products = Array.isArray(products) ? products : [];
-          refreshColorChartContent();
-          if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
-        })
-        .catch(() => {
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
         });
@@ -4928,24 +4950,23 @@
     function loadRankingData() {
       if (state.rankingData.loaded || state.rankingData.loading) return;
       state.rankingData.loading = true;
-      if (!state.products.length) loadPublicProductsForColorChart();
+      const productPromise = !state.products.length && canUseOrderApi()
+        ? resolveWithTimeout(callServer('getPublicProducts'), 5000, [], 'Ranking products')
+        : Promise.resolve(state.products);
       const orderPromise = canUseOrderApi()
-        ? callServer('getPublicColorRankings').catch((error) => {
-            console.warn('Color purchase ranking unavailable:', getErrorMessage(error));
-            return null;
-          })
+        ? resolveWithTimeout(callServer('getPublicColorRankings'), 5000, null, 'Color purchase ranking')
         : Promise.resolve(null);
       const stylebookPromise = STYLEBOOK_API_URL
-        ? fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${Date.now()}`)
+        ? resolveWithTimeout(fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${Date.now()}`)
             .then((response) => response.json())
-            .catch((error) => {
-              console.warn('Stylebook ranking unavailable:', error);
-              return null;
-            })
+          , 5000, null, 'Stylebook ranking')
         : Promise.resolve(null);
 
-      Promise.all([orderPromise, stylebookPromise])
-        .then(([orderData, stylebookData]) => {
+      Promise.all([productPromise, orderPromise, stylebookPromise])
+        .then(([products, orderData, stylebookData]) => {
+          if (Array.isArray(products) && products.length) {
+            state.products = products;
+          }
           state.rankingData.purchaseCounts = orderData?.purchaseCounts || {};
           state.rankingData.periodLabel = orderData?.periodLabel || '';
           const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
