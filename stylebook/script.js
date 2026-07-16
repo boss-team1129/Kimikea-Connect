@@ -9,6 +9,10 @@ const DEBUG_STYLEBOOK = false;
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
 const STYLEBOOK_ASSET_VERSION = '20260716-loading-cache-1';
+const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
+  ? '/Kimikea-Connect/color-images/'
+  : '../color-images/';
+const COLOR_IMAGE_VERSION = '20260716-color-image-fix-1';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
@@ -198,9 +202,39 @@ function displayStaffName(post) {
 }
 
 function colorSwatchStyle(color) {
-  const value = color.imageUrl || '#efe9df';
+  const value = colorImageUrl(color) || color.imageUrl || '#efe9df';
   if (/^#|rgb|hsl|linear-gradient/.test(value)) return `background:${escapeHtml(value)}`;
   return `background-image:url('${escapeHtml(normalizeImageUrl(value))}')`;
+}
+
+function normalizeColorCode(value) {
+  return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
+}
+
+function productCodeFromColor(color) {
+  const explicitCode = normalizeColorCode(
+    color?.productCode
+    || color?.product_code
+    || color?.itemCode
+    || color?.sku
+    || color?.['商品コード']
+  );
+  if (explicitCode) return explicitCode;
+  const legacyId = normalizeColorCode(color?.id || color?.colorId);
+  return /^(DC|LC|OR)\d{3}$/.test(legacyId) ? legacyId : '';
+}
+
+function colorImageUrl(color, extension = 'jpg') {
+  const code = productCodeFromColor(color);
+  return code ? `${COLOR_IMAGE_BASE_PATH}${encodeURIComponent(code)}.${extension}?v=${COLOR_IMAGE_VERSION}` : '';
+}
+
+function colorImageMarkup(color, className = 'color-choice-image') {
+  const src = colorImageUrl(color, 'jpg');
+  const fallbackSrc = colorImageUrl(color, 'png');
+  const label = colorDisplayLabel(color) || color?.productCode || '';
+  if (!src) return `<span class="${className} is-missing">画像準備中</span>`;
+  return `<span class="${className}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><em>画像準備中</em></span>`;
 }
 
 function activeColors() {
@@ -906,7 +940,7 @@ function renderColorChoiceList() {
     if (!list.length) return '';
     return `<section class="color-category"><h3>${escapeHtml(category)}</h3><div class="color-choice-grid">${list.map(color => `
       <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
-        <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
+        ${colorImageMarkup(color)}
         <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
         <small>${escapeHtml(color.category)}</small>
       </button>
@@ -915,7 +949,7 @@ function renderColorChoiceList() {
   const otherColors = colors.filter(color => !categories.includes(color.category));
   const otherHtml = otherColors.length ? `<section class="color-category"><h3>その他</h3><div class="color-choice-grid">${otherColors.map(color => `
     <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
-      <span class="color-choice-swatch" style="${colorSwatchStyle(color)}"></span>
+      ${colorImageMarkup(color)}
       <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
       <small>${escapeHtml(color.category)}</small>
     </button>
@@ -960,6 +994,15 @@ function colorLabels(post) {
   return (post.extensionColorIds || []).map(id => {
     const color = getById('extensionColors', id);
     return color ? colorDisplayLabel(color) : '';
+  }).filter(Boolean);
+}
+
+function colorDetailChips(post) {
+  return (post.extensionColorIds || []).map(id => {
+    const color = getById('extensionColors', id);
+    if (!color) return '';
+    const label = colorDisplayLabel(color);
+    return `<button class="detail-color-chip" data-action="filter-label" data-kind="color" data-label="${escapeHtml(label)}">${colorImageMarkup(color, 'detail-color-image')}<span>${escapeHtml(label)}</span></button>`;
   }).filter(Boolean);
 }
 
@@ -1252,7 +1295,7 @@ function showDetail(postId, options = {}) {
         </div>
         <p>${escapeHtml(post.description)}</p>
         <dl class="recipe-spec">
-          <div><dt>使用色</dt><dd>${colorLabels(post).map(label => `<button data-action="filter-label" data-kind="color" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('')}</dd></div>
+          <div><dt>使用色</dt><dd class="detail-color-list">${colorDetailChips(post).join('')}</dd></div>
           <div><dt>施術スタイル</dt><dd>${typeLabels(post).map(label => `<button data-action="filter-label" data-kind="type" data-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('')}</dd></div>
           <div><dt>使用本数</dt><dd>${post.extensionCount}本</dd></div>
           <div><dt>サロン</dt><dd>${post.shopId ? `<button data-action="filter-shop" data-id="${post.shopId}">${escapeHtml(salonName)}</button>` : escapeHtml(salonName)}</dd></div>
