@@ -113,7 +113,12 @@ const KCO_DEFAULT_SETTINGS = [
 
 const KCO_FRANCHISE_HEADERS = [
   'memberId',
+  'userId',
+  'shopId',
   'salonName',
+  'staffId',
+  'displayName',
+  'role',
   'email',
   'phone',
   'initialPassword',
@@ -748,9 +753,6 @@ function setupFranchiseMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
-    sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', '', '', 'active', '', new Date(), new Date()],
-    ]);
   } else {
     ensureFranchiseMasterColumns_(sheet);
     migrateProductionFranchiseRows_(sheet);
@@ -775,40 +777,19 @@ function ensureFranchiseMasterColumns_(sheet) {
 
 function migrateProductionFranchiseRows_(sheet) {
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) {
-    sheet.getRange(2, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([
-      ['K-1', 'TEAM hair', '', '', '', '', '', '', '', 'active', '', new Date(), new Date()],
-    ]);
-    return;
-  }
+  if (values.length <= 1) return;
 
   const headers = values[0].map(normalizeMasterHeader_);
   const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
-  const memberIdIndex = getIndex(['memberId', '加盟店ID']);
   const salonNameIndex = getIndex(['salonName', '加盟店名']);
   const emailIndex = getIndex(['email', 'メールアドレス']);
-  const phoneIndex = getIndex(['phone', '電話', '電話番号']);
-  const passwordIndex = getIndex(['initialPassword', 'パスワード', 'password']);
-  const statusIndex = getIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
-  const visibleIndex = getIndex(['表示']);
-  const updatedAtIndex = getIndex(['updatedAt', '更新日']);
 
-  let hasTeamHair = false;
   const rowsToDelete = [];
   values.slice(1).forEach((row, offset) => {
     const rowNumber = offset + 2;
-    const memberId = memberIdIndex === -1 ? '' : String(row[memberIdIndex] || '').trim();
     const salonName = salonNameIndex === -1 ? '' : String(row[salonNameIndex] || '').trim();
     const email = emailIndex === -1 ? '' : String(row[emailIndex] || '').trim();
     const isTestRow = salonName === 'テスト加盟店' || email === 'test@example.com';
-
-    if (memberId === 'K-1') {
-      hasTeamHair = true;
-      if (salonNameIndex !== -1) sheet.getRange(rowNumber, salonNameIndex + 1).setValue('TEAM hair');
-      if (statusIndex !== -1) sheet.getRange(rowNumber, statusIndex + 1).setValue('active');
-      if (visibleIndex !== -1) sheet.getRange(rowNumber, visibleIndex + 1).setValue(true);
-      if (updatedAtIndex !== -1) sheet.getRange(rowNumber, updatedAtIndex + 1).setValue(new Date());
-    }
 
     if (isTestRow) {
       rowsToDelete.push(rowNumber);
@@ -816,18 +797,6 @@ function migrateProductionFranchiseRows_(sheet) {
   });
 
   rowsToDelete.reverse().forEach((rowNumber) => sheet.deleteRow(rowNumber));
-
-  if (!hasTeamHair) {
-    const newRow = new Array(sheet.getLastColumn()).fill('');
-    if (memberIdIndex !== -1) newRow[memberIdIndex] = 'K-1';
-    if (salonNameIndex !== -1) newRow[salonNameIndex] = 'TEAM hair';
-    if (statusIndex !== -1) newRow[statusIndex] = 'active';
-    if (visibleIndex !== -1) newRow[visibleIndex] = true;
-    const createdAtIndex = getIndex(['createdAt', '作成日', '登録日']);
-    if (createdAtIndex !== -1) newRow[createdAtIndex] = new Date();
-    if (updatedAtIndex !== -1) newRow[updatedAtIndex] = new Date();
-    sheet.getRange(sheet.getLastRow() + 1, 1, 1, newRow.length).setValues([newRow]);
-  }
 }
 
 function setupSettings_(ss) {
@@ -1931,7 +1900,12 @@ function getFranchiseMasterRecords_() {
   const headers = values[0].map(normalizeMasterHeader_);
   const findHeaderIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
   const franchiseIdIndex = findHeaderIndex(['memberId', '加盟店ID']);
+  const userIdIndex = findHeaderIndex(['userId', 'ユーザーID']);
+  const shopIdIndex = findHeaderIndex(['shopId', '店舗ID']);
   const franchiseNameIndex = findHeaderIndex(['salonName', '加盟店名']);
+  const staffIdIndex = findHeaderIndex(['staffId', '担当者ID']);
+  const displayNameIndex = findHeaderIndex(['displayName', '表示名', '担当者名']);
+  const roleIndex = findHeaderIndex(['role', '権限']);
   const emailIndex = findHeaderIndex(['email', 'メールアドレス']);
   const phoneIndex = findHeaderIndex(['phone', '電話', '電話番号']);
   const passwordIndex = findHeaderIndex(['initialPassword', 'パスワード', 'password']);
@@ -1986,8 +1960,17 @@ function getFranchiseMasterRecords_() {
       return {
         franchiseId: String(row[franchiseIdIndex] || '').trim(),
         memberId: String(row[franchiseIdIndex] || '').trim(),
+        userId: userIdIndex === -1
+          ? String(row[franchiseIdIndex] || '').trim()
+          : String(row[userIdIndex] || row[franchiseIdIndex] || '').trim(),
+        shopId: shopIdIndex === -1
+          ? generateShopIdFromMemberId_(row[franchiseIdIndex])
+          : String(row[shopIdIndex] || generateShopIdFromMemberId_(row[franchiseIdIndex]) || '').trim(),
         franchiseName: String(row[franchiseNameIndex] || '').trim(),
         salonName: String(row[franchiseNameIndex] || '').trim(),
+        staffId: staffIdIndex === -1 ? '' : String(row[staffIdIndex] || '').trim(),
+        displayName: displayNameIndex === -1 ? '' : String(row[displayNameIndex] || '').trim(),
+        role: roleIndex === -1 ? 'member' : String(row[roleIndex] || 'member').trim() || 'member',
         rowNumber: offset + 2,
         contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
         email: String(row[emailIndex] || '').trim(),
@@ -2022,6 +2005,11 @@ function getFranchiseMasterRecords_() {
     })),
   });
   return records;
+}
+
+function generateShopIdFromMemberId_(memberId) {
+  const normalized = String(memberId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  return normalized ? `shop-${normalized}` : '';
 }
 
 function getVisibleFranchises(sessionToken) {
@@ -2254,6 +2242,12 @@ function sanitizeFranchise_(franchise) {
   return {
     franchiseId: franchise.franchiseId,
     memberId: franchise.memberId || franchise.franchiseId,
+    userId: franchise.userId || franchise.memberId || franchise.franchiseId,
+    id: franchise.userId || franchise.memberId || franchise.franchiseId,
+    shopId: franchise.shopId || generateShopIdFromMemberId_(franchise.memberId || franchise.franchiseId),
+    staffId: franchise.staffId || '',
+    displayName: franchise.displayName || franchise.contactName || franchise.franchiseName,
+    role: franchise.role || 'member',
     franchiseName: franchise.franchiseName,
     salonName: franchise.salonName || franchise.franchiseName,
     contactName: franchise.contactName,

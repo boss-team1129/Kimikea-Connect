@@ -8,7 +8,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-mine-auth-1';
+const STYLEBOOK_ASSET_VERSION = '20260716-multi-tenant-1';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
@@ -23,7 +23,7 @@ function readConnectFranchiseSession() {
 }
 
 function stylebookUserIdFromFranchise(franchise) {
-  return normalizeUserId(franchise?.memberId || franchise?.franchiseId || '');
+  return normalizeUserId(franchise?.userId || franchise?.id || franchise?.memberId || franchise?.franchiseId || '');
 }
 
 const roles = {
@@ -272,25 +272,21 @@ function seedData() {
   ].map((name, index) => ({ id: `type-${String(index + 1).padStart(2, '0')}`, name, isActive: true, sortOrder: index + 1 }));
 
   const shops = [
-    { id: 'shop-team', name: 'TEAM hair', address: '静岡県富士市横割2丁目2-27', imageUrl: '', isActive: true },
-    { id: 'shop-fuji', name: 'エクステランド富士店', address: '静岡県富士市', imageUrl: '', isActive: true },
-    { id: 'shop-yoshida', name: 'エクステランド吉田店', address: '静岡県榛原郡吉田町', imageUrl: '', isActive: true },
+    { id: 'demo-shop-a', name: 'デモ加盟店A', address: '静岡県', imageUrl: '', isActive: true },
+    { id: 'demo-shop-b', name: 'デモ加盟店B', address: '静岡県', imageUrl: '', isActive: true },
+    { id: 'demo-shop-c', name: 'デモ加盟店C', address: '静岡県', imageUrl: '', isActive: true },
   ];
 
   const staff = [
-    ['staff-boss', 'BOSS', 'shop-team'],
-    ['staff-kana', '神田 加奈', 'shop-team'],
-    ['staff-ai', '松本 藍', 'shop-team'],
-    ['staff-chisa', '松下 千紗', 'shop-team'],
-    ['staff-fuji-a', '富士店 担当A', 'shop-fuji'],
-    ['staff-yoshida-a', '吉田店 担当A', 'shop-yoshida'],
+    ['demo-staff-a', 'デモ担当A', 'demo-shop-a'],
+    ['demo-staff-b', 'デモ担当B', 'demo-shop-b'],
+    ['demo-staff-c', 'デモ担当C', 'demo-shop-c'],
   ].map(([id, name, shopId]) => ({ id, name, shopId, profileImageUrl: '', isActive: true }));
 
   const users = [
-    { id: 'user-member', name: '一般ユーザー', email: 'member@example.com', role: roles.member, shopId: 'shop-team', staffId: '' },
-    { id: 'user-contributor', name: '投稿スタッフ', email: 'contributor@example.com', role: roles.contributor, shopId: 'shop-team', staffId: 'staff-ai' },
-    { id: 'user-shop-admin', name: '店舗管理者', email: 'shopadmin@example.com', role: roles.shop_admin, shopId: 'shop-team', staffId: 'staff-boss' },
-    { id: 'user-hq', name: '本部管理者', email: 'admin@example.com', role: roles.headquarters_admin, shopId: '', staffId: '' },
+    { id: 'demo-user-a', name: 'デモユーザーA', email: '', role: roles.member, shopId: 'demo-shop-a', staffId: 'demo-staff-a' },
+    { id: 'demo-user-b', name: 'デモユーザーB', email: '', role: roles.member, shopId: 'demo-shop-b', staffId: 'demo-staff-b' },
+    { id: 'demo-user-admin', name: 'デモ管理者', email: '', role: roles.headquarters_admin, shopId: '', staffId: '' },
   ];
 
   return {
@@ -429,9 +425,10 @@ function currentExternalShopName() {
 }
 
 function shopIdFromFranchise(franchise) {
-  const memberId = String(franchise?.memberId || franchise?.franchiseId || '').trim();
-  if (memberId === 'K-1') return 'shop-team';
-  return memberId || '';
+  const explicitShopId = String(franchise?.shopId || franchise?.storeId || '').trim();
+  if (explicitShopId) return explicitShopId;
+  const sourceId = String(franchise?.memberId || franchise?.franchiseId || franchise?.userId || franchise?.id || '').trim();
+  return sourceId ? `shop-${sourceId.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}` : '';
 }
 
 function userFromConnectFranchise(franchise) {
@@ -439,11 +436,11 @@ function userFromConnectFranchise(franchise) {
   if (!id) return null;
   return {
     id,
-    name: franchise?.salonName || franchise?.franchiseName || id,
+    name: franchise?.displayName || franchise?.contactName || franchise?.salonName || franchise?.franchiseName || id,
     email: franchise?.email || '',
-    role: roles.member,
+    role: franchise?.role || franchise?.permission || roles.member,
     shopId: shopIdFromFranchise(franchise),
-    staffId: '',
+    staffId: franchise?.staffId || '',
   };
 }
 
@@ -616,7 +613,7 @@ function canPost() {
 }
 
 function canManageAll() {
-  return currentUser()?.role === roles.headquarters_admin;
+  return ['admin', roles.headquarters_admin].includes(currentUser()?.role);
 }
 
 function postAuthorId(post) {
@@ -1626,6 +1623,9 @@ async function submitPost(event) {
   const matchedShop = findShopByName(salonName);
   const staffName = el.staffNameInput.value.trim();
   const matchedStaff = findStaffByName(staffName, matchedShop?.id || '');
+  const user = currentUser();
+  const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || matchedShop?.id || '');
+  const resolvedStaffId = editing ? (editing.staffId || '') : (user?.staffId || matchedStaff?.id || '');
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
@@ -1635,12 +1635,12 @@ async function submitPost(event) {
     extensionColorIds: selectedColorIds.length ? selectedColorIds : (editing?.extensionColorIds || []),
     styleTypeIds: selectedValues(el.styleTypeSelect),
     extensionCount: Number(el.extensionCountInput.value || 0),
-    shopId: matchedShop?.id || '',
-    staffId: matchedStaff?.id || '',
+    shopId: resolvedShopId,
+    staffId: resolvedStaffId,
     salonName,
     staffName,
-    authorId: editing ? postAuthorId(editing) : currentUser().id,
-    createdByUserId: editing?.createdByUserId || editing?.authorId || currentUser().id,
+    authorId: editing ? postAuthorId(editing) : user.id,
+    createdByUserId: editing?.createdByUserId || editing?.authorId || user.id,
     createdAt: editing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     saveCount: editing?.saveCount || 0,

@@ -4407,16 +4407,16 @@
     const NETWORK_SHOP_IMAGE_VERSION = '20260716-1';
     const NETWORK_FALLBACK_SHOPS = [
       {
-        shopId: 'K-1',
+        shopId: 'demo-network-shop',
         type: '加盟店',
-        name: 'TEAM hair',
+        name: 'デモ加盟店',
         city: '静岡県富士市',
-        address: '静岡県富士市横割2丁目2-27',
+        address: '静岡県富士市',
         lat: 35.151,
         lng: 138.655,
-        mapUrl: 'https://www.google.com/maps/search/?api=1&query=TEAM%20hair%20%E9%9D%99%E5%B2%A1%E7%9C%8C%E5%AF%8C%E5%A3%AB%E5%B8%82%E6%A8%AA%E5%89%B22%E4%B8%81%E7%9B%AE2-27',
+        mapUrl: 'https://www.google.com/maps/search/?api=1&query=%E9%9D%99%E5%B2%A1%E7%9C%8C%E5%AF%8C%E5%A3%AB%E5%B8%82',
         photoUrl: `./assets/home-gallery/map.jpg?v=${NETWORK_SHOP_IMAGE_VERSION}`,
-        staff: '村松 剛好',
+        staff: '担当者',
         intro: 'シールエクステの提案とデザイン相談に対応するKimikea Connect加盟店です。',
         lineUrl: NPO_LINE_URL,
         reservationUrl: '',
@@ -5246,7 +5246,7 @@
             <h3>パスワードを0000へリセット</h3>
             <label class="field">
               <span>加盟店ID / memberId</span>
-              <input id="adminResetMemberId" type="text" autocomplete="off" placeholder="例：K-1" required>
+              <input id="adminResetMemberId" type="text" autocomplete="off" placeholder="例：member-001" required>
             </label>
             <p class="form-note">本部管理者のみ実行できます。パスワードは画面上に表示されません。</p>
             <button type="submit" class="button button-outline">0000へリセット</button>

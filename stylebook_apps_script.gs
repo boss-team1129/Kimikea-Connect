@@ -130,7 +130,6 @@ function getStylebookDatabase_(userId, options) {
   const shops = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS)).map(normalizeBooleans_);
   const staff = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF)).map(normalizeBooleans_);
   const users = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.USERS));
-  if (!users.some(user => user.id === userId) && users.length) userId = users[0].id;
   logStylebookDebug_('database response counts', {
     spreadsheetId: ss.getId(),
     spreadsheetName: ss.getName(),
@@ -214,6 +213,14 @@ function savePost_(post, userId) {
   const incomingAdditionalImages = Array.isArray(post.additionalImages) ? post.additionalImages : existingAdditionalImages;
   const additional = saveAdditionalImages_(id, incomingAdditionalImages, existing && existing.object.additionalImageFileIds);
   const status = post.status === 'published' ? 'published' : 'draft';
+  const resolvedShopId = existing ? String(existing.object.shopId || '') : String(user.shopId || '');
+  const resolvedStaffId = existing ? String(existing.object.staffId || '') : String(user.staffId || '');
+  const resolvedSalonName = existing
+    ? String(existing.object.salonName || getShopName_(existing.object.shopId) || '')
+    : String(getShopName_(resolvedShopId) || user.shopName || user.name || post.salonName || '');
+  const resolvedStaffName = existing
+    ? String(existing.object.staffName || getStaffName_(existing.object.staffId) || '')
+    : String(user.displayName || user.name || post.staffName || '');
   const row = {
     id,
     title: post.title || '',
@@ -225,10 +232,10 @@ function savePost_(post, userId) {
     extensionColorIds: arrayString_(post.extensionColorIds),
     styleTypeIds: arrayString_(post.styleTypeIds),
     extensionCount: Number(post.extensionCount || 0),
-    shopId: post.shopId || '',
-    staffId: post.staffId || '',
-    salonName: post.salonName || getShopName_(post.shopId) || '',
-    staffName: post.staffName || getStaffName_(post.staffId) || '',
+    shopId: resolvedShopId,
+    staffId: resolvedStaffId,
+    salonName: resolvedSalonName,
+    staffName: resolvedStaffName,
     createdByUserId: existing ? (existing.object.createdByUserId || existing.object.authorId || user.id) : user.id,
     createdAt: existing ? existing.object.createdAt : now,
     updatedAt: now,
@@ -359,21 +366,19 @@ function setupSheetsIfNeeded_(ss) {
 function seedMastersIfEmpty_(ss) {
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS, defaultTypes_());
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.SHOPS), KC_SHOP_HEADERS, [
-    ['shop-team', 'TEAM hair', '静岡県富士市横割2丁目2-27', '', true],
-    ['shop-fuji', 'エクステランド富士店', '静岡県富士市', '', true],
-    ['shop-yoshida', 'エクステランド吉田店', '静岡県榛原郡吉田町', '', true],
+    ['demo-shop-a', 'デモ加盟店A', '静岡県', '', true],
+    ['demo-shop-b', 'デモ加盟店B', '静岡県', '', true],
+    ['demo-shop-c', 'デモ加盟店C', '静岡県', '', true],
   ]);
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.STAFF), KC_STAFF_HEADERS, [
-    ['staff-boss', 'BOSS', 'shop-team', '', true],
-    ['staff-kana', '神田 加奈', 'shop-team', '', true],
-    ['staff-ai', '松本 藍', 'shop-team', '', true],
-    ['staff-chisa', '松下 千紗', 'shop-team', '', true],
-    ['staff-fuji-a', '富士店 担当A', 'shop-fuji', '', true],
+    ['demo-staff-a', 'デモ担当A', 'demo-shop-a', '', true],
+    ['demo-staff-b', 'デモ担当B', 'demo-shop-b', '', true],
+    ['demo-staff-c', 'デモ担当C', 'demo-shop-c', '', true],
   ]);
   seedSheetIfEmpty_(getOrCreateSheet_(ss, KC_STYLEBOOK.USERS), KC_USER_HEADERS, [
-    ['K-1', 'TEAM hair', '', 'member', 'shop-team', 'staff-boss'],
-    ['user-exteland-fuji', 'エクステランド富士店', '', 'member', 'shop-fuji', 'staff-fuji-a'],
-    ['user-hq', '本部管理者', 'admin@example.com', 'headquarters_admin', '', ''],
+    ['demo-user-a', 'デモユーザーA', '', 'member', 'demo-shop-a', 'demo-staff-a'],
+    ['demo-user-b', 'デモユーザーB', '', 'member', 'demo-shop-b', 'demo-staff-b'],
+    ['demo-user-admin', 'デモ管理者', '', 'headquarters_admin', '', ''],
   ]);
 }
 
@@ -386,10 +391,13 @@ function syncFranchiseMasterToStylebook_(ss) {
   franchises.forEach(franchise => {
     const visibleValue = firstDefined_(franchise['表示'], franchise.visible, franchise.isActive, true);
     if (!normalizeBoolean_(visibleValue)) return;
-    const memberId = String(franchise.memberId || franchise['加盟店ID'] || '').trim();
-    const salonName = String(franchise.salonName || franchise['加盟店名'] || franchise.franchiseName || '').trim();
-    if (!memberId || !salonName) return;
-    const shopId = stylebookShopIdForFranchise_(memberId, salonName);
+    const memberId = String(firstDefined_(franchise.memberId, franchise['memberId'], franchise['加盟店ID'], franchise['会員ID'])).trim();
+    const userId = String(firstDefined_(franchise.userId, franchise['userId'], franchise['ユーザーID'], memberId)).trim();
+    const shopId = String(firstDefined_(franchise.shopId, franchise['shopId'], franchise['店舗ID'], stylebookGeneratedShopId_(memberId || userId))).trim();
+    const salonName = String(firstDefined_(franchise.salonName, franchise.shopName, franchise['店舗名'], franchise['加盟店名'], franchise.franchiseName, franchise.name)).trim();
+    const staffName = String(firstDefined_(franchise.staffName, franchise.displayName, franchise.contactName, franchise['担当者名'], franchise['担当者'], franchise['代表者名'])).trim();
+    const role = String(firstDefined_(franchise.role, franchise['権限'], franchise.permission, 'member')).trim() || 'member';
+    if (!userId || !shopId || !salonName) return;
     upsertObject_(shopsSheet, KC_SHOP_HEADERS, {
       id: shopId,
       name: salonName,
@@ -398,12 +406,12 @@ function syncFranchiseMasterToStylebook_(ss) {
       isActive: true,
     }, 'id');
     upsertObject_(usersSheet, KC_USER_HEADERS, {
-      id: memberId,
-      name: salonName,
+      id: userId,
+      name: staffName || salonName,
       email: String(franchise.email || franchise['メールアドレス'] || '').trim(),
-      role: 'member',
+      role,
       shopId,
-      staffId: '',
+      staffId: String(firstDefined_(franchise.staffId, franchise['staffId'], franchise['担当者ID'])).trim(),
     }, 'id');
   });
 }
@@ -415,12 +423,9 @@ function firstDefined_() {
   return '';
 }
 
-function stylebookShopIdForFranchise_(memberId, salonName) {
-  const id = String(memberId || '').trim();
-  if (id === 'K-1') return 'shop-team';
-  const name = String(salonName || '').trim();
-  if (name === 'エクステランド富士店') return 'shop-fuji';
-  return `shop-${id.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
+function stylebookGeneratedShopId_(sourceId) {
+  const id = String(sourceId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  return id ? `shop-${id}` : '';
 }
 
 function defaultTypes_() {
@@ -457,7 +462,7 @@ function saveStyleId_(save) {
 }
 
 function isHeadquartersAdmin_(user) {
-  return user && user.role === 'headquarters_admin';
+  return user && ['admin', 'headquarters_admin'].includes(String(user.role || '').trim());
 }
 
 function getUser_(userId) {
