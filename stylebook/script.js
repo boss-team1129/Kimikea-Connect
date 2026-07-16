@@ -8,7 +8,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-multi-tenant-1';
+const STYLEBOOK_ASSET_VERSION = '20260716-detail-modes-1';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
@@ -47,6 +47,7 @@ const state = {
   visibleCount: PAGE_SIZE,
   currentView: 'menu',
   currentDetailId: '',
+  currentDetailMode: 'public',
   currentEditId: '',
   currentImageData: '',
   currentAdditionalImageData: [],
@@ -656,6 +657,23 @@ function canManagePost(post) {
   return canEditPost(post);
 }
 
+function normalizeDetailMode(mode) {
+  return ['public', 'myPosts', 'admin'].includes(mode) ? mode : 'public';
+}
+
+function detailModeForCurrentView() {
+  if (state.currentView === 'mine' || state.currentView === 'drafts' || state.currentView === 'post') return 'myPosts';
+  if (state.currentView === 'admin') return 'admin';
+  return 'public';
+}
+
+function canShowManageButtons(post, mode = 'public') {
+  const detailMode = normalizeDetailMode(mode);
+  if (detailMode === 'myPosts') return isPostAuthor(post);
+  if (detailMode === 'admin') return canManageAll();
+  return false;
+}
+
 function getById(collection, id) {
   return state.db[collection].find(item => item.id === id);
 }
@@ -956,8 +974,9 @@ function renderManageItem(post, mode = 'mine') {
   const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
   const dateLabel = new Date(post.updatedAt || post.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const photoUrl = imageUrlFromPost(post);
-  const editButton = canEditPost(post) ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : '';
-  const deleteButton = canDeletePost(post) ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : '';
+  const canShowManage = (mode === 'mine' || mode === 'drafts') && canShowManageButtons(post, 'myPosts');
+  const editButton = canShowManage ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : '';
+  const deleteButton = canShowManage ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : '';
   return `
     <article class="manage-card">
       <button type="button" class="manage-thumb" data-action="detail" data-id="${post.id}">
@@ -1036,20 +1055,21 @@ function stylebookUrlFor(name, id = '') {
   return url;
 }
 
-function replaceStylebookHistory(name = state.currentView, id = state.currentDetailId || '') {
+function replaceStylebookHistory(name = state.currentView, id = state.currentDetailId || '', mode = state.currentDetailMode || 'public') {
   if (!window.history?.replaceState) return;
   const url = stylebookUrlFor(name, id);
-  window.history.replaceState({ kimikeaStylebook: true, view: name, id }, '', url);
+  window.history.replaceState({ kimikeaStylebook: true, view: name, id, mode: normalizeDetailMode(mode) }, '', url);
   state.historyReady = true;
 }
 
-function pushStylebookHistory(name, id = '') {
+function pushStylebookHistory(name, id = '', mode = '') {
   if (!window.history?.pushState) return;
   const current = window.history.state;
   const normalizedId = id || '';
-  if (current?.kimikeaStylebook && current.view === name && (current.id || '') === normalizedId) return;
+  const normalizedMode = normalizeDetailMode(mode || (name === 'detail' ? state.currentDetailMode : 'public'));
+  if (current?.kimikeaStylebook && current.view === name && (current.id || '') === normalizedId && (current.mode || 'public') === normalizedMode) return;
   const url = stylebookUrlFor(name, normalizedId);
-  window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId }, '', url);
+  window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId, mode: normalizedMode }, '', url);
 }
 
 function notifyStylebookNavigationState() {
@@ -1057,20 +1077,21 @@ function notifyStylebookNavigationState() {
 }
 
 function stylebookRouteId(route) {
-  return `${route?.name || 'menu'}:${route?.id || ''}`;
+  return `${route?.name || 'menu'}:${route?.id || ''}:${route?.mode || ''}`;
 }
 
 function currentStylebookRoute() {
   return {
     name: state.currentView || 'menu',
     id: state.currentView === 'detail' ? state.currentDetailId : (state.currentView === 'post' ? state.currentEditId : ''),
+    mode: state.currentView === 'detail' ? normalizeDetailMode(state.currentDetailMode) : '',
   };
 }
 
-function rememberStylebookRoute(nextName, nextId = '') {
+function rememberStylebookRoute(nextName, nextId = '', nextMode = '') {
   if (state.isRestoringAppHistory) return;
   const current = currentStylebookRoute();
-  const next = { name: nextName || 'menu', id: nextId || '' };
+  const next = { name: nextName || 'menu', id: nextId || '', mode: nextName === 'detail' ? normalizeDetailMode(nextMode || state.currentDetailMode) : '' };
   if (stylebookRouteId(current) === stylebookRouteId(next)) {
     notifyStylebookNavigationState();
     return;
@@ -1097,8 +1118,8 @@ function restoreStylebookAppRoute(route) {
       showView('gallery', { push: false });
       replaceStylebookHistory('gallery');
     } else if (route.name === 'detail' && route.id) {
-      showDetail(route.id, { push: false });
-      replaceStylebookHistory('detail', route.id);
+      showDetail(route.id, { push: false, mode: route.mode || 'public' });
+      replaceStylebookHistory('detail', route.id, route.mode || 'public');
     } else if (route.name === 'post') {
       showPostForm(route.id || '', { push: false });
       replaceStylebookHistory('post', route.id || '');
@@ -1142,8 +1163,8 @@ function showStylebookMenuEntry() {
 }
 
 function showView(name, options = {}) {
-  const { push = true, id = '' } = options;
-  if (push) rememberStylebookRoute(name, id);
+  const { push = true, id = '', mode = '' } = options;
+  if (push) rememberStylebookRoute(name, id, mode);
   state.currentView = name;
   updateStylebookHeading();
   ['menuView', 'galleryView', 'detailView', 'postView', 'savedView', 'draftsView', 'mineView', 'adminView'].forEach(key => {
@@ -1151,8 +1172,8 @@ function showView(name, options = {}) {
     if (view) view.hidden = key !== `${name}View`;
   });
   updateRoleVisibility();
-  if (push && state.historyReady) pushStylebookHistory(name, id);
-  if (!push && state.historyReady) replaceStylebookHistory(name, id);
+  if (push && state.historyReady) pushStylebookHistory(name, id, mode);
+  if (!push && state.historyReady) replaceStylebookHistory(name, id, mode);
   if (name === 'gallery') {
     renderGallery();
     window.requestAnimationFrame(() => window.scrollTo(0, Number(sessionStorage.getItem(SCROLL_KEY) || 0)));
@@ -1163,16 +1184,19 @@ function showView(name, options = {}) {
 }
 
 function showDetail(postId, options = {}) {
-  const { push = true } = options;
+  const { push = true, mode = detailModeForCurrentView() } = options;
+  const detailMode = normalizeDetailMode(mode);
   sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
   const post = state.db.stylePosts.find(item => item.id === postId);
   if (!post || post.deletedAt) return;
   state.currentDetailId = postId;
+  state.currentDetailMode = detailMode;
   const salonName = displaySalonName(post);
   const staffName = displayStaffName(post);
   const creator = getById('users', postAuthorId(post));
-  const canEdit = canEditPost(post);
-  const canDelete = canDeletePost(post);
+  const canShowManage = canShowManageButtons(post, detailMode);
+  const canEdit = canShowManage && canEditPost(post);
+  const canDelete = canShowManage && canDeletePost(post);
   el.detailView.innerHTML = `
     <article class="detail-card">
       <div class="detail-photo-wrap">
@@ -1205,7 +1229,7 @@ function showDetail(postId, options = {}) {
         </div>
       </div>
     </article>`;
-  showView('detail', { id: postId, push });
+  showView('detail', { id: postId, push, mode: detailMode });
 }
 
 async function toggleSave(postId) {
@@ -1268,7 +1292,7 @@ async function toggleSave(postId) {
 }
 
 function renderCurrentAfterSave(postId) {
-  if (state.currentView === 'detail') showDetail(postId, { push: false });
+  if (state.currentView === 'detail') showDetail(postId, { push: false, mode: state.currentDetailMode });
   else if (state.currentView === 'saved') renderSaved();
   else if (state.currentView === 'mine') showMine({ push: false });
   else renderGallery();
@@ -1283,7 +1307,7 @@ function renderCurrentViewAfterDataLoad() {
   else if (state.currentView === 'drafts') showDrafts({ push: false });
   else if (state.currentView === 'mine') showMine({ push: false });
   else if (state.currentView === 'admin') renderAdmin({ push: false });
-  else if (state.currentView === 'detail' && state.currentDetailId) showDetail(state.currentDetailId, { push: false });
+  else if (state.currentView === 'detail' && state.currentDetailId) showDetail(state.currentDetailId, { push: false, mode: state.currentDetailMode });
   else renderGallery();
 }
 
@@ -1380,7 +1404,7 @@ function restoreViewFromHistory(historyState) {
   const view = historyState?.view || 'menu';
   const id = historyState?.id || '';
   if (view === 'detail' && id) {
-    showDetail(id, { push: false });
+    showDetail(id, { push: false, mode: historyState?.mode || 'public' });
     return;
   }
   if (view === 'gallery') {
@@ -1388,7 +1412,7 @@ function restoreViewFromHistory(historyState) {
     return;
   }
   if (view === 'post') {
-    showPostForm('', { push: false });
+    showPostForm(id, { push: false });
     return;
   }
   if (view === 'drafts') {
@@ -1417,7 +1441,7 @@ function handleActionElement(action) {
     currentView: state.currentView,
     actionEventCount: state.actionEventCount,
   });
-  if (actionName === 'detail') showDetail(id);
+  if (actionName === 'detail') showDetail(id, { mode: detailModeForCurrentView() });
   else if (actionName === 'save') toggleSave(id);
   else if (actionName === 'edit') showPostForm(id);
   else if (actionName === 'delete') logicalDeletePost(id);
@@ -1588,10 +1612,13 @@ function showPostForm(postId = '', options = {}) {
   clearPostForm();
   if (postId) {
     const post = state.db.stylePosts.find(item => item.id === postId);
-    if (!post || !canManagePost(post)) return;
+    if (!post || !canManagePost(post)) {
+      alert('この投稿を編集する権限がありません。');
+      return;
+    }
     fillPostForm(post);
   }
-  showView('post', { push });
+  showView('post', { push, id: postId });
 }
 
 async function submitPost(event) {
@@ -1662,7 +1689,7 @@ async function submitPost(event) {
       const result = await apiRequest('savePost', { post });
       await refreshRemoteDb();
       clearPostForm();
-      showDetail(result.id || post.id);
+      showDetail(result.id || post.id, { mode: 'myPosts' });
       return;
     }
     const index = state.db.stylePosts.findIndex(item => item.id === post.id);
@@ -1670,7 +1697,7 @@ async function submitPost(event) {
     else state.db.stylePosts.unshift(post);
     saveDb();
     clearPostForm();
-    showDetail(post.id);
+    showDetail(post.id, { mode: 'myPosts' });
   } catch (error) {
     el.formMessage.textContent = error.message || '保存できませんでした。';
     el.formMessage.classList.add('error');
@@ -1694,7 +1721,7 @@ async function publishPost(postId) {
       post.updatedAt = new Date().toISOString();
       saveDb();
     }
-    showDetail(post.id);
+    showDetail(post.id, { mode: 'myPosts' });
   } catch (error) {
     alert(error.message || '公開できませんでした。');
   }
@@ -1725,7 +1752,8 @@ async function logicalDeletePost(postId) {
     return;
   }
   if (state.currentView === 'drafts') showDrafts();
-  else if (state.currentView === 'mine') showMine();
+  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') showMine();
+  else if (state.currentView === 'admin' || state.currentDetailMode === 'admin') renderAdmin();
   else showView('gallery');
 }
 
@@ -1792,8 +1820,9 @@ function adminRowsFor(tab) {
       const salonName = displaySalonName(post);
       const staffName = displayStaffName(post);
       const creator = getById('users', postAuthorId(post));
-      const deleteButton = canDeletePost(post) ? `<button data-action="delete" data-id="${post.id}">削除</button>` : '';
-      const editButton = canEditPost(post) ? `<button data-action="edit" data-id="${post.id}">編集</button>` : '';
+      const canShowAdminManage = canShowManageButtons(post, 'admin');
+      const deleteButton = canShowAdminManage && canDeletePost(post) ? `<button data-action="delete" data-id="${post.id}">削除</button>` : '';
+      const editButton = canShowAdminManage && canEditPost(post) ? `<button data-action="edit" data-id="${post.id}">編集</button>` : '';
       return `<tr><td>${imageTag(imageUrlFromPost(post), post.title || '投稿写真')}</td><td>${escapeHtml(post.title)}</td><td>${escapeHtml(salonName)}</td><td>${escapeHtml(staffName)}</td><td>${escapeHtml(creator?.name || '')}</td><td>${new Date(post.createdAt).toLocaleDateString('ja-JP')}</td><td>${post.status}</td><td>${saveCountForPost(post)}</td><td>${editButton}${deleteButton}</td></tr>`;
     }).join('');
   }
