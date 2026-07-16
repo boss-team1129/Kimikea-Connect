@@ -521,7 +521,7 @@ function submitCartOrder(order) {
     const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
     const product = productMap[key];
     if (!product) {
-      throw new Error(`商品マスタに見つかりません: ${item.productCode || `${item.category} / ${item.color}`}`);
+      throw new Error(`商品マスタに見つかりません: ${item.category || ''} / ${item.color || ''}`);
     }
 
     const qty = Number(item.quantity || 0);
@@ -1081,7 +1081,6 @@ function buildFranchiseEmailBody_(summary, invoiceSettings) {
 function buildOrderItemsText_(summary) {
   return getSummaryDetailItems_(summary).map((item) => [
     `${item.category} / ${item.colorName || item.color}`,
-    `商品コード：${item.productCode || ''}`,
     `数量：${item.quantity}袋`,
     `単価：${formatYen_(item.invoiceUnitPrice || item.unitPrice)}`,
     `小計：${formatYen_(item.lineTotal || item.subtotal)}`,

@@ -232,7 +232,7 @@ function colorImageUrl(color, extension = 'jpg') {
 function colorImageMarkup(color, className = 'color-choice-image') {
   const src = colorImageUrl(color, 'jpg');
   const fallbackSrc = colorImageUrl(color, 'png');
-  const label = colorDisplayLabel(color) || color?.productCode || '';
+  const label = colorDisplayLabel(color);
   if (!src) return `<span class="${className} is-missing">画像準備中</span>`;
   return `<span class="${className}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><em>画像準備中</em></span>`;
 }
@@ -245,7 +245,7 @@ function activeColors() {
 }
 
 function colorDisplayLabel(color) {
-  return String(color?.colorName || color?.color || color?.name || color?.colorCode || '').trim();
+  return String(color?.colorName || color?.color || color?.name || '').trim() || '名称未設定';
 }
 
 function colorSearchText(color) {
@@ -1927,7 +1927,7 @@ function adminRowsFor(tab) {
     }).join('');
   }
   if (tab === 'colors') {
-    return state.db.extensionColors.map(color => `<tr><td><span class="admin-swatch" style="background:${escapeHtml(color.imageUrl)}"></span></td><td>${escapeHtml(color.productCode || color.id)}</td><td>${escapeHtml(color.category)}</td><td>${escapeHtml(colorDisplayLabel(color))}</td><td>${color.isActive ? '表示' : '非表示'}</td><td>${color.sortOrder}</td><td>商品マスタで管理</td></tr>`).join('');
+    return state.db.extensionColors.map(color => `<tr><td><span class="admin-swatch" style="background:${escapeHtml(color.imageUrl)}"></span></td><td>${escapeHtml(colorDisplayLabel(color))}</td><td>${escapeHtml(color.category)}</td><td>${color.isActive ? '表示' : '非表示'}</td><td>${color.sortOrder}</td><td>商品マスタで管理</td></tr>`).join('');
   }
   if (tab === 'types') return state.db.styleTypes.map(type => `<tr><td>${escapeHtml(type.name)}</td><td>${type.isActive ? '公開' : '非公開'}</td><td>${type.sortOrder}</td><td><button data-admin-action="toggle-type" data-id="${type.id}">切替</button></td></tr>`).join('');
   if (tab === 'shops') return state.db.shops.map(shop => `<tr><td>${escapeHtml(shop.name)}</td><td>${escapeHtml(shop.address)}</td><td>${shop.isActive ? '公開' : '非公開'}</td><td>${state.db.staff.filter(person => person.shopId === shop.id).length}名</td></tr>`).join('');
@@ -1945,7 +1945,7 @@ function adminHeaders(tab) {
   const headers = {
     posts: ['写真', 'スタイル名', '店舗', '担当者', '投稿者', '投稿日', '状態', '保存数', '操作'],
     saves: ['styleId', '保存総数', '最終保存日時', '公開状態', 'サロン名', '担当者名', '投稿日'],
-    colors: ['色', '商品コード', 'カテゴリ', '表示名', '状態', '順番', '管理'],
+    colors: ['色', 'カラー名', 'カテゴリ', '状態', '順番', '管理'],
     types: ['施術スタイル', '状態', '順番', '操作'],
     shops: ['店舗', '住所', '状態', '担当者数'],
     staff: ['担当者', '店舗', '状態'],

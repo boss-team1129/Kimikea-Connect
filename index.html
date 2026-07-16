@@ -3461,7 +3461,7 @@
             <input
               id="orderProductSearch"
               type="search"
-              placeholder="カラーコード・カラー名で検索"
+              placeholder="カラー名で検索"
               oninput="setOrderProductSearch(this.value)"
             >
             <div id="orderProductGrid" class="order-product-grid"></div>
@@ -4537,13 +4537,13 @@
       const code = normalizeColorCode(color.productCode || color.code || color['商品コード']);
       const src = colorImageUrlFromCode(code, 'jpg');
       const fallbackSrc = colorImageUrlFromCode(code, 'png');
-      const label = [code, color.colorName || color.color].filter(Boolean).join(' ');
+      const label = colorDisplayName(color);
       if (!src) return `<span class="${className} is-missing" data-size="${escapeHtml(size)}">画像準備中</span>`;
       return `<span class="${className}" data-size="${escapeHtml(size)}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><span>画像準備中</span></span>`;
     }
 
     function colorDisplayName(color) {
-      return String(color.colorName || color.color || color.name || '').trim();
+      return String(color.colorName || color.color || color.name || '').trim() || '名称未設定';
     }
 
     function rankingLabel(value) {
@@ -4751,7 +4751,7 @@
               class="color-chart-search"
               type="search"
               value="${escapeHtml(state.colorChartSearch)}"
-              placeholder="カラーコード・カラー名で検索"
+              placeholder="カラー名で検索"
               oninput="setColorChartSearch(this.value)"
             >
             <div class="color-chart-tabs" aria-label="カテゴリで絞り込み">
