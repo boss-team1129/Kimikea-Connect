@@ -8,7 +8,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-detail-modes-1';
+const STYLEBOOK_ASSET_VERSION = '20260716-loading-cache-1';
 const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
@@ -186,7 +186,7 @@ function imageUrlFromPost(post) {
 function imageTag(url, alt, className = '') {
   const src = normalizeImageUrl(url);
   const classAttr = className ? ` class="${escapeHtml(className)}"` : '';
-  return `<img${classAttr} src="${escapeHtml(src)}" alt="${escapeHtml(alt || 'スタイル写真')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.gallery-item,.manage-card,.detail-card,td')?.classList.add('image-load-error'); this.alt='画像を読み込めません';">`;
+  return `<img${classAttr} src="${escapeHtml(src)}" alt="${escapeHtml(alt || 'スタイル写真')}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest('.gallery-item,.manage-card,.detail-card,td')?.classList.add('image-load-error'); this.alt='画像を読み込めません';">`;
 }
 
 function displaySalonName(post) {
@@ -391,6 +391,7 @@ async function loadRemoteDb() {
     state.db = normalizeDatabase(fallback.database);
     state.db.stylePosts = state.db.stylePosts.filter(post => String(post.shopId || '').trim() === scopedShopId);
     state.backendMode = 'remote';
+    saveDb();
     debugStylebook('API database compatibility fallback counts', {
       shopId: scopedShopId,
       posts: state.db.stylePosts?.length || 0,
@@ -400,6 +401,7 @@ async function loadRemoteDb() {
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
   state.db = normalizeDatabase(data.database);
   state.backendMode = 'remote';
+  saveDb();
   debugStylebook('API database response counts', {
     posts: state.db.stylePosts?.length || 0,
     colorsFromApi: state.db.extensionColors?.length || 0,
@@ -545,13 +547,26 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
 
 async function loadDb() {
   if (hasRemoteApi()) {
+    state.isLoading = true;
+    const saved = localStorage.getItem(dbStorageKeyForCurrentUser());
+    if (saved) {
+      try {
+        state.db = normalizeDatabase(JSON.parse(saved));
+        state.backendMode = 'loading';
+      } catch (error) {
+        state.db = seedData();
+        state.backendMode = 'loading';
+      }
+    }
     try {
       await loadRemoteDb();
+      state.isLoading = false;
       return;
     } catch (error) {
       console.warn('Stylebook remote API failed. Local display only.', error);
-      state.db = seedData();
+      if (!saved) state.db = seedData();
       state.backendMode = 'local';
+      state.isLoading = false;
       return;
     }
   }
@@ -571,6 +586,7 @@ async function loadDb() {
   }
   state.db = seedData();
   state.backendMode = 'local';
+  state.isLoading = false;
   saveDb();
 }
 
@@ -588,6 +604,7 @@ function primeDbForImmediateNavigation() {
   }
   state.db = seedData();
   state.backendMode = hasRemoteApi() ? 'loading' : 'local';
+  state.isLoading = hasRemoteApi();
 }
 
 function saveDb() {
@@ -597,10 +614,15 @@ function saveDb() {
 
 async function refreshRemoteDb() {
   if (!hasRemoteApi()) return;
-  await loadRemoteDb();
-  renderUserSelect();
-  renderFilterControls();
-  renderSelectOptions();
+  state.isLoading = true;
+  try {
+    await loadRemoteDb();
+  } finally {
+    state.isLoading = false;
+    renderUserSelect();
+    renderFilterControls();
+    renderSelectOptions();
+  }
 }
 
 function currentUser() {
@@ -1020,14 +1042,32 @@ function renderActiveChips() {
   )).join('');
 }
 
+function renderGalleryLoading() {
+  el.galleryGrid.innerHTML = `
+    <div class="gallery-loading-state" aria-live="polite">
+      <strong>読み込み中...</strong>
+      <span>スタイルを取得しています</span>
+      <div class="skeleton-gallery" aria-hidden="true">
+        ${Array.from({ length: 6 }).map(() => '<i></i>').join('')}
+      </div>
+    </div>`;
+}
+
 function renderGallery() {
   updateStylebookHeading();
   renderShopScopeNotice();
   const posts = filteredPosts();
   const visible = posts.slice(0, state.visibleCount);
+  const isInitialLoading = state.isLoading && !posts.length && hasRemoteApi();
   el.galleryGrid.innerHTML = visible.map(renderGalleryItem).join('');
-  el.resultCount.textContent = `${posts.length}件`;
+  el.resultCount.textContent = isInitialLoading ? '読み込み中' : `${posts.length}件`;
   if (el.stylebookPostCount) el.stylebookPostCount.textContent = `${activePosts().length}件`;
+  if (isInitialLoading) {
+    renderGalleryLoading();
+    renderActiveChips();
+    renderFilterControls();
+    return;
+  }
   if (!posts.length) {
     const hasPublishedPosts = activePosts().length > 0;
     el.galleryGrid.innerHTML = hasPublishedPosts

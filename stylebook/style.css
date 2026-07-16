@@ -365,6 +365,46 @@ img { display: block; max-width: 100%; }
 .empty-gallery-state {
   align-content: center;
 }
+.gallery-loading-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  min-height: min(56vh, 460px);
+  padding: 34px 12px;
+  align-content: center;
+  text-align: center;
+  color: var(--muted);
+}
+.gallery-loading-state strong {
+  color: var(--ink);
+  font-size: clamp(19px, 5vw, 26px);
+  line-height: 1.25;
+}
+.gallery-loading-state span {
+  font-size: 14px;
+  font-weight: 800;
+}
+.skeleton-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 520px);
+  margin: 12px auto 0;
+}
+.skeleton-gallery i {
+  display: block;
+  min-height: 178px;
+  border-radius: 16px;
+  background:
+    linear-gradient(100deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.74) 38%, rgba(255,255,255,.18) 76%) 0 0 / 220% 100%,
+    rgba(255,255,255,.72);
+  border: 1px solid rgba(212, 190, 145, .28);
+  box-shadow: 0 16px 34px rgba(35,45,49,.08);
+  animation: skeletonShimmer 1.2s ease-in-out infinite;
+}
+@keyframes skeletonShimmer {
+  to { background-position: -220% 0, 0 0; }
+}
 .sentinel { height: 80px; }
 
 .quick-actions {
