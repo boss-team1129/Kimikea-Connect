@@ -4542,6 +4542,10 @@
       return `<span class="${className}" data-size="${escapeHtml(size)}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><span>画像準備中</span></span>`;
     }
 
+    function colorDisplayName(color) {
+      return String(color.colorName || color.color || color.name || '').trim();
+    }
+
     function rankingLabel(value) {
       const rank = Number(value || 0);
       return rank > 0 ? `第${rank}位` : '集計中';
@@ -4679,8 +4683,8 @@
             ${colorImageMarkup(color, 'color-detail-image', 'large')}
             <div>
               <span class="color-chart-category">${escapeHtml(color.category)}</span>
-              <h3>${escapeHtml(color.code || color.color)}</h3>
-              <p>${escapeHtml(color.colorName || color.color || '')}</p>
+              <h3>${escapeHtml(colorDisplayName(color))}</h3>
+              <p>${escapeHtml(color.category || '')}</p>
               <dl class="color-rankings">
                 <div><dt>今月購入ランキング</dt><dd>${escapeHtml(rankingLabel(color.purchaseRank))}</dd></div>
                 <div><dt>サロン人気ランキング</dt><dd>${escapeHtml(rankingLabel(color.salonRank))}</dd></div>
@@ -4730,8 +4734,7 @@
           ${colors.map((color) => `
             <button type="button" class="color-chart-item" onclick="openColorDetail('${escapeHtml(color.code)}')">
               ${colorImageMarkup(color, 'color-chart-swatch')}
-              <strong>${escapeHtml(color.code || color.color)}</strong>
-              ${color.colorName ? `<span>${escapeHtml(color.colorName)}</span>` : `<span>${escapeHtml(color.color)}</span>`}
+              <strong>${escapeHtml(colorDisplayName(color))}</strong>
               <span class="color-chart-category">${escapeHtml(color.category)}</span>
             </button>
           `).join('')}
@@ -4782,8 +4785,8 @@
         <article class="ranking-color-card">
           ${colorImageMarkup(color, 'ranking-color-image')}
           <em>${escapeHtml(rankingLabel(color[rankKey]))}</em>
-          <strong>${escapeHtml(color.code || color.color)}</strong>
-          <small>${escapeHtml(color.colorName || color.color || '')}</small>
+          <strong>${escapeHtml(colorDisplayName(color))}</strong>
+          <small>${escapeHtml(color.category || '')}</small>
         </article>
       `;
     }
@@ -5879,8 +5882,8 @@
         return `
           <button type="button" class="order-product-card${selected ? ' is-selected' : ''}" onclick="selectOrderProduct(${index})">
             ${colorImageMarkup(color, 'order-product-image')}
-            <strong>${escapeHtml(color.code || color.color)}</strong>
-            <span>${escapeHtml(color.colorName || color.color)}</span>
+            <strong>${escapeHtml(colorDisplayName(color))}</strong>
+            <span>${escapeHtml(color.category || '')}</span>
           </button>
         `;
       }).join('') || '<p class="color-chart-empty">該当するカラーがありません。</p>';

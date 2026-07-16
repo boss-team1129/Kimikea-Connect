@@ -245,7 +245,18 @@ function activeColors() {
 }
 
 function colorDisplayLabel(color) {
-  return [color?.colorCode, color?.colorName].filter(Boolean).join(' ');
+  return String(color?.colorName || color?.color || color?.name || color?.colorCode || '').trim();
+}
+
+function colorSearchText(color) {
+  return [
+    color?.productCode,
+    color?.colorCode,
+    color?.colorName,
+    color?.color,
+    color?.name,
+    color?.category,
+  ].filter(Boolean).join(' ');
 }
 
 function buildImageSvg(seed, title, a, b, c) {
@@ -927,7 +938,7 @@ function renderColorChoiceList() {
   const activeColorList = activeColors();
   const colors = activeColorList.filter(color => {
     if (!query) return true;
-    return [color.colorCode, color.colorName, color.category].join(' ').toLowerCase().includes(query);
+    return colorSearchText(color).toLowerCase().includes(query);
   });
   debugStylebook('renderColorChoiceList counts before render', {
     query,
@@ -941,7 +952,7 @@ function renderColorChoiceList() {
     return `<section class="color-category"><h3>${escapeHtml(category)}</h3><div class="color-choice-grid">${list.map(color => `
       <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
         ${colorImageMarkup(color)}
-        <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
+        <span><strong>${escapeHtml(colorDisplayLabel(color))}</strong></span>
         <small>${escapeHtml(color.category)}</small>
       </button>
     `).join('')}</div></section>`;
@@ -950,7 +961,7 @@ function renderColorChoiceList() {
   const otherHtml = otherColors.length ? `<section class="color-category"><h3>その他</h3><div class="color-choice-grid">${otherColors.map(color => `
     <button type="button" class="color-choice ${selected.has(color.id) ? 'active' : ''}" data-color-choice="${escapeHtml(color.id)}" aria-pressed="${selected.has(color.id) ? 'true' : 'false'}">
       ${colorImageMarkup(color)}
-      <span><strong>${escapeHtml(color.colorCode)}</strong>${escapeHtml(color.colorName)}</span>
+      <span><strong>${escapeHtml(colorDisplayLabel(color))}</strong></span>
       <small>${escapeHtml(color.category)}</small>
     </button>
   `).join('')}</div></section>` : '';
