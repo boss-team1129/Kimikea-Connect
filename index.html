@@ -3012,6 +3012,92 @@
       background: #fffdf9;
     }
 
+    .mypage-hero {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+      border: 1px solid rgba(189, 147, 64, 0.24);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(247,240,226,.82));
+      box-shadow: 0 18px 40px rgba(34, 28, 20, .08);
+    }
+    .mypage-hero h3 { margin: 0; font-size: 22px; }
+    .mypage-hero p { margin: 0; color: var(--muted); line-height: 1.6; }
+    .mypage-tabbar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mypage-tabbar button {
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(189, 147, 64, .24);
+      background: rgba(255,255,255,.9);
+      font-weight: 800;
+    }
+    .mypage-tabbar button.is-active {
+      color: #fff;
+      background: linear-gradient(135deg, #b88a2c, #e2c878);
+      box-shadow: 0 10px 22px rgba(184, 138, 44, .22);
+    }
+    .mypage-summary-grid,
+    .mypage-section-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .mypage-card {
+      display: grid;
+      gap: 5px;
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid rgba(189, 147, 64, .18);
+      border-radius: 16px;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 12px 28px rgba(34, 28, 20, .06);
+      text-align: left;
+    }
+    .mypage-card span { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .mypage-card strong { color: var(--black); font-size: 16px; line-height: 1.35; }
+    .mypage-card small { color: var(--muted); line-height: 1.45; }
+    .mypage-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .mypage-list-card {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid rgba(189, 147, 64, .16);
+      border-radius: 16px;
+      background: #fffdf9;
+    }
+    .mypage-list-card header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+    }
+    .mypage-list-card dl {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0;
+    }
+    .mypage-list-card dt { color: var(--muted); font-size: 11px; font-weight: 800; }
+    .mypage-list-card dd { margin: 2px 0 0; font-weight: 800; }
+    @media (max-width: 360px) {
+      .mypage-summary-grid,
+      .mypage-section-grid,
+      .mypage-list-card dl { grid-template-columns: 1fr; }
+    }
+
 
     .order-back-row { display: none; }
 
@@ -3577,6 +3663,7 @@
       <div class="field">
         <label for="loginPassword">パスワード</label>
         <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" required>
+        <button type="button" class="button button-outline button-small" onclick="toggleLoginPasswordVisibility()">パスワードを表示</button>
       </div>
       <button id="loginButton" class="button button-gold" type="submit">ログイン</button>
       <div class="login-info-box">
@@ -4063,6 +4150,14 @@
             : '会員IDまたはメールアドレス、またはパスワードが正しくありません。';
           setMessage('loginMessage', safeMessage, true);
         });
+    }
+
+    function toggleLoginPasswordVisibility() {
+      const input = document.getElementById('loginPassword');
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
+      const button = input.parentElement?.querySelector('button[type="button"]');
+      if (button) button.textContent = input.type === 'password' ? 'パスワードを表示' : 'パスワードを非表示';
     }
 
     function handleInitialPasswordSetup(event) {
@@ -6200,11 +6295,171 @@
       openPublicPage(action);
     }
 
+    function myPageOrderSummary() {
+      const orders = state.orders || [];
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return orders.reduce((summary, order) => {
+        const status = String(order.shippingStatus || '');
+        const cancelled = status.includes('キャンセル') || status.toLowerCase() === 'cancelled';
+        const amount = Number(order.invoiceTotal || 0);
+        const bags = Number(order.totalBags || 0);
+        if (!cancelled) {
+          summary.totalAmount += amount;
+          summary.totalBags += bags;
+          summary.orderCount += 1;
+          if (String(order.orderDate || '').startsWith(monthKey)) {
+            summary.monthAmount += amount;
+            summary.monthBags += bags;
+          }
+        }
+        return summary;
+      }, { totalAmount: 0, totalBags: 0, orderCount: 0, monthAmount: 0, monthBags: 0 });
+    }
+
+    function myPageInvoices() {
+      const groups = {};
+      (state.orders || []).forEach((order) => {
+        const key = String(order.orderDate || '').slice(0, 7).replace('/', '-');
+        if (!key) return;
+        if (!groups[key]) groups[key] = { key, orders: [], amount: 0, bags: 0 };
+        groups[key].orders.push(order);
+        if (!String(order.shippingStatus || '').includes('キャンセル')) {
+          groups[key].amount += Number(order.invoiceTotal || 0);
+          groups[key].bags += Number(order.totalBags || 0);
+        }
+      });
+      return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
+    }
+
+    function renderMyPageTab(tab = 'profile') {
+      document.querySelectorAll('.mypage-tabbar button').forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.tab === tab);
+      });
+      const franchise = state.franchise || {};
+      const target = document.getElementById('mypageContent');
+      if (!target) return;
+      if (tab === 'profile') {
+        target.innerHTML = `
+          <div class="mypage-section-grid">
+            <section class="mypage-card"><span>サロン名</span><strong>${escapeHtml(franchise.salonName || franchise.franchiseName || '未登録')}</strong></section>
+            <section class="mypage-card"><span>担当者名</span><strong>${escapeHtml(franchise.contactName || franchise.displayName || '未登録')}</strong></section>
+            <section class="mypage-card"><span>加盟店ID</span><strong>${escapeHtml(franchise.memberId || franchise.franchiseId || '')}</strong></section>
+            <section class="mypage-card"><span>メール</span><strong>${escapeHtml(franchise.email || '未登録')}</strong></section>
+            <section class="mypage-card"><span>電話番号</span><strong>${escapeHtml(franchise.phone || '未登録')}</strong></section>
+            <section class="mypage-card"><span>登録区分</span><strong>${escapeHtml(franchise.role || 'member')}</strong></section>
+          </div>
+          <form class="coordinator-form" onsubmit="handleMyPageProfileChange(event)">
+            <h3>プロフィール編集</h3>
+            <label class="field"><span>サロン名</span><input id="mypageSalonName" type="text" value="${escapeHtml(franchise.salonName || franchise.franchiseName || '')}" autocomplete="organization"></label>
+            <label class="field"><span>担当者名</span><input id="mypageContactName" type="text" value="${escapeHtml(franchise.contactName || franchise.displayName || '')}" autocomplete="name"></label>
+            <label class="field"><span>電話番号</span><input id="mypagePhone" type="tel" value="${escapeHtml(franchise.phone || '')}" autocomplete="tel"></label>
+            <button type="submit" class="button button-gold">プロフィールを保存</button>
+          </form>
+          <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">
+            <h3>メールアドレス変更</h3>
+            <label class="field"><span>現在のパスワード</span><input id="mypageEmailCurrentPassword" type="password" autocomplete="current-password" required></label>
+            <label class="field"><span>新しいメールアドレス</span><input id="mypageNewEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
+            <label class="field"><span>新しいメールアドレス確認</span><input id="mypageConfirmEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
+            <button type="submit" class="button button-gold">メールアドレスを変更</button>
+          </form>
+          <form class="coordinator-form" onsubmit="handleMyPagePasswordChange(event)">
+            <h3>パスワード変更</h3>
+            <label class="field"><span>現在のパスワード</span><input id="mypageCurrentPassword" type="password" autocomplete="current-password" required></label>
+            <label class="field"><span>新しいパスワード</span><input id="mypageNewPassword" type="password" autocomplete="new-password" required></label>
+            <label class="field"><span>確認用パスワード</span><input id="mypageConfirmPassword" type="password" autocomplete="new-password" required></label>
+            <p class="form-note">新しいパスワードは4文字以上で設定してください。</p>
+            <button type="submit" class="button button-gold">パスワードを変更</button>
+          </form>
+        `;
+        return;
+      }
+      if (tab === 'posts') {
+        target.innerHTML = `
+          <div class="mypage-list">
+            <button type="button" class="mypage-list-card" onclick="openStylebook()">
+              <header><strong>スタイル図鑑の投稿履歴を開く</strong><span>本人投稿のみ</span></header>
+              <small>編集・削除は「自分の投稿」ページ内だけで操作できます。</small>
+            </button>
+          </div>
+        `;
+        return;
+      }
+      if (tab === 'orders') {
+        const summary = myPageOrderSummary();
+        const cards = (state.orders || []).map((order) => `
+          <article class="mypage-list-card">
+            <header><strong>${escapeHtml(order.orderNo)}</strong><span>${escapeHtml(order.shippingStatus || '発送準備')}</span></header>
+            <dl>
+              <div><dt>注文日</dt><dd>${escapeHtml(order.orderDate || '')}</dd></div>
+              <div><dt>注文金額</dt><dd>${yen(order.invoiceTotal || 0)}</dd></div>
+              <div><dt>注文袋数</dt><dd>${Number(order.totalBags || 0)}袋</dd></div>
+              <div><dt>支払状況</dt><dd>${escapeHtml(order.paymentStatus || '未確認')}</dd></div>
+            </dl>
+            <button type="button" class="button button-outline button-small" onclick="openOrderPage()">詳細を見る</button>
+          </article>
+        `).join('');
+        target.innerHTML = `
+          <div class="mypage-summary-grid">
+            <section class="mypage-card"><span>累計注文金額</span><strong>${yen(summary.totalAmount)}</strong></section>
+            <section class="mypage-card"><span>累計注文袋数</span><strong>${summary.totalBags}袋</strong></section>
+            <section class="mypage-card"><span>注文回数</span><strong>${summary.orderCount}回</strong></section>
+            <section class="mypage-card"><span>今月の注文</span><strong>${yen(summary.monthAmount)} / ${summary.monthBags}袋</strong></section>
+          </div>
+          <div class="mypage-list">${cards || '<p class="message">注文履歴はまだありません。</p>'}</div>
+        `;
+        return;
+      }
+      if (tab === 'invoices') {
+        const invoices = myPageInvoices();
+        target.innerHTML = `
+          <div class="mypage-list">
+            ${invoices.map((invoice) => `
+              <article class="mypage-list-card">
+                <header><strong>${escapeHtml(invoice.key)} 請求書</strong><span>未確定</span></header>
+                <dl>
+                  <div><dt>対象期間</dt><dd>${escapeHtml(invoice.key)}</dd></div>
+                  <div><dt>対象注文</dt><dd>${invoice.orders.length}件</dd></div>
+                  <div><dt>請求金額</dt><dd>${yen(invoice.amount)}</dd></div>
+                  <div><dt>合計袋数</dt><dd>${invoice.bags}袋</dd></div>
+                </dl>
+                <small>正式PDFは本部確定後に表示します。現在は注文履歴から月単位で集計しています。</small>
+              </article>
+            `).join('') || '<p class="message">請求対象の注文はまだありません。</p>'}
+          </div>
+        `;
+        return;
+      }
+      if (tab === 'logout') {
+        handleLogout();
+      }
+    }
+
+    function refreshMyPageData() {
+      const message = document.getElementById('mypageMessage');
+      if (message) message.textContent = 'マイページ情報を読み込んでいます...';
+      return callServer('getPortalData', state.sessionToken)
+        .then((data) => {
+          state.franchise = data.franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
+          state.orders = data.orders || [];
+          state.orderSettings = data.orderSettings || state.orderSettings;
+          renderMyPageTab('profile');
+          if (message) message.textContent = '';
+        })
+        .catch((error) => {
+          if (message) {
+            message.textContent = getErrorMessage(error);
+            message.classList.add('error');
+          }
+        });
+    }
+
     function openMyPage() {
       const isLoggedIn = Boolean(state.sessionToken && !String(state.sessionToken).startsWith('public-'));
       if (!isLoggedIn) {
         showOrderLogin();
-        setMessage('loginMessage', 'マイページを見るには登録済みメールアドレスとパスワードでログインしてください。', false);
+        setMessage('loginMessage', 'マイページは加盟店・コーディネーター専用です。ご登録時に発行されたIDとパスワードでログインしてください。', false);
         return;
       }
       rememberKimikeaRoute('public', 'mypage');
@@ -6214,92 +6469,35 @@
       document.getElementById('orderWorkspace').hidden = true;
       document.getElementById('publicPageView').hidden = false;
       document.getElementById('publicPageTitle').textContent = 'マイページ';
-      document.getElementById('publicPageLead').textContent = `${franchise.franchiseName || '加盟店'} 様の会員ページです。注文履歴、お気に入り、投稿履歴、下書きをここに集約していきます。`;
+      document.getElementById('publicPageLead').textContent = '加盟店・コーディネーター専用ページです。プロフィール、投稿、注文、請求情報を確認できます。';
       document.getElementById('publicPageList').innerHTML = '';
       document.getElementById('publicPageActions').innerHTML = `
-        <div id="mypageRegistrationNotice" class="order-profile-notice">店舗情報や担当者情報が未登録の場合は、こちらで登録・確認してください。</div>
-        <div class="mypage-section-grid">
-          <section class="mypage-card">
-            <span>プロフィール</span>
-            <strong>${escapeHtml(franchise.franchiseName || franchise.salonName || '加盟店')}</strong>
-            <small>${escapeHtml(franchise.email || 'メール未登録')}</small>
-          </section>
-          <button type="button" class="mypage-card" onclick="openStylebook()">
-            <span>保存したスタイル</span>
-            <strong>お気に入り</strong>
-            <small>スタイル図鑑で保存したレシピを確認</small>
-          </button>
-          <button type="button" class="mypage-card" onclick="openStylebook()">
-            <span>自分の投稿</span>
-            <strong>投稿履歴</strong>
-            <small>投稿した写真とレシピを管理</small>
-          </button>
-          <button type="button" class="mypage-card" onclick="openStylebook()">
-            <span>下書き</span>
-            <strong>作成途中</strong>
-            <small>下書き保存したスタイルを編集</small>
-          </button>
-          <button type="button" class="mypage-card" onclick="openOrderPage()">
-            <span>注文履歴</span>
-            <strong>会員注文</strong>
-            <small>過去の注文と請求書を確認</small>
-          </button>
-          <button type="button" class="mypage-card" onclick="openStylebook()">
-            <span>お気に入り</span>
-            <strong>保存一覧</strong>
-            <small>提案に使うレシピをまとめる</small>
-          </button>
-          <section class="mypage-card">
-            <span>登録店舗情報</span>
-            <strong>${escapeHtml(franchise.salonName || franchise.franchiseName || '未登録')}</strong>
-            <small>${escapeHtml(franchise.address || '店舗住所を登録できます')}</small>
-          </section>
-          <section class="mypage-card">
-            <span>担当者情報</span>
-            <strong>${escapeHtml(franchise.contactName || '未登録')}</strong>
-            <small>${escapeHtml(franchise.phone || '電話番号を登録できます')}</small>
-          </section>
+        <section class="mypage-hero">
+          <span>KIMIKEA MEMBER</span>
+          <h3>${escapeHtml(franchise.franchiseName || franchise.salonName || '加盟店')}</h3>
+          <p>${escapeHtml(franchise.contactName || franchise.displayName || '')}</p>
+        </section>
+        <div class="mypage-tabbar" role="tablist">
+          <button type="button" data-tab="profile" class="is-active" onclick="renderMyPageTab('profile')">プロフィール</button>
+          <button type="button" data-tab="posts" onclick="renderMyPageTab('posts')">投稿履歴</button>
+          <button type="button" data-tab="orders" onclick="renderMyPageTab('orders')">注文履歴</button>
+          <button type="button" data-tab="invoices" onclick="renderMyPageTab('invoices')">請求書一覧</button>
+          <button type="button" data-tab="logout" onclick="renderMyPageTab('logout')">ログアウト</button>
         </div>
-        <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">
-          <h3>メールアドレス変更</h3>
-          <label class="field">
-            <span>新しいメールアドレス</span>
-            <input id="mypageNewEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required>
-          </label>
-          <button type="submit" class="button button-gold">メールアドレスを保存</button>
-        </form>
-        <form class="coordinator-form" onsubmit="handleMyPagePasswordChange(event)">
-          <h3>パスワード変更</h3>
-          <label class="field">
-            <span>現在のパスワード</span>
-            <input id="mypageCurrentPassword" type="password" autocomplete="current-password" required>
-          </label>
-          <label class="field">
-            <span>新しいパスワード</span>
-            <input id="mypageNewPassword" type="password" autocomplete="new-password" required>
-          </label>
-          <label class="field">
-            <span>確認用パスワード</span>
-            <input id="mypageConfirmPassword" type="password" autocomplete="new-password" required>
-          </label>
-          <p class="form-note">新しいパスワードは4文字以上で設定してください。変更しない場合は初期パスワード「0000」をそのまま使えます。</p>
-          <button type="submit" class="button button-gold">パスワードを変更</button>
-        </form>
+        <div id="mypageContent"><p class="message">マイページ情報を読み込んでいます...</p></div>
         <details class="coordinator-form">
           <summary>本部管理者用 ユーザー管理</summary>
           <form onsubmit="handleAdminPasswordReset(event)">
             <h3>パスワードを0000へリセット</h3>
-            <label class="field">
-              <span>加盟店ID / memberId</span>
-              <input id="adminResetMemberId" type="text" autocomplete="off" placeholder="例：member-001" required>
-            </label>
+            <label class="field"><span>加盟店ID / memberId</span><input id="adminResetMemberId" type="text" autocomplete="off" placeholder="例：member-001" required></label>
             <p class="form-note">本部管理者のみ実行できます。パスワードは画面上に表示されません。</p>
             <button type="submit" class="button button-outline">0000へリセット</button>
           </form>
         </details>
-        <button type="button" class="button button-outline" onclick="handleLogout()">ログアウト</button>
         <p id="mypageMessage" class="message" aria-live="polite"></p>
       `;
+      renderMyPageTab('profile');
+      refreshMyPageData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
     }
@@ -6307,13 +6505,41 @@
     function handleMyPageEmailChange(event) {
       event.preventDefault();
       const newEmail = document.getElementById('mypageNewEmail').value.trim();
+      const confirmEmail = document.getElementById('mypageConfirmEmail').value.trim();
+      const currentPassword = document.getElementById('mypageEmailCurrentPassword').value.normalize('NFKC').replace(/\s/g, '');
+      if (newEmail !== confirmEmail) {
+        setMessage('mypageMessage', '新しいメールアドレスと確認用メールアドレスが一致しません。', true);
+        return;
+      }
       setMessage('mypageMessage', '保存しています...', false);
-      callServer('updateMemberEmail', state.sessionToken, newEmail)
+      callServer('changeMemberEmail', state.sessionToken, currentPassword, newEmail, confirmEmail)
         .then((franchise) => {
           state.franchise = franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           renderProfile();
-          setMessage('mypageMessage', 'メールアドレスを更新しました。', false);
+          renderMyPageTab('profile');
+          setMessage('mypageMessage', 'メールアドレスを更新しました。次回から新しいメールアドレスでログインしてください。', false);
+        })
+        .catch((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        });
+    }
+
+    function handleMyPageProfileChange(event) {
+      event.preventDefault();
+      const profile = {
+        salonName: document.getElementById('mypageSalonName').value.trim(),
+        contactName: document.getElementById('mypageContactName').value.trim(),
+        phone: document.getElementById('mypagePhone').value.trim(),
+      };
+      setMessage('mypageMessage', 'プロフィールを保存しています...', false);
+      callServer('updateMyProfile', state.sessionToken, profile)
+        .then((franchise) => {
+          state.franchise = franchise || state.franchise;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
+          renderProfile();
+          renderMyPageTab('profile');
+          setMessage('mypageMessage', 'プロフィールを保存しました。', false);
         })
         .catch((error) => {
           setMessage('mypageMessage', getErrorMessage(error), true);

@@ -390,6 +390,66 @@ function updateMemberEmail(sessionToken, newEmail) {
   return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
 }
 
+function changeMemberEmail(sessionToken, currentPassword, newEmail, confirmEmail) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const current = normalizeLoginPassword_(currentPassword);
+  if (!isValidFranchisePassword_(franchise, current)) {
+    throw new Error('現在のパスワードが正しくありません。');
+  }
+  const email = normalizeEmail_(newEmail);
+  const confirm = normalizeEmail_(confirmEmail);
+  if (!email || email.indexOf('@') === -1) {
+    throw new Error('正しいメールアドレスを入力してください。');
+  }
+  if (email !== confirm) {
+    throw new Error('新しいメールアドレスと確認用メールアドレスが一致しません。');
+  }
+
+  const duplicate = getFranchiseMasterRecords_().find((item) => (
+    item.franchiseId !== franchise.franchiseId
+    && item.visible
+    && normalizeEmail_(item.email) === email
+  ));
+  if (duplicate) {
+    throw new Error('このメールアドレスはすでに登録されています。');
+  }
+
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const indexes = getFranchiseMasterColumnIndexes_(sheet);
+  sheet.getRange(franchise.rowNumber, indexes.email + 1).setValue(email);
+  if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(new Date());
+  return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
+}
+
+function updateMyProfile(sessionToken, profile) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const indexFor = (candidates) => findMasterHeaderIndex_(headers, candidates);
+  const salonNameIndex = indexFor(['salonName', '加盟店名', 'サロン名']);
+  const contactNameIndex = indexFor(['contactName', '担当者名']);
+  const displayNameIndex = indexFor(['displayName', '表示名']);
+  const phoneIndex = indexFor(['phone', '電話番号']);
+  const updatedAtIndex = indexFor(['updatedAt', '更新日']);
+
+  const salonName = String(profile && profile.salonName || '').trim();
+  const contactName = String(profile && profile.contactName || '').trim();
+  const phone = String(profile && profile.phone || '').trim();
+
+  if (salonNameIndex !== -1) sheet.getRange(franchise.rowNumber, salonNameIndex + 1).setValue(salonName);
+  if (contactNameIndex !== -1) sheet.getRange(franchise.rowNumber, contactNameIndex + 1).setValue(contactName);
+  if (displayNameIndex !== -1) sheet.getRange(franchise.rowNumber, displayNameIndex + 1).setValue(contactName || salonName);
+  if (phoneIndex !== -1) sheet.getRange(franchise.rowNumber, phoneIndex + 1).setValue(phone);
+  if (updatedAtIndex !== -1) sheet.getRange(franchise.rowNumber, updatedAtIndex + 1).setValue(new Date());
+
+  return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
+}
+
 function changeMemberPassword(sessionToken, currentPassword, newPassword, confirmPassword) {
   const franchise = getSessionFranchise_(sessionToken);
   const current = normalizeLoginPassword_(currentPassword);

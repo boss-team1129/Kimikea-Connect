@@ -8,7 +8,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260717-color-name-fix-1';
+const STYLEBOOK_ASSET_VERSION = '20260717-speed-mypage-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -65,6 +65,7 @@ const state = {
   isRestoringAppHistory: false,
   immediateActionUntil: 0,
   savingPostIds: new Set(),
+  isSubmittingPost: false,
   externalShopId: STYLEBOOK_INITIAL_SHOP_ID,
   externalShopName: STYLEBOOK_INITIAL_SHOP_NAME,
   externalShopScopeApplied: false,
@@ -663,6 +664,42 @@ function primeDbForImmediateNavigation() {
 function saveDb() {
   if (state.db) state.db.saveSummaries = buildSaveSummariesFromSaves(state.db.stylePosts, state.db.savedStyles);
   localStorage.setItem(dbStorageKeyForCurrentUser(), JSON.stringify(state.db));
+}
+
+function upsertLocalPost(post) {
+  if (!post || !post.id || !state.db) return;
+  const normalized = normalizeDatabase({ ...state.db, stylePosts: [post] }).stylePosts[0] || post;
+  const index = state.db.stylePosts.findIndex(item => item.id === normalized.id);
+  if (index >= 0) state.db.stylePosts[index] = { ...state.db.stylePosts[index], ...normalized };
+  else state.db.stylePosts.unshift(normalized);
+  saveDb();
+}
+
+function markLocalPostDeleted(postId, deletedPost = null) {
+  if (!state.db) return;
+  const index = state.db.stylePosts.findIndex(item => item.id === postId);
+  if (index < 0) return;
+  state.db.stylePosts[index] = {
+    ...state.db.stylePosts[index],
+    ...(deletedPost || {}),
+    status: 'deleted',
+    isPublished: false,
+    deletedAt: deletedPost?.deletedAt || new Date().toISOString(),
+  };
+  saveDb();
+}
+
+function setPostSubmitting(isSubmitting, message = '') {
+  state.isSubmittingPost = Boolean(isSubmitting);
+  const buttons = el.postForm ? Array.from(el.postForm.querySelectorAll('button[type="submit"]')) : [];
+  buttons.forEach(button => {
+    button.disabled = state.isSubmittingPost;
+    button.classList.toggle('is-loading', state.isSubmittingPost);
+  });
+  if (message) {
+    el.formMessage.classList.remove('error');
+    el.formMessage.textContent = message;
+  }
 }
 
 async function refreshRemoteDb() {
@@ -1740,6 +1777,7 @@ function showPostForm(postId = '', options = {}) {
 
 async function submitPost(event) {
   event.preventDefault();
+  if (state.isSubmittingPost) return;
   if (!canPost()) return;
   const editing = state.currentEditId ? state.db.stylePosts.find(post => post.id === state.currentEditId) : null;
   if (editing && !canManagePost(editing)) {
@@ -1797,13 +1835,16 @@ async function submitPost(event) {
     el.formMessage.classList.add('error');
     return;
   }
-  el.formMessage.classList.remove('error');
-  el.formMessage.textContent = requestedStatus === 'draft' ? '下書きを保存しています...' : '投稿を保存しています...';
+  setPostSubmitting(true, imageUrl.startsWith('data:image/')
+    ? '画像を保存しています...'
+    : '投稿内容を登録しています...');
   try {
     if (state.backendMode === 'remote') {
       const result = await apiRequest('savePost', { post });
-      await refreshRemoteDb();
+      upsertLocalPost(result.post || post);
       clearPostForm();
+      setPostSubmitting(false);
+      alert(requestedStatus === 'draft' ? '下書きを保存しました。' : '投稿しました。');
       showDetail(result.id || post.id, { mode: 'myPosts' });
       return;
     }
@@ -1812,10 +1853,13 @@ async function submitPost(event) {
     else state.db.stylePosts.unshift(post);
     saveDb();
     clearPostForm();
+    setPostSubmitting(false);
+    alert(requestedStatus === 'draft' ? '下書きを保存しました。' : '投稿しました。');
     showDetail(post.id, { mode: 'myPosts' });
   } catch (error) {
     el.formMessage.textContent = error.message || '保存できませんでした。';
     el.formMessage.classList.add('error');
+    setPostSubmitting(false);
   }
 }
 
@@ -1828,8 +1872,8 @@ async function publishPost(postId) {
   }
   try {
     if (state.backendMode === 'remote') {
-      await apiRequest('publishPost', { postId });
-      await refreshRemoteDb();
+      const result = await apiRequest('publishPost', { postId });
+      upsertLocalPost(result.post || { ...post, status: 'published', isPublished: true, updatedAt: new Date().toISOString() });
     } else {
       post.status = 'published';
       post.isPublished = true;
@@ -1850,10 +1894,14 @@ async function logicalDeletePost(postId) {
   }
   if (!confirm('この投稿を削除します。よろしいですか？')) return;
   const reason = '投稿者本人による削除';
+  const previousPost = { ...post };
+  markLocalPostDeleted(postId);
+  if (state.currentView === 'drafts') renderDrafts();
+  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine();
   try {
     if (state.backendMode === 'remote') {
-      await apiRequest('deletePost', { postId, reason });
-      await refreshRemoteDb();
+      const result = await apiRequest('deletePost', { postId, reason });
+      markLocalPostDeleted(postId, result.post);
     } else {
       post.deletedAt = new Date().toISOString();
       post.deletedByUserId = currentUser().id;
@@ -1862,12 +1910,14 @@ async function logicalDeletePost(postId) {
       post.status = 'deleted';
       saveDb();
     }
+    alert('投稿を削除しました。');
   } catch (error) {
+    upsertLocalPost(previousPost);
     alert(error.message || '削除できませんでした。');
     return;
   }
-  if (state.currentView === 'drafts') showDrafts();
-  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') showMine();
+  if (state.currentView === 'drafts') renderDrafts();
+  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine();
   else if (state.currentView === 'admin' || state.currentDetailMode === 'admin') renderAdmin();
   else showView('gallery');
 }

@@ -332,8 +332,10 @@ function normalizeRankingColorKey_(value) {
 }
 
 function savePost_(post, userId) {
+  const startedAt = Date.now();
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
+  const setupMs = Date.now() - startedAt;
   const user = getUser_(userId);
   if (!user) throw new Error('ログインユーザーが見つかりません。');
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
@@ -347,10 +349,14 @@ function savePost_(post, userId) {
   const existingImageUrl = existing ? String(existing.object.imageUrl || '') : '';
   const existingImageFileId = existing ? String(existing.object.imageFileId || '') : '';
   const incomingImage = post.imageUrl || post.photo || existingImageUrl || '';
+  const imageStart = Date.now();
   const image = saveImageIfNeeded_(id, incomingImage, existingImageFileId);
+  const imageMs = Date.now() - imageStart;
   const existingAdditionalImages = existing ? splitArray_(existing.object.additionalImages) : [];
   const incomingAdditionalImages = Array.isArray(post.additionalImages) ? post.additionalImages : existingAdditionalImages;
+  const additionalImageStart = Date.now();
   const additional = saveAdditionalImages_(id, incomingAdditionalImages, existing && existing.object.additionalImageFileIds);
+  const additionalImageMs = Date.now() - additionalImageStart;
   const status = post.status === 'published' ? 'published' : 'draft';
   const resolvedShopId = existing ? String(existing.object.shopId || '') : String(user.shopId || '');
   const resolvedStaffId = existing ? String(existing.object.staffId || '') : String(user.staffId || '');
@@ -392,8 +398,21 @@ function savePost_(post, userId) {
     deleteReason: existing ? existing.object.deleteReason : '',
     authorId: existing ? postAuthorId_(existing.object) : user.id,
   };
+  const sheetStart = Date.now();
   upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
-  return { ok: true, id, database: getStylebookDatabase_(user.id) };
+  const sheetMs = Date.now() - sheetStart;
+  const normalizedPost = normalizePost_(row);
+  logStylebookDebug_('savePost timing', {
+    id,
+    isEdit: Boolean(existing),
+    status,
+    setupMs,
+    imageMs,
+    additionalImageMs,
+    sheetMs,
+    totalMs: Date.now() - startedAt,
+  });
+  return { ok: true, id, post: normalizedPost };
 }
 
 function publishPost_(postId, userId) {
@@ -406,7 +425,7 @@ function publishPost_(postId, userId) {
   found.object.isPublished = true;
   found.object.updatedAt = new Date().toISOString();
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
-  return { ok: true, id: postId };
+  return { ok: true, id: postId, post: normalizePost_(found.object) };
 }
 
 function deletePost_(postId, userId, reason) {
@@ -422,7 +441,7 @@ function deletePost_(postId, userId, reason) {
   found.object.deleteReason = reason || '';
   found.object.updatedAt = new Date().toISOString();
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
-  return { ok: true, id: postId };
+  return { ok: true, id: postId, post: normalizePost_(found.object) };
 }
 
 function restorePost_(postId, userId) {
