@@ -234,7 +234,7 @@ function isPublicRankingPost_(post) {
 }
 
 function normalizeRankingColorKey_(value) {
-  return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
+  return String(value || '').normalize('NFKC').trim().replace(/[\s\-‐‑‒–—―]+/g, '').toUpperCase();
 }
 
 function savePost_(post, userId) {

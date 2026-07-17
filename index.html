@@ -4778,7 +4778,7 @@
     const COLOR_CHART_CATEGORIES = ['すべて', 'ダークカラー', 'ライトカラー', '原色'];
 
     function normalizeColorCode(value) {
-      return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
+      return String(value || '').normalize('NFKC').trim().replace(/[\s\-‐‑‒–—―]+/g, '').toUpperCase();
     }
 
     function colorCodeFromProduct(product) {
@@ -4954,7 +4954,7 @@
         })
         .catch(() => {
           state.colorChartStyles = [];
-          state.colorChartStylesLoaded = true;
+          state.colorChartStylesLoaded = false;
           refreshColorChartContent();
         });
     }
@@ -5085,6 +5085,28 @@
       return [...new Set(values.map(normalizeColorCode).filter(Boolean))];
     }
 
+    function colorAliasKeys(color) {
+      return [...new Set([
+        color.productCode,
+        color.code,
+        color.colorId,
+        color.id,
+        color.colorCode,
+        color.color,
+        color.colorName,
+        color.name,
+        colorDisplayName(color),
+      ].map(normalizeColorCode).filter(Boolean))];
+    }
+
+    function countForColorAliases(color, counts) {
+      const source = counts || {};
+      return colorAliasKeys(color).reduce((max, key) => {
+        const value = Number(source[key] || 0);
+        return value > max ? value : max;
+      }, 0);
+    }
+
     function isPublishedStylePost(post) {
       const status = String(post.status || '').trim();
       const publishedValue = post.isPublished ?? post.published ?? post.isVisible;
@@ -5111,15 +5133,8 @@
     }
 
     function colorIncludedInStyle(post, color) {
-      const keys = [color.code, color.color, color.colorName, colorDisplayName(color)].map(normalizeColorCode).filter(Boolean);
-      const colorText = normalizeColorCode(JSON.stringify([
-        post.extensionColors,
-        post.extensionColorIds,
-        post.colorCodes,
-        post.colors,
-        post.colorLabels,
-      ]));
-      return keys.some((key) => colorText.includes(key));
+      const postKeys = new Set(extractPostColorKeys(post));
+      return colorAliasKeys(color).some((key) => postKeys.has(key));
     }
 
     function openColorDetail(code) {
@@ -5144,7 +5159,7 @@
     }
 
     function renderColorDetail(color) {
-      const stylePosts = state.colorChartStyles.filter((post) => colorIncludedInStyle(post, color));
+      const stylePosts = state.colorChartStyles.filter((post) => isPublishedStylePost(post) && colorIncludedInStyle(post, color));
       const ranking = colorRankingMetrics(color);
       const backLabel = state.colorDetailReturnTarget === 'ranking' ? '← ランキングへ戻る' : '← カラー一覧へ戻る';
       return `
@@ -5245,9 +5260,8 @@
 
     function colorRankingMetrics(color) {
       const code = normalizeColorCode(color.code);
-      const name = normalizeColorCode(colorDisplayName(color));
       const purchase = Number(state.rankingData.purchaseCounts[code] || 0);
-      const salon = Number(state.rankingData.salonCounts[code] || state.rankingData.salonCounts[name] || 0);
+      const salon = countForColorAliases(color, state.rankingData.salonCounts);
       const total = purchase + salon;
       return {
         purchase,
@@ -5291,9 +5305,8 @@
       const normalizedCode = normalizeColorCode(code);
       const rows = getActiveColorChartProducts().map((color) => {
         const colorCode = normalizeColorCode(color.code);
-        const name = normalizeColorCode(colorDisplayName(color));
         const purchase = Number(state.rankingData.purchaseCounts[colorCode] || 0);
-        const salon = Number(state.rankingData.salonCounts[colorCode] || state.rankingData.salonCounts[name] || 0);
+        const salon = countForColorAliases(color, state.rankingData.salonCounts);
         const score = mode === 'purchase' ? purchase : mode === 'salon' ? salon : purchase + salon;
         return { code: colorCode, score, color, sortOrder: Number(color.sortOrder || 0) };
       }).filter((row) => row.score > 0)
