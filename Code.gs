@@ -30,6 +30,10 @@ const KCO_CONFIG = {
   SESSION_SECONDS: 21600,
 };
 
+const KCO_SETUP_VALIDATION_MIN_ROWS = 100;
+const KCO_SETUP_VALIDATION_BUFFER_ROWS = 200;
+const KCO_SETUP_VALIDATION_MAX_ROWS = 1000;
+
 const KCO_COST_PRICE_FRANCHISE_IDS = ['K-0', 'K-1'];
 
 const KCO_CATEGORY_PRICES = {
@@ -1292,6 +1296,8 @@ function submitCartOrder(order) {
 
 function setupProductMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.PRODUCT_MASTER);
+  let insertedDefaultRows = 0;
+  let updatedCodeRows = 0;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_PRODUCT_HEADERS.length).setValues([KCO_PRODUCT_HEADERS]);
 
@@ -1302,13 +1308,20 @@ function setupProductMaster_(ss) {
     ];
     sheet.getRange(2, 1, rows.length, KCO_PRODUCT_HEADERS.length).setValues(rows);
     sheet.getRange(2, 4, rows.length, 2).setNumberFormat('¥#,##0');
+    insertedDefaultRows = rows.length;
   } else {
     ensureProductMasterColumns_(sheet);
-    fillMissingProductCodes_(sheet);
+    updatedCodeRows = fillMissingProductCodes_(sheet);
   }
   applyProductMasterDropdowns_(sheet);
   applyHeaderStyle_(sheet, KCO_PRODUCT_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_PRODUCT_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_PRODUCT_HEADERS.length);
+  return {
+    sheet: sheet.getName(),
+    lastRow: sheet.getLastRow(),
+    insertedDefaultRows,
+    updatedCodeRows,
+  };
 }
 
 function createProductRows_(category, colors) {
@@ -1337,7 +1350,6 @@ function ensureProductMasterColumns_(sheet) {
     sheet.getRange(1, sheet.getLastColumn()).setValue(header);
     existingHeaders.push(normalizeMasterHeader_(header));
   });
-  applyProductMasterDropdowns_(sheet);
 }
 
 function applyProductMasterDropdowns_(sheet) {
@@ -1348,7 +1360,7 @@ function applyProductMasterDropdowns_(sheet) {
   const colorGroupIndex = findMasterHeaderIndex_(headers, ['色系統', 'colorGroup']);
   if (colorGroupIndex < 0) return;
 
-  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const maxRows = getSetupValidationRowCount_(sheet);
   const rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(KCO_COLOR_GROUPS, true)
     .setAllowInvalid(false)
@@ -1358,11 +1370,11 @@ function applyProductMasterDropdowns_(sheet) {
 
 function fillMissingProductCodes_(sheet) {
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return;
+  if (values.length <= 1) return 0;
   const headers = values[0].map(normalizeMasterHeader_);
   const codeIndex = findMasterHeaderIndex_(headers, ['商品コード']);
   const categoryIndex = findMasterHeaderIndex_(headers, ['商品カテゴリー']);
-  if (codeIndex < 0 || categoryIndex < 0) return;
+  if (codeIndex < 0 || categoryIndex < 0) return 0;
 
   const counters = {};
   values.slice(1).forEach((row) => {
@@ -1371,13 +1383,19 @@ function fillMissingProductCodes_(sheet) {
     if (!category || !code) return;
     counters[category] = Number(counters[category] || 0) + 1;
   });
-  values.slice(1).forEach((row, rowOffset) => {
-    const rowNumber = rowOffset + 2;
+  let updatedRowCount = 0;
+  values.slice(1).forEach((row) => {
     if (String(row[codeIndex] || '').trim()) return;
     const category = String(row[categoryIndex] || '').trim();
     counters[category] = Number(counters[category] || 0) + 1;
-    sheet.getRange(rowNumber, codeIndex + 1).setValue(createDefaultProductCode_(category, counters[category]));
+    row[codeIndex] = createDefaultProductCode_(category, counters[category]);
+    updatedRowCount += 1;
   });
+  if (updatedRowCount > 0) {
+    const codeValues = values.slice(1).map((row) => [row[codeIndex]]);
+    sheet.getRange(2, codeIndex + 1, codeValues.length, 1).setValues(codeValues);
+  }
+  return updatedRowCount;
 }
 
 function createDefaultProductCode_(category, sequence) {
@@ -1396,18 +1414,21 @@ function setupOrders_(ss) {
   ensureOrderHeaders_(sheet);
   applyHeaderStyle_(sheet, KCO_ORDER_HEADERS.length);
   setupOrderDropdowns_(sheet);
-  sheet.autoResizeColumns(1, KCO_ORDER_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_ORDER_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow() };
 }
 
 function setupOrderDetails_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.ORDER_DETAILS);
   ensureOrderDetailHeaders_(sheet);
   applyHeaderStyle_(sheet, KCO_DETAIL_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_DETAIL_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_DETAIL_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow() };
 }
 
 function setupNotices_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.NOTICES);
+  const wasEmpty = sheet.getLastRow() === 0;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_NOTICE_HEADERS.length).setValues([KCO_NOTICE_HEADERS]);
   } else {
@@ -1415,29 +1436,34 @@ function setupNotices_(ss) {
   }
   applyNoticeDropdowns_(sheet);
   applyHeaderStyle_(sheet, KCO_NOTICE_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_NOTICE_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_NOTICE_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
 function setupFranchiseMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
+  const wasEmpty = sheet.getLastRow() === 0;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
   } else {
     ensureFranchiseMasterColumns_(sheet);
   }
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_FRANCHISE_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_FRANCHISE_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
 function setupUserMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  const wasEmpty = sheet.getLastRow() === 0;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_USER_HEADERS.length).setValues([KCO_USER_HEADERS]);
   } else {
     ensureUserMasterColumns_(sheet);
   }
   applyHeaderStyle_(sheet, KCO_USER_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_USER_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_USER_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
 function ensureUserMasterColumns_(sheet) {
@@ -1703,9 +1729,10 @@ function setupSettings_(ss) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_SETTING_HEADERS.length).setValues([KCO_SETTING_HEADERS]);
   }
-  ensureDefaultSettings_(sheet);
+  const insertedDefaultRows = ensureDefaultSettings_(sheet);
   applyHeaderStyle_(sheet, KCO_SETTING_HEADERS.length);
-  sheet.autoResizeColumns(1, KCO_SETTING_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_SETTING_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), insertedDefaultRows };
 }
 
 function ensureDefaultSettings_(sheet) {
@@ -1724,14 +1751,23 @@ function ensureDefaultSettings_(sheet) {
       .setValues(missingRows);
   }
 
-  KCO_DEFAULT_SETTINGS.forEach((defaultRow) => {
-    const rowNumber = rowByItem[defaultRow[0]];
-    if (!rowNumber || defaultRow[1] === '') return;
-    const currentValue = String(sheet.getRange(rowNumber, 2).getValue() || '').trim();
-    if (!currentValue) {
-      sheet.getRange(rowNumber, 2).setValue(defaultRow[1]);
+  if (existingRows.length > 0) {
+    let changed = false;
+    KCO_DEFAULT_SETTINGS.forEach((defaultRow) => {
+      const rowNumber = rowByItem[defaultRow[0]];
+      if (!rowNumber || defaultRow[1] === '') return;
+      const rowIndex = rowNumber - 2;
+      const currentValue = String(existingRows[rowIndex][1] || '').trim();
+      if (!currentValue) {
+        existingRows[rowIndex][1] = defaultRow[1];
+        changed = true;
+      }
+    });
+    if (changed) {
+      sheet.getRange(2, 1, existingRows.length, KCO_SETTING_HEADERS.length).setValues(existingRows);
     }
-  });
+  }
+  return missingRows.length;
 }
 
 function ensureOrderHeaders_(sheet) {
@@ -1796,7 +1832,7 @@ function ensureNoticeHeaders_(sheet) {
 }
 
 function applyNoticeDropdowns_(sheet) {
-  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const maxRows = getSetupValidationRowCount_(sheet);
   const index = createIndex_(KCO_NOTICE_HEADERS);
   const categoryRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(KCO_NOTICE_CATEGORIES, true)
@@ -1822,7 +1858,7 @@ function getHeaderValues_(sheet) {
 
 function setupOrderDropdowns_(sheet) {
   const index = createIndex_(KCO_ORDER_HEADERS);
-  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const maxRows = getSetupValidationRowCount_(sheet);
 
   const shippingRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(KCO_CONFIG.SHIPPING_STATUS, true)
@@ -2535,7 +2571,8 @@ function testSendGrowMail() {
 
 function ensureShipmentEditTrigger_(ss) {
   const handlerName = 'handleOrderStatusEdit';
-  const exists = ScriptApp.getProjectTriggers().some((trigger) => (
+  const triggers = ScriptApp.getProjectTriggers();
+  const exists = triggers.some((trigger) => (
     trigger.getHandlerFunction() === handlerName
     && trigger.getEventType() === ScriptApp.EventType.ON_EDIT
   ));
@@ -2545,6 +2582,11 @@ function ensureShipmentEditTrigger_(ss) {
       .onEdit()
       .create();
   }
+  return {
+    existingTriggerCount: triggers.length,
+    handlerName,
+    created: !exists,
+  };
 }
 
 function handleOrderStatusEdit(event) {
@@ -3316,7 +3358,10 @@ function getSheet_(name) {
 }
 
 function getOrCreateSheet_(ss, name) {
-  return ss.getSheetByName(name) || ss.insertSheet(name);
+  const existingSheet = ss.getSheetByName(name);
+  if (existingSheet) return existingSheet;
+  logSetupStep_('create sheet', { sheetName: name });
+  return ss.insertSheet(name);
 }
 
 function createIndex_(headers) {
@@ -3342,6 +3387,34 @@ function applyHeaderStyle_(sheet, colCount) {
     .setBackground('#111111')
     .setFontColor('#ffffff');
   sheet.setFrozenRows(1);
+}
+
+function getSetupValidationRowCount_(sheet) {
+  const maxAvailableRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const targetRows = Math.max(
+    KCO_SETUP_VALIDATION_MIN_ROWS,
+    sheet.getLastRow() + KCO_SETUP_VALIDATION_BUFFER_ROWS
+  );
+  return Math.max(1, Math.min(maxAvailableRows, KCO_SETUP_VALIDATION_MAX_ROWS, targetRows));
+}
+
+function safeSetupAutoResize_(sheet, colCount) {
+  const startedAt = Date.now();
+  try {
+    sheet.autoResizeColumns(1, colCount);
+    logSetupStep_('auto resize completed', {
+      sheetName: sheet.getName(),
+      colCount,
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    logSetupStep_('auto resize skipped', {
+      sheetName: sheet.getName(),
+      colCount,
+      message: error && error.message ? error.message : String(error),
+      durationMs: Date.now() - startedAt,
+    });
+  }
 }
 
 function isVisible_(value) {
