@@ -3392,15 +3392,48 @@
 
     .notice-list { display: grid; gap: 12px; }
     .notice-item {
+      width: 100%;
       padding: 16px;
       border: 1px solid var(--line);
       border-left: 4px solid var(--gold);
       border-radius: 8px;
       background: #fffdf9;
+      text-align: left;
+      cursor: pointer;
     }
     .notice-date { display: block; margin-bottom: 5px; color: var(--muted); font-size: 12px; }
+    .notice-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(189, 147, 64, .22);
+      color: #7a5a1f;
+      background: rgba(246, 236, 213, .72);
+      font-size: 12px;
+      font-weight: 850;
+    }
     .notice-title { margin: 0 0 7px; color: var(--black); font-size: 16px; }
     .notice-body { margin: 0; color: var(--muted); line-height: 1.7; }
+    .notice-detail {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid rgba(189, 147, 64, .18);
+      border-radius: 18px;
+      background: #fffdf9;
+    }
+    .notice-detail h2 { margin: 0; font-size: 24px; }
+    .notice-detail p { margin: 0; color: var(--muted); line-height: 1.8; }
+    .notice-detail-image {
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+      border-radius: 16px;
+      background: #f5efe3;
+    }
     .install-guide {
       margin-top: 14px;
       padding: 16px;
@@ -3849,7 +3882,7 @@
         <section class="home-news-panel" aria-label="新着情報">
           <div class="home-section-head">
             <h2>新着情報</h2>
-            <button type="button" onclick="openPublicPage('notice')">すべて見る</button>
+            <button type="button" onclick="openNoticePage()">すべて見る</button>
           </div>
           <ul id="homeNewsList" class="home-news-list"></ul>
         </section>
@@ -4061,6 +4094,14 @@
         savedPosts: [],
         savedStyles: [],
       },
+      notices: {
+        loaded: false,
+        loading: false,
+        error: '',
+        items: [],
+        latest: null,
+      },
+      noticeDetailId: '',
     };
     let manifestObjectUrl = '';
     const OFFICIAL_PUBLIC_URL = 'https://boss-team1129.github.io/Kimikea-Connect/';
@@ -4974,6 +5015,7 @@
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
       renderHomeAnnouncements();
+      loadPublicNotices();
       initializeHomeGallery();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
@@ -4997,43 +5039,154 @@
       notifyKimikeaNavigationState();
     }
 
-    const HOME_NOTICE_ITEMS = [
-      {
-        date: '2026.07.14',
-        title: 'Kimikea Connect ホーム画像を更新しました',
-        summary: 'ホーム画面のギャラリー画像を新しいブランドビジュアルへ切り替えました。',
-        isNew: true,
-      },
-      {
-        date: '2026.07.13',
-        title: 'スタイル図鑑の投稿機能を調整中です',
-        summary: '加盟店・コーディネーターが施術写真を共有しやすい画面へ整えています。',
-        isNew: true,
-      },
-      {
-        date: '2026.07.12',
-        title: '会員専用注文ページを準備しています',
-        summary: 'エクステ注文、注文履歴、請求関連を会員向けに使いやすく整備しています。',
-        isNew: false,
-      },
-    ];
-
     function renderHomeAnnouncements() {
       const newsList = document.getElementById('homeNewsList');
-      const latest = HOME_NOTICE_ITEMS.slice(0, 3);
-      if (newsList) {
-        newsList.innerHTML = latest.map(item => `
+      if (!newsList) return;
+      if (state.notices.loading || !state.notices.loaded) {
+        newsList.innerHTML = `
           <li>
-            <button type="button" class="home-news-item" onclick="openPublicPage('notice')">
-              <span class="home-news-meta">
-                <span>${escapeHtml(item.date)}</span>
-                ${item.isNew ? '<span class="home-news-new">NEW</span>' : ''}
-              </span>
-              <span class="home-news-title">${escapeHtml(item.title)}</span>
-            </button>
+            <div class="home-news-item">
+              <span class="home-news-meta"><span>読み込み中…</span></span>
+              <span class="home-news-title">お知らせを取得しています</span>
+            </div>
           </li>
-        `).join('');
+        `;
+        return;
       }
+      if (state.notices.error) {
+        newsList.innerHTML = `
+          <li>
+            <div class="home-news-item">
+              <span class="home-news-meta"><span>INFO</span></span>
+              <span class="home-news-title">お知らせを読み込めませんでした</span>
+            </div>
+          </li>
+        `;
+        return;
+      }
+      const item = state.notices.latest;
+      if (!item) {
+        newsList.innerHTML = `
+          <li>
+            <div class="home-news-item">
+              <span class="home-news-meta"><span>INFO</span></span>
+              <span class="home-news-title">現在公開中のお知らせはありません</span>
+            </div>
+          </li>
+        `;
+        return;
+      }
+      newsList.innerHTML = `
+        <li>
+          <button type="button" class="home-news-item" onclick="openNoticeDetail(${escapeHtml(JSON.stringify(String(item.noticeId || '')))})">
+            <span class="home-news-meta">
+              <span>${escapeHtml(formatNoticeDate(item.startAt || item.createdAt))}</span>
+              <span class="home-news-new">${escapeHtml(item.isImportant ? '重要' : item.category || 'NEW')}</span>
+            </span>
+            <span class="home-news-title">${escapeHtml(item.title)}</span>
+          </button>
+        </li>
+      `;
+    }
+
+    function loadPublicNotices(force = false) {
+      if (state.notices.loading) return Promise.resolve(state.notices);
+      if (state.notices.loaded && !force) return Promise.resolve(state.notices);
+      state.notices.loading = true;
+      state.notices.error = '';
+      renderHomeAnnouncements();
+      return callServer('getPublicNotices')
+        .then((data) => {
+          state.notices = {
+            loaded: true,
+            loading: false,
+            error: '',
+            items: Array.isArray(data.notices) ? data.notices : [],
+            latest: data.latest || null,
+          };
+          renderHomeAnnouncements();
+          if (currentPublicPageKey === 'notice') refreshCurrentPublicActions();
+          return state.notices;
+        })
+        .catch((error) => {
+          console.warn('Notice loading failed:', getErrorMessage(error));
+          state.notices = {
+            ...state.notices,
+            loaded: true,
+            loading: false,
+            error: 'お知らせを読み込めませんでした。',
+          };
+          renderHomeAnnouncements();
+          if (currentPublicPageKey === 'notice') refreshCurrentPublicActions();
+          return state.notices;
+        });
+    }
+
+    function formatNoticeDate(value) {
+      const text = String(value || '').trim();
+      return text ? text.slice(0, 10).replace(/\//g, '.') : '';
+    }
+
+    function noticeCategoryIcon(category) {
+      const icons = {
+        '重要': '!',
+        '講習': 'A',
+        'キャンペーン': '%',
+        '新商品': '+',
+        'システム': 'i',
+      };
+      return icons[category] || 'i';
+    }
+
+    function openNoticeDetail(noticeId) {
+      state.noticeDetailId = String(noticeId || '').trim();
+      openPublicPage('notice');
+    }
+
+    function closeNoticeDetail() {
+      state.noticeDetailId = '';
+      refreshCurrentPublicActions();
+    }
+
+    function renderNoticePage() {
+      if (state.notices.loading || !state.notices.loaded) {
+        window.setTimeout(() => loadPublicNotices(), 0);
+        return '<div class="notice-list"><article class="notice-item"><span class="notice-date">読み込み中…</span><h3 class="notice-title">お知らせを取得しています</h3></article></div>';
+      }
+      if (state.notices.error) {
+        return `<p class="message error">${escapeHtml(state.notices.error)}</p>`;
+      }
+      const items = state.notices.items || [];
+      const detail = state.noticeDetailId
+        ? items.find((item) => String(item.noticeId || '') === String(state.noticeDetailId))
+        : null;
+      if (detail) {
+        return `
+          <article class="notice-detail">
+            <button type="button" class="button button-outline" onclick="closeNoticeDetail()">← お知らせ一覧へ戻る</button>
+            ${detail.imageUrl ? `<img class="notice-detail-image" src="${escapeHtml(detail.imageUrl)}" alt="${escapeHtml(detail.title)}" loading="lazy" decoding="async">` : ''}
+            <span class="notice-date">${escapeHtml(formatNoticeDate(detail.startAt || detail.createdAt))}　${escapeHtml(detail.category || '')}</span>
+            <h2>${escapeHtml(detail.title)}</h2>
+            <p>${escapeHtml(detail.body).replace(/\n/g, '<br>')}</p>
+            ${detail.linkUrl ? `<a class="button button-gold" href="${escapeHtml(detail.linkUrl)}" target="_blank" rel="noopener">関連ページを開く</a>` : ''}
+          </article>
+        `;
+      }
+      if (!items.length) {
+        return '<p class="message">お知らせはありません。</p>';
+      }
+      return `
+        <div class="notice-list">
+          ${items.map((item) => `
+            <button type="button" class="notice-item" onclick="openNoticeDetail(${escapeHtml(JSON.stringify(String(item.noticeId || '')))})">
+              <span class="notice-date">${escapeHtml(formatNoticeDate(item.startAt || item.createdAt))}</span>
+              <span class="notice-label"><b>${escapeHtml(noticeCategoryIcon(item.category))}</b>${escapeHtml(item.category || 'システム')}${item.isImportant ? ' / 重要' : ''}</span>
+              <h3 class="notice-title">${escapeHtml(item.title)}</h3>
+              <p class="notice-body">${escapeHtml(item.body || '').slice(0, 90)}${String(item.body || '').length > 90 ? '…' : ''}</p>
+            </button>
+          `).join('')}
+        </div>
+      `;
     }
 
     const COLOR_CHART_CATEGORIES = ['すべて', 'ダークカラー', 'ライトカラー', '原色'];
@@ -6322,7 +6475,8 @@
       notice: {
         title: 'お知らせ',
         lead: '新色、イベント、講習、メンテナンス情報を確認できます。',
-        items: HOME_NOTICE_ITEMS.map(item => `${item.date}　${item.title}：${item.summary}`)
+        items: [],
+        renderActions: renderNoticePage
       },
       coordinator: {
         title: 'コーディネーター講習案内',
@@ -6382,6 +6536,7 @@
     }
 
     function openNoticePage() {
+      state.noticeDetailId = '';
       openPublicPage('notice');
     }
 

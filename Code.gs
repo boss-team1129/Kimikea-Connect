@@ -20,6 +20,7 @@ const KCO_CONFIG = {
   USER_MASTER: 'ユーザーマスタ',
   STYLEBOOK_POSTS: 'style_posts',
   STYLEBOOK_SAVES: 'style_saves',
+  NOTICES: 'お知らせ',
   SETTINGS: '設定',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
@@ -148,6 +149,23 @@ const KCO_USER_HEADERS = [
 ];
 const KCO_DEFAULT_INITIAL_PASSWORD = '0000';
 
+const KCO_NOTICE_HEADERS = [
+  'noticeId',
+  'title',
+  'body',
+  'category',
+  'startAt',
+  'endAt',
+  'imageUrl',
+  'linkUrl',
+  'status',
+  'isImportant',
+  'createdAt',
+  'updatedAt',
+];
+
+const KCO_NOTICE_CATEGORIES = ['重要', '講習', 'キャンペーン', '新商品', 'システム'];
+
 const KCO_DETAIL_HEADERS = [
   '注文番号',
   '商品カテゴリー',
@@ -193,6 +211,7 @@ function handleJsonpApi_(event) {
     completeInitialPasswordSetup,
     getPublicProducts,
     getPublicColorRankings,
+    getPublicNotices,
     getPortalData,
     getMyPageStylebookData,
     updateMemberEmail,
@@ -296,6 +315,7 @@ function setupKimikeaConnectOrder() {
     summary.skippedUserCount = Number(userSyncSummary.skippedUserCount || 0);
     runSetupStep_('orders', () => setupOrders_(ss));
     runSetupStep_('order details', () => setupOrderDetails_(ss));
+    runSetupStep_('notices', () => setupNotices_(ss));
     runSetupStep_('settings', () => setupSettings_(ss));
     runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
 
@@ -743,6 +763,85 @@ function styleSavePostIdForMypage_(save) {
 
 function getPublicProducts() {
   return getClientProducts_();
+}
+
+function getPublicNotices() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(KCO_CONFIG.NOTICES);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return {
+      notices: [],
+      latest: null,
+      categories: KCO_NOTICE_CATEGORIES,
+    };
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const index = createIndex_(values[0].map((header) => String(header || '').trim()));
+  const now = new Date();
+  const notices = values.slice(1)
+    .map((row, offset) => normalizeNoticeForClient_(row, index, offset + 2))
+    .filter((notice) => isPublicNoticeActive_(notice, now))
+    .sort(comparePublicNotices_);
+
+  return {
+    notices,
+    latest: notices[0] || null,
+    categories: KCO_NOTICE_CATEGORIES,
+  };
+}
+
+function normalizeNoticeForClient_(row, index, rowNumber) {
+  const startAtValue = getRowValueByHeader_(row, index, ['startAt']);
+  const endAtValue = getRowValueByHeader_(row, index, ['endAt']);
+  const createdAtValue = getRowValueByHeader_(row, index, ['createdAt']);
+  const updatedAtValue = getRowValueByHeader_(row, index, ['updatedAt']);
+  const startAt = parseDateValue_(startAtValue);
+  const endAt = parseDateValue_(endAtValue);
+  const createdAt = parseDateValue_(createdAtValue);
+  const updatedAt = parseDateValue_(updatedAtValue);
+  const category = String(getRowValueByHeader_(row, index, ['category']) || 'システム').trim() || 'システム';
+  const noticeId = String(getRowValueByHeader_(row, index, ['noticeId']) || '').trim() || `notice-row-${rowNumber}`;
+  return {
+    noticeId,
+    title: String(getRowValueByHeader_(row, index, ['title']) || '').trim(),
+    body: String(getRowValueByHeader_(row, index, ['body']) || '').trim(),
+    category,
+    audience: String(getRowValueByHeader_(row, index, ['audience']) || '').trim(),
+    startAt: formatDateTimeForClient_(startAt || startAtValue),
+    endAt: formatDateTimeForClient_(endAt || endAtValue),
+    imageUrl: String(getRowValueByHeader_(row, index, ['imageUrl']) || '').trim(),
+    linkUrl: String(getRowValueByHeader_(row, index, ['linkUrl']) || '').trim(),
+    status: String(getRowValueByHeader_(row, index, ['status']) || '').trim(),
+    isImportant: parseBooleanForClient_(getRowValueByHeader_(row, index, ['isImportant'])),
+    createdAt: formatDateTimeForClient_(createdAt || createdAtValue),
+    updatedAt: formatDateTimeForClient_(updatedAt || updatedAtValue),
+    sortDateValue: Number((startAt || createdAt || updatedAt || new Date(0)).getTime()),
+  };
+}
+
+function isPublicNoticeActive_(notice, now) {
+  if (!notice.title) return false;
+  if (String(notice.status || '').trim() !== '公開') return false;
+  const startAt = parseDateValue_(notice.startAt);
+  const endAt = parseDateValue_(notice.endAt);
+  if (startAt && now < startAt) return false;
+  if (endAt && now > endAt) return false;
+  return true;
+}
+
+function comparePublicNotices_(a, b) {
+  if (Boolean(a.isImportant) !== Boolean(b.isImportant)) {
+    return a.isImportant ? -1 : 1;
+  }
+  return Number(b.sortDateValue || 0) - Number(a.sortDateValue || 0);
+}
+
+function formatDateTimeForClient_(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return Utilities.formatDate(value, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+  }
+  return String(value || '');
 }
 
 function getPublicColorRankings(year, month) {
@@ -1307,6 +1406,18 @@ function setupOrderDetails_(ss) {
   sheet.autoResizeColumns(1, KCO_DETAIL_HEADERS.length);
 }
 
+function setupNotices_(ss) {
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.NOTICES);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_NOTICE_HEADERS.length).setValues([KCO_NOTICE_HEADERS]);
+  } else {
+    ensureNoticeHeaders_(sheet);
+  }
+  applyNoticeDropdowns_(sheet);
+  applyHeaderStyle_(sheet, KCO_NOTICE_HEADERS.length);
+  sheet.autoResizeColumns(1, KCO_NOTICE_HEADERS.length);
+}
+
 function setupFranchiseMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
   if (sheet.getLastRow() === 0) {
@@ -1668,6 +1779,40 @@ function ensureOrderDetailHeaders_(sheet) {
     sheet.getRange(1, sheet.getLastColumn()).setValue(header);
     currentHeaders.push(header);
   });
+}
+
+function ensureNoticeHeaders_(sheet) {
+  const currentHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((value) => String(value || '').trim());
+
+  KCO_NOTICE_HEADERS.forEach((header) => {
+    if (currentHeaders.indexOf(header) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    currentHeaders.push(header);
+  });
+}
+
+function applyNoticeDropdowns_(sheet) {
+  const maxRows = Math.max(sheet.getMaxRows() - 1, 1);
+  const index = createIndex_(KCO_NOTICE_HEADERS);
+  const categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(KCO_NOTICE_CATEGORIES, true)
+    .setAllowInvalid(true)
+    .build();
+  const statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['下書き', '公開', '非公開'], true)
+    .setAllowInvalid(true)
+    .build();
+  const booleanRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['TRUE', 'FALSE'], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(2, index.category + 1, maxRows, 1).setDataValidation(categoryRule);
+  sheet.getRange(2, index.status + 1, maxRows, 1).setDataValidation(statusRule);
+  sheet.getRange(2, index.isImportant + 1, maxRows, 1).setDataValidation(booleanRule);
 }
 
 function getHeaderValues_(sheet) {
