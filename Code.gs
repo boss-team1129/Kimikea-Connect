@@ -437,9 +437,8 @@ function getPublicProducts() {
 
 function getPublicColorRankings() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const periodStart = new Date(2026, 6, 1, 0, 0, 0);
+  const periodEnd = new Date(2026, 6, 31, 23, 59, 59);
   const colorProducts = getVisibleProducts_().filter((product) => (
     KCO_CATEGORY_PRICES[product.category] && product.productCode
   ));
@@ -453,6 +452,8 @@ function getPublicColorRankings() {
   const purchaseCounts = {};
   let countedOrders = 0;
   let countedLines = 0;
+  let excludedCanceledOrders = 0;
+  let excludedOtherLines = 0;
 
   if (ordersSheet && detailsSheet && ordersSheet.getLastRow() > 1 && detailsSheet.getLastRow() > 1) {
     const orderValues = ordersSheet.getDataRange().getValues();
@@ -461,10 +462,17 @@ function getPublicColorRankings() {
     orderValues.slice(1).forEach((row) => {
       const orderNo = String(row[orderIndex['注文番号']] || '').trim();
       const orderDate = parseDateValue_(row[orderIndex['注文日時']]);
-      const status = String(row[orderIndex['発送状況']] || '').trim();
+      const status = [
+        row[orderIndex['発送状況']],
+        row[orderIndex['入金状況']],
+        row[orderIndex['ステータス']],
+      ].map((value) => String(value || '').trim()).join(' ');
       if (!orderNo || !orderDate) return;
       if (orderDate < periodStart || orderDate > periodEnd) return;
-      if (status === 'キャンセル') return;
+      if (status.indexOf('キャンセル') !== -1) {
+        excludedCanceledOrders += 1;
+        return;
+      }
       validOrderNos[orderNo] = true;
       countedOrders += 1;
     });
@@ -475,7 +483,10 @@ function getPublicColorRankings() {
       const orderNo = String(row[detailIndex['注文番号']] || '').trim();
       if (!validOrderNos[orderNo]) return;
       const productCode = String(row[detailIndex['商品コード']] || '').trim();
-      if (!productCode || !colorProductCodes[createProductCodeKey_(productCode)]) return;
+      if (!productCode || !colorProductCodes[createProductCodeKey_(productCode)]) {
+        excludedOtherLines += 1;
+        return;
+      }
       const quantity = Number(row[detailIndex['数量']] || 0);
       if (quantity <= 0) return;
       purchaseCounts[productCode] = Number(purchaseCounts[productCode] || 0) + quantity;
@@ -490,6 +501,8 @@ function getPublicColorRankings() {
     purchaseCounts,
     countedOrders,
     countedLines,
+    excludedCanceledOrders,
+    excludedOtherLines,
   };
 }
 
