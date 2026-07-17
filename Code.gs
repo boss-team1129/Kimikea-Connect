@@ -21,6 +21,7 @@ const KCO_CONFIG = {
   STYLEBOOK_POSTS: 'style_posts',
   STYLEBOOK_SAVES: 'style_saves',
   NOTICES: 'お知らせ',
+  MAP_ENTRIES: '加盟店マップ',
   SETTINGS: '設定',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
@@ -170,6 +171,33 @@ const KCO_NOTICE_HEADERS = [
 
 const KCO_NOTICE_CATEGORIES = ['重要', '講習', 'キャンペーン', '新商品', 'システム'];
 
+const KCO_MAP_HEADERS = [
+  'mapId',
+  'shopId',
+  'type',
+  'prefecture',
+  'city',
+  'salonName',
+  'staffName',
+  'address',
+  'latitude',
+  'longitude',
+  'phone',
+  'imageUrl',
+  'description',
+  'linkLabel1',
+  'linkUrl1',
+  'linkLabel2',
+  'linkUrl2',
+  'status',
+  'sortOrder',
+  'createdAt',
+  'updatedAt',
+];
+
+const KCO_MAP_TYPES = ['加盟店', 'コーディネーター'];
+const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
+
 const KCO_DETAIL_HEADERS = [
   '注文番号',
   '商品カテゴリー',
@@ -216,6 +244,7 @@ function handleJsonpApi_(event) {
     getPublicProducts,
     getPublicColorRankings,
     getPublicNotices,
+    getPublicMapEntries,
     getPortalData,
     getMyPageStylebookData,
     updateMemberEmail,
@@ -320,6 +349,7 @@ function setupKimikeaConnectOrder() {
     runSetupStep_('orders', () => setupOrders_(ss));
     runSetupStep_('order details', () => setupOrderDetails_(ss));
     runSetupStep_('notices', () => setupNotices_(ss));
+    runSetupStep_('map entries', () => setupMapEntries_(ss));
     runSetupStep_('settings', () => setupSettings_(ss));
     runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
 
@@ -846,6 +876,85 @@ function formatDateTimeForClient_(value) {
     return Utilities.formatDate(value, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
   }
   return String(value || '');
+}
+
+function getPublicMapEntries() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(KCO_CONFIG.MAP_ENTRIES);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return {
+      entries: [],
+      prefectures: [],
+      types: KCO_MAP_TYPES,
+    };
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const index = createIndex_(values[0].map((header) => String(header || '').trim()));
+  const entries = values.slice(1)
+    .map((row, offset) => normalizeMapEntryForClient_(row, index, offset + 2))
+    .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type && Number.isFinite(entry.latitude) && Number.isFinite(entry.longitude))
+    .sort(comparePublicMapEntries_);
+  const prefectures = [];
+  entries.forEach((entry) => {
+    if (prefectures.indexOf(entry.prefecture) === -1) prefectures.push(entry.prefecture);
+  });
+  const types = [];
+  entries.forEach((entry) => {
+    if (types.indexOf(entry.type) === -1) types.push(entry.type);
+  });
+
+  return {
+    entries,
+    prefectures,
+    types: types.length ? types : KCO_MAP_TYPES,
+  };
+}
+
+function normalizeMapEntryForClient_(row, index, rowNumber) {
+  const type = String(getRowValueByHeader_(row, index, ['type']) || '').trim() || '加盟店';
+  const prefecture = String(getRowValueByHeader_(row, index, ['prefecture']) || '').trim();
+  const city = String(getRowValueByHeader_(row, index, ['city']) || '').trim();
+  const salonName = String(getRowValueByHeader_(row, index, ['salonName']) || '').trim();
+  const staffName = String(getRowValueByHeader_(row, index, ['staffName']) || '').trim();
+  const address = String(getRowValueByHeader_(row, index, ['address']) || '').trim();
+  const mapId = String(getRowValueByHeader_(row, index, ['mapId']) || '').trim() || `map-row-${rowNumber}`;
+  const shopId = String(getRowValueByHeader_(row, index, ['shopId']) || '').trim() || mapId;
+  return {
+    mapId,
+    shopId,
+    type,
+    prefecture,
+    city,
+    salonName,
+    staffName,
+    address,
+    latitude: parseMapCoordinate_(getRowValueByHeader_(row, index, ['latitude'])),
+    longitude: parseMapCoordinate_(getRowValueByHeader_(row, index, ['longitude'])),
+    phone: String(getRowValueByHeader_(row, index, ['phone']) || '').trim(),
+    imageUrl: String(getRowValueByHeader_(row, index, ['imageUrl']) || '').trim(),
+    description: String(getRowValueByHeader_(row, index, ['description']) || '').trim(),
+    linkLabel1: String(getRowValueByHeader_(row, index, ['linkLabel1']) || '').trim(),
+    linkUrl1: String(getRowValueByHeader_(row, index, ['linkUrl1']) || '').trim(),
+    linkLabel2: String(getRowValueByHeader_(row, index, ['linkLabel2']) || '').trim(),
+    linkUrl2: String(getRowValueByHeader_(row, index, ['linkUrl2']) || '').trim(),
+    status: String(getRowValueByHeader_(row, index, ['status']) || '').trim(),
+    sortOrder: Number(getRowValueByHeader_(row, index, ['sortOrder']) || 9999),
+    createdAt: formatDateTimeForClient_(parseDateValue_(getRowValueByHeader_(row, index, ['createdAt'])) || getRowValueByHeader_(row, index, ['createdAt'])),
+    updatedAt: formatDateTimeForClient_(parseDateValue_(getRowValueByHeader_(row, index, ['updatedAt'])) || getRowValueByHeader_(row, index, ['updatedAt'])),
+  };
+}
+
+function comparePublicMapEntries_(a, b) {
+  const orderDiff = Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999);
+  if (orderDiff) return orderDiff;
+  return String(a.salonName || a.staffName || '').localeCompare(String(b.salonName || b.staffName || ''), 'ja');
+}
+
+function parseMapCoordinate_(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return NaN;
+  const number = Number(String(value).trim());
+  return Number.isFinite(number) ? number : NaN;
 }
 
 function getPublicColorRankings(year, month) {
@@ -1440,6 +1549,20 @@ function setupNotices_(ss) {
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
+function setupMapEntries_(ss) {
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.MAP_ENTRIES);
+  const wasEmpty = sheet.getLastRow() === 0;
+  if (wasEmpty) {
+    sheet.getRange(1, 1, 1, KCO_MAP_HEADERS.length).setValues([KCO_MAP_HEADERS]);
+  } else {
+    ensureMapEntryHeaders_(sheet);
+  }
+  applyMapEntryDropdowns_(sheet);
+  applyHeaderStyle_(sheet, KCO_MAP_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_MAP_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+}
+
 function setupFranchiseMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
   const wasEmpty = sheet.getLastRow() === 0;
@@ -1831,6 +1954,20 @@ function ensureNoticeHeaders_(sheet) {
   });
 }
 
+function ensureMapEntryHeaders_(sheet) {
+  const currentHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((value) => String(value || '').trim());
+
+  KCO_MAP_HEADERS.forEach((header) => {
+    if (currentHeaders.indexOf(header) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    currentHeaders.push(header);
+  });
+}
+
 function applyNoticeDropdowns_(sheet) {
   const maxRows = getSetupValidationRowCount_(sheet);
   const index = createIndex_(KCO_NOTICE_HEADERS);
@@ -1849,6 +1986,21 @@ function applyNoticeDropdowns_(sheet) {
   sheet.getRange(2, index.category + 1, maxRows, 1).setDataValidation(categoryRule);
   sheet.getRange(2, index.status + 1, maxRows, 1).setDataValidation(statusRule);
   sheet.getRange(2, index.isImportant + 1, maxRows, 1).setDataValidation(booleanRule);
+}
+
+function applyMapEntryDropdowns_(sheet) {
+  const maxRows = getSetupValidationRowCount_(sheet);
+  const index = createIndex_(KCO_MAP_HEADERS);
+  const typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(KCO_MAP_TYPES, true)
+    .setAllowInvalid(true)
+    .build();
+  const statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(KCO_MAP_STATUS_OPTIONS, true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(2, index.type + 1, maxRows, 1).setDataValidation(typeRule);
+  sheet.getRange(2, index.status + 1, maxRows, 1).setDataValidation(statusRule);
 }
 
 function getHeaderValues_(sheet) {
