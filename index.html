@@ -4970,9 +4970,7 @@
         ? resolveWithTimeout(callServer('getPublicColorRankings', rankingPeriod.year, rankingPeriod.month), 5000, null, 'Color purchase ranking')
         : Promise.resolve(null);
       const stylebookPromise = STYLEBOOK_API_URL
-        ? resolveWithTimeout(fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${Date.now()}`)
-            .then((response) => response.json())
-          , 5000, null, 'Stylebook ranking')
+        ? resolveWithTimeout(fetchStylebookRankingData(), 45000, null, 'Stylebook ranking')
         : Promise.resolve(null);
 
       Promise.all([productPromise, orderPromise, stylebookPromise])
@@ -4995,9 +4993,12 @@
             });
           }
           const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
-          state.colorChartStyles = Array.isArray(posts) ? posts : [];
-          state.colorChartStylesLoaded = true;
-          state.rankingData.salonCounts = buildSalonRankingCounts(state.colorChartStyles);
+          state.colorChartStyles = Array.isArray(posts) ? posts : state.colorChartStyles;
+          state.colorChartStylesLoaded = Array.isArray(posts) || state.colorChartStylesLoaded;
+          state.rankingData.salonCounts = stylebookData?.ranking?.counts || stylebookData?.colorUsageCounts || buildSalonRankingCounts(state.colorChartStyles);
+          if (stylebookData?.ranking || stylebookData?.colorUsageCounts) {
+            console.info('[Kimikea Ranking] サロン人気集計', stylebookData.ranking || stylebookData);
+          }
           state.rankingData.loaded = true;
           state.rankingData.loading = false;
           refreshColorChartContent();
@@ -5010,6 +5011,19 @@
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
         });
+    }
+
+    function fetchStylebookRankingData() {
+      const cacheBuster = Date.now();
+      return fetch(`${STYLEBOOK_API_URL}?action=colorUsageRankings&userId=public-ranking&t=${cacheBuster}`)
+        .then((response) => response.json())
+        .then((data) => {
+          if (data?.ok && data?.ranking?.counts) return data;
+          return fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${cacheBuster}`)
+            .then((response) => response.json());
+        })
+        .catch(() => fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${cacheBuster}`)
+          .then((response) => response.json()));
     }
 
     function getCurrentRankingPeriod(date = new Date()) {

@@ -79,6 +79,9 @@ function doGet(e) {
   if (action === 'myPosts') {
     return json_({ ok: true, posts: getOwnStylebookPosts_(userId, e.parameter.draftsOnly === 'true') });
   }
+  if (action === 'colorUsageRankings') {
+    return json_({ ok: true, ranking: getStylebookColorUsageRanking_() });
+  }
   return json_({ ok: false, message: '未対応の処理です。' });
 }
 
@@ -190,6 +193,48 @@ function buildSaveSummaries_(posts, saves) {
       createdAt: post.createdAt || '',
     };
   });
+}
+
+function getStylebookColorUsageRanking_() {
+  const ss = getKimikeaConnectSpreadsheet_();
+  const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
+  const counts = {};
+  let publicPostCount = 0;
+  let colorSelectionCount = 0;
+  posts.forEach(post => {
+    if (!isPublicRankingPost_(post)) return;
+    publicPostCount += 1;
+    const colorIds = splitArray_(post.extensionColorIds)
+      .map(normalizeRankingColorKey_)
+      .filter(Boolean);
+    const uniqueColorIds = Array.from(new Set(colorIds));
+    uniqueColorIds.forEach(colorId => {
+      counts[colorId] = Number(counts[colorId] || 0) + 1;
+      colorSelectionCount += 1;
+    });
+  });
+  logStylebookDebug_('color usage ranking', {
+    publicPostCount,
+    colorSelectionCount,
+    counts,
+  });
+  return {
+    counts,
+    publicPostCount,
+    colorSelectionCount,
+  };
+}
+
+function isPublicRankingPost_(post) {
+  const status = String(post.status || '').trim();
+  if (post.deletedAt || post.isDeleted || status === 'deleted' || status === '削除済み') return false;
+  if (status === 'draft' || status === 'private' || status === '下書き') return false;
+  if (post.isPublished === false || String(post.isPublished).toUpperCase() === 'FALSE') return false;
+  return status === 'published' || status === '公開' || post.isPublished === true || String(post.isPublished).toUpperCase() === 'TRUE';
+}
+
+function normalizeRankingColorKey_(value) {
+  return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
 }
 
 function savePost_(post, userId) {
