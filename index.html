@@ -4997,7 +4997,7 @@
           const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
           state.colorChartStyles = Array.isArray(posts) ? posts : [];
           state.colorChartStylesLoaded = true;
-          state.rankingData.salonCounts = buildSalonRankingCounts(state.colorChartStyles, state.rankingData.year, state.rankingData.month);
+          state.rankingData.salonCounts = buildSalonRankingCounts(state.colorChartStyles);
           state.rankingData.loaded = true;
           state.rankingData.loading = false;
           refreshColorChartContent();
@@ -5071,15 +5071,27 @@
       return [...new Set(values.map(normalizeColorCode).filter(Boolean))];
     }
 
-    function buildSalonRankingCounts(posts, year, month) {
+    function isPublishedStylePost(post) {
+      const status = String(post.status || '').trim();
+      const publishedValue = post.isPublished ?? post.published ?? post.isVisible;
+      const isExplicitlyUnpublished = publishedValue === false || String(publishedValue).toUpperCase() === 'FALSE';
+      if (post.deletedAt || post.isDeleted || status === 'deleted' || status === '削除済み') return false;
+      if (status === 'draft' || status === 'private' || status === '下書き') return false;
+      if (isExplicitlyUnpublished) return false;
+      return status === 'published' || status === '公開' || publishedValue === true || String(publishedValue).toUpperCase() === 'TRUE';
+    }
+
+    function buildSalonRankingCounts(posts) {
       const counts = {};
       (posts || []).forEach((post) => {
-        const status = String(post.status || '').trim();
-        if (post.deletedAt || post.isDeleted || status === 'draft' || status === '下書き') return;
-        if (!isDateInRankingMonth(post.createdAt || post.updatedAt, year, month)) return;
+        if (!isPublishedStylePost(post)) return;
         extractPostColorKeys(post).forEach((key) => {
           counts[key] = Number(counts[key] || 0) + 1;
         });
+      });
+      console.info('[Kimikea Ranking] サロン人気集計', {
+        publicPosts: (posts || []).filter(isPublishedStylePost).length,
+        salonCounts: counts,
       });
       return counts;
     }
@@ -5283,8 +5295,8 @@
 
     function rankingScoreText(row, mode = state.rankingMode) {
       if (mode === 'purchase') return `${row.purchase}袋`;
-      if (mode === 'salon') return `投稿${row.salon}件`;
-      return `購入${row.purchase}票 / 投稿${row.salon}票 / 合計${row.total}pt`;
+      if (mode === 'salon') return `使用${row.salon}回`;
+      return `購入${row.purchase}票 / 使用${row.salon}回 / 合計${row.total}pt`;
     }
 
     function renderRankingRoundImage(color, className = 'ranking-round-image') {
