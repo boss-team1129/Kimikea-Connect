@@ -18,8 +18,9 @@ const KCO_CONFIG = {
   ORDER_DETAILS: '注文詳細',
   FRANCHISE_MASTER: '加盟店マスタ',
   USER_MASTER: 'ユーザーマスタ',
+  STYLEBOOK_POSTS: 'style_posts',
+  STYLEBOOK_SAVES: 'style_saves',
   SETTINGS: '設定',
-  STYLEBOOK_API_URL: 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
   SHIPPING_FEE: 1000,
@@ -612,23 +613,9 @@ function getMyPageStylebookData(sessionToken) {
     throw new Error('ログインユーザーIDを確認できません。');
   }
 
-  const response = UrlFetchApp.fetch(`${KCO_CONFIG.STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(userId)}&t=${Date.now()}`, {
-    method: 'get',
-    muteHttpExceptions: true,
-  });
-  const statusCode = response.getResponseCode();
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(`スタイル図鑑データを取得できませんでした。status=${statusCode}`);
-  }
-
-  const payload = JSON.parse(response.getContentText() || '{}');
-  if (payload.ok === false) {
-    throw new Error(payload.message || 'スタイル図鑑データを取得できませんでした。');
-  }
-
-  const database = payload.database || payload;
-  const stylePosts = Array.isArray(database.stylePosts) ? database.stylePosts : [];
-  const savedStyles = Array.isArray(database.savedStyles) ? database.savedStyles : [];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const stylePosts = getMyPageStylebookPostsFromSheet_(ss);
+  const savedStyles = getMyPageStylebookSavesFromSheet_(ss, userId);
   const ownPosts = stylePosts.filter((post) => sameIdString_(stylePostAuthorIdForMypage_(post), userId));
   const ownSaveIds = {};
   const ownSaves = savedStyles.filter((save) => sameIdString_(save && save.userId, userId));
@@ -645,6 +632,97 @@ function getMyPageStylebookData(sessionToken) {
     savedPosts,
     savedStyles: ownSaves,
   };
+}
+
+function getMyPageStylebookPostsFromSheet_(ss) {
+  const sheet = ss.getSheetByName(KCO_CONFIG.STYLEBOOK_POSTS);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((header) => String(header || '').trim());
+  const index = createIndex_(headers);
+  return values.slice(1).map((row) => normalizeStylebookPostForMypage_(row, index));
+}
+
+function getMyPageStylebookSavesFromSheet_(ss, userId) {
+  const sheet = ss.getSheetByName(KCO_CONFIG.STYLEBOOK_SAVES);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((header) => String(header || '').trim());
+  const index = createIndex_(headers);
+  const normalizedUserId = String(userId || '').trim();
+  return values.slice(1)
+    .map((row) => {
+      const stylePostId = String(getRowValueByHeader_(row, index, ['stylePostId']) || '').trim();
+      const styleId = String(getRowValueByHeader_(row, index, ['styleId']) || stylePostId).trim();
+      return {
+        id: String(getRowValueByHeader_(row, index, ['id']) || ''),
+        userId: String(getRowValueByHeader_(row, index, ['userId']) || '').trim(),
+        stylePostId: stylePostId || styleId,
+        styleId,
+        createdAt: formatDateForClient_(getRowValueByHeader_(row, index, ['createdAt'])),
+      };
+    })
+    .filter((save) => sameIdString_(save.userId, normalizedUserId));
+}
+
+function normalizeStylebookPostForMypage_(row, index) {
+  const imageFileId = String(getRowValueByHeader_(row, index, ['imageFileId', 'imageFileID', 'fileId']) || '');
+  const imageUrl = String(getRowValueByHeader_(row, index, ['imageUrl', 'imageUrls', 'photo', 'photoUrl']) || '');
+  const status = String(getRowValueByHeader_(row, index, ['status']) || 'draft');
+  const isPublishedValue = getRowValueByHeader_(row, index, ['isPublished', 'published', 'isVisible']);
+  return {
+    id: String(getRowValueByHeader_(row, index, ['id', 'postId', 'styleId']) || '').trim(),
+    title: String(getRowValueByHeader_(row, index, ['title']) || ''),
+    description: String(getRowValueByHeader_(row, index, ['description']) || ''),
+    imageUrl: imageUrl || getDriveFileUrlForClient_(imageFileId),
+    imageFileId,
+    imageUrls: splitClientArray_(getRowValueByHeader_(row, index, ['additionalImages', 'imageUrls'])),
+    extensionColorIds: splitClientArray_(getRowValueByHeader_(row, index, ['extensionColorIds'])),
+    extensionCount: Number(getRowValueByHeader_(row, index, ['extensionCount']) || 0),
+    shopId: String(getRowValueByHeader_(row, index, ['shopId']) || ''),
+    staffId: String(getRowValueByHeader_(row, index, ['staffId']) || ''),
+    salonName: String(getRowValueByHeader_(row, index, ['salonName']) || ''),
+    staffName: String(getRowValueByHeader_(row, index, ['staffName']) || ''),
+    authorId: String(getRowValueByHeader_(row, index, ['authorId', 'createdByUserId', 'userId']) || '').trim(),
+    createdByUserId: String(getRowValueByHeader_(row, index, ['createdByUserId']) || '').trim(),
+    createdAt: formatDateForClient_(getRowValueByHeader_(row, index, ['createdAt'])),
+    updatedAt: formatDateForClient_(getRowValueByHeader_(row, index, ['updatedAt'])),
+    saveCount: Number(getRowValueByHeader_(row, index, ['saveCount']) || 0),
+    status,
+    isPublished: parseBooleanForClient_(isPublishedValue),
+    deletedAt: formatDateForClient_(getRowValueByHeader_(row, index, ['deletedAt'])),
+  };
+}
+
+function splitClientArray_(value) {
+  if (Array.isArray(value)) return value;
+  const text = String(value || '').trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (error) {
+    // Plain text list.
+  }
+  return text.split(/[\n,、|]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function parseBooleanForClient_(value) {
+  if (value === true) return true;
+  const text = String(value || '').trim().toUpperCase();
+  return text === 'TRUE' || text === '1' || text === 'YES' || text === '公開';
+}
+
+function getDriveFileUrlForClient_(fileId) {
+  const id = String(fileId || '').trim();
+  return id ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}` : '';
+}
+
+function formatDateForClient_(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+  }
+  return String(value || '');
 }
 
 function sameIdString_(a, b) {

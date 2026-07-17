@@ -3046,13 +3046,13 @@
     }
     .mypage-tabbar {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
-      overflow-x: auto;
+      overflow: visible;
       padding: 8px 0;
-      -webkit-overflow-scrolling: touch;
     }
     .mypage-tabbar button {
-      flex: 0 0 auto;
+      flex: 1 1 calc(50% - 8px);
       min-height: 42px;
       padding: 0 14px;
       border-radius: 999px;
@@ -6692,11 +6692,12 @@
           return state.myPageStylebook;
         })
         .catch((error) => {
+          console.warn('MyPage stylebook data error:', getErrorMessage(error));
           state.myPageStylebook = {
             ...state.myPageStylebook,
             loaded: true,
             loading: false,
-            error: getErrorMessage(error),
+            error: 'データを読み込めませんでした。時間をおいてもう一度お試しください',
           };
           return state.myPageStylebook;
         });
@@ -6749,7 +6750,7 @@
             <section class="mypage-card"><span>管理操作</span><strong>自分の投稿ページ</strong><small>編集・削除は本人投稿のみ</small></section>
           </div>
           <div class="mypage-list">
-            ${cards || '<p class="message">投稿履歴はまだありません。</p>'}
+            ${cards || '<p class="message">履歴はまだありません</p>'}
             <button type="button" class="button button-outline" onclick="openStylebookMine()">自分の投稿を管理する</button>
           </div>
         `;
