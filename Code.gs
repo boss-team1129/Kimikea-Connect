@@ -262,19 +262,80 @@ function authorizeDocumentApp() {
 }
 
 function setupKimikeaConnectOrder() {
+  const startedAt = Date.now();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.rename(KCO_CONFIG.SPREADSHEET_NAME);
+  const summary = {
+    createdUserCount: 0,
+    updatedUserCount: 0,
+    skippedUserCount: 0,
+  };
 
-  setupProductMaster_(ss);
-  setupFranchiseMaster_(ss);
-  setupUserMaster_(ss);
-  syncFranchiseUsersToUserMaster_(ss);
-  setupOrders_(ss);
-  setupOrderDetails_(ss);
-  setupSettings_(ss);
-  ensureShipmentEditTrigger_(ss);
+  try {
+    logSetupStep_('setup started', {
+      spreadsheetId: ss.getId(),
+      spreadsheetName: ss.getName(),
+    });
 
-  SpreadsheetApp.getUi().alert('Kimikea Connect Order 管理表の土台を作成しました。');
+    runSetupStep_('rename spreadsheet', () => {
+      if (ss.getName() !== KCO_CONFIG.SPREADSHEET_NAME) {
+        ss.rename(KCO_CONFIG.SPREADSHEET_NAME);
+      }
+      return { spreadsheetName: ss.getName() };
+    });
+
+    runSetupStep_('product master', () => setupProductMaster_(ss));
+    runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
+    runSetupStep_('franchise identity backfill', () => backfillFranchiseIdentityColumns_(ss));
+    runSetupStep_('user master', () => setupUserMaster_(ss));
+    const userSyncSummary = runSetupStep_('sync franchise users to user master', () => syncFranchiseUsersToUserMaster_(ss)) || {};
+    summary.createdUserCount = Number(userSyncSummary.createdUserCount || 0);
+    summary.updatedUserCount = Number(userSyncSummary.updatedUserCount || 0);
+    summary.skippedUserCount = Number(userSyncSummary.skippedUserCount || 0);
+    runSetupStep_('orders', () => setupOrders_(ss));
+    runSetupStep_('order details', () => setupOrderDetails_(ss));
+    runSetupStep_('settings', () => setupSettings_(ss));
+    runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
+
+    logSetupStep_('setup completed', {
+      createdUserCount: summary.createdUserCount,
+      updatedUserCount: summary.updatedUserCount,
+      skippedUserCount: summary.skippedUserCount,
+      durationMs: Date.now() - startedAt,
+    });
+
+    SpreadsheetApp.getUi().alert('Kimikea Connect Order 管理表の土台を作成しました。');
+  } catch (error) {
+    logSetupStep_('setup failed', {
+      message: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? error.stack : '',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+function runSetupStep_(label, callback) {
+  const startedAt = Date.now();
+  logSetupStep_(`${label} start`, {});
+  try {
+    const result = callback();
+    logSetupStep_(`${label} completed`, {
+      durationMs: Date.now() - startedAt,
+      result: result || '',
+    });
+    return result;
+  } catch (error) {
+    logSetupStep_(`${label} failed`, {
+      durationMs: Date.now() - startedAt,
+      message: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? error.stack : '',
+    });
+    throw error;
+  }
+}
+
+function logSetupStep_(label, data) {
+  logOrderDebug_(`setup ${label}`, data || {});
 }
 
 function getPublicOrderSettings(sessionToken) {
@@ -1106,7 +1167,6 @@ function setupFranchiseMaster_(ss) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
   } else {
     ensureFranchiseMasterColumns_(sheet);
-    migrateProductionFranchiseRows_(sheet);
   }
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_FRANCHISE_HEADERS.length);
@@ -1124,6 +1184,10 @@ function setupUserMaster_(ss) {
 }
 
 function ensureUserMasterColumns_(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_USER_HEADERS.length).setValues([KCO_USER_HEADERS]);
+    return;
+  }
   const existingHeaders = sheet
     .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
     .getValues()[0]
@@ -1136,44 +1200,207 @@ function ensureUserMasterColumns_(sheet) {
   });
 }
 
-function syncFranchiseUsersToUserMaster_(ss) {
-  const userSheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
-  setupUserMaster_(ss);
-  const userValues = userSheet.getDataRange().getValues();
-  const userHeaders = userValues[0].map(normalizeMasterHeader_);
-  const userIdIndex = findMasterHeaderIndex_(userHeaders, ['userId', 'ユーザーID']);
-  const existingRowsByUserId = {};
-  userValues.slice(1).forEach((row, offset) => {
-    const userId = String(row[userIdIndex] || '').trim();
-    if (userId) existingRowsByUserId[userId] = offset + 2;
-  });
-  getFranchiseMasterRecords_().forEach((franchise) => {
-    if (!franchise.userId || !franchise.shopId) return;
-    const row = {
-      userId: franchise.userId,
-      shopId: franchise.shopId,
-      staffName: franchise.contactName || franchise.displayName || '',
-      role: franchise.role || 'member',
-      passwordHash: franchise.passwordHash || '',
-      lastLogin: franchise.lastLogin || '',
-      createdAt: franchise.createdAt || new Date(),
+function backfillFranchiseIdentityColumns_(ss) {
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    return {
+      updatedRowCount: 0,
+      skippedRowCount: 0,
     };
-    upsertUserMasterRow_(userSheet, row, existingRowsByUserId[row.userId]);
-  });
+  }
+
+  const headers = values[0].map(normalizeMasterHeader_);
+  const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
+  const memberIdIndex = getIndex(['memberId', '加盟店ID']);
+  const userIdIndex = getIndex(['userId', 'ユーザーID']);
+  const shopIdIndex = getIndex(['shopId', '店舗ID']);
+  const emailIndex = getIndex(['email', 'メールアドレス']);
+  const loginIdIndex = getIndex(['loginId', 'ログインID']);
+  const createdAtIndex = getIndex(['createdAt', '作成日', '登録日']);
+  const updatedAtIndex = getIndex(['updatedAt', '更新日']);
+  let updatedRowCount = 0;
+  let skippedRowCount = 0;
+  const now = new Date();
+
+  if (memberIdIndex === -1) {
+    throw new Error('加盟店マスタに memberId または 加盟店ID 列がありません。');
+  }
+
+  for (let i = 1; i < values.length; i += 1) {
+    const row = values[i];
+    const memberId = String(row[memberIdIndex] || '').trim();
+    try {
+      if (!memberId) {
+        skippedRowCount += 1;
+        continue;
+      }
+      let changed = false;
+      if (userIdIndex !== -1 && !String(row[userIdIndex] || '').trim()) {
+        row[userIdIndex] = memberId;
+        changed = true;
+      }
+      if (shopIdIndex !== -1 && !String(row[shopIdIndex] || '').trim()) {
+        row[shopIdIndex] = generateShopIdFromMemberId_(memberId);
+        changed = true;
+      }
+      if (loginIdIndex !== -1 && !String(row[loginIdIndex] || '').trim()) {
+        row[loginIdIndex] = emailIndex === -1 ? '' : String(row[emailIndex] || '').trim();
+        changed = true;
+      }
+      if (createdAtIndex !== -1 && !row[createdAtIndex]) {
+        row[createdAtIndex] = now;
+        changed = true;
+      }
+      if (updatedAtIndex !== -1 && !row[updatedAtIndex]) {
+        row[updatedAtIndex] = now;
+        changed = true;
+      }
+      if (changed) updatedRowCount += 1;
+      else skippedRowCount += 1;
+    } catch (error) {
+      logSetupStep_('franchise identity backfill row failed', {
+        rowNumber: i + 1,
+        memberId,
+        message: error && error.message ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  if (updatedRowCount > 0) {
+    sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+  }
+
+  return {
+    updatedRowCount,
+    skippedRowCount,
+  };
 }
 
-function upsertUserMasterRow_(sheet, row, rowNumber) {
-  ensureUserMasterColumns_(sheet);
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const values = headers.map((header) => {
-    const key = String(header || '').trim();
-    return Object.prototype.hasOwnProperty.call(row, key) ? row[key] : '';
-  });
-  if (rowNumber) {
-    sheet.getRange(rowNumber, 1, 1, values.length).setValues([values]);
-  } else {
-    sheet.appendRow(values);
+function syncFranchiseUsersToUserMaster_(ss) {
+  const userSheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  ensureUserMasterColumns_(userSheet);
+  const startedAt = Date.now();
+  const userValues = userSheet.getDataRange().getValues();
+  const rawUserHeaders = userValues[0].map((header) => String(header || '').trim());
+  const userHeaders = rawUserHeaders.map(normalizeMasterHeader_);
+  const getUserIndex = (candidates) => findMasterHeaderIndex_(userHeaders, candidates);
+  const indexes = {
+    userId: getUserIndex(['userId', 'ユーザーID']),
+    shopId: getUserIndex(['shopId', '店舗ID']),
+    staffName: getUserIndex(['staffName', 'スタッフ名', '担当者名']),
+    role: getUserIndex(['role', '権限']),
+    passwordHash: getUserIndex(['passwordHash', 'パスワードハッシュ']),
+    lastLogin: getUserIndex(['lastLogin', '最終ログイン']),
+    createdAt: getUserIndex(['createdAt', '作成日', '登録日']),
+  };
+  if (indexes.userId === -1) {
+    throw new Error('ユーザーマスタに userId 列がありません。');
   }
+
+  const existingRows = userValues.length <= 1
+    ? []
+    : userValues.slice(1).map((row) => row.slice(0, rawUserHeaders.length));
+  const rowIndexByUserId = {};
+  existingRows.forEach((row, index) => {
+    const userId = String(row[indexes.userId] || '').trim();
+    if (userId && rowIndexByUserId[userId] === undefined) {
+      rowIndexByUserId[userId] = index;
+    }
+  });
+
+  const franchises = getFranchiseMasterRecords_();
+  let createdUserCount = 0;
+  let updatedUserCount = 0;
+  let skippedUserCount = 0;
+  const newRows = [];
+  const now = new Date();
+
+  franchises.forEach((franchise) => {
+    const franchiseId = String(franchise.franchiseId || franchise.memberId || '').trim();
+    const userId = String(franchise.userId || '').trim();
+    const shopId = String(franchise.shopId || '').trim();
+    try {
+      if (!userId || !shopId) {
+        skippedUserCount += 1;
+        logSetupStep_('sync franchise user skipped', {
+          franchiseId,
+          reason: 'missing_userId_or_shopId',
+          userId,
+          shopId,
+        });
+        return;
+      }
+
+      const rowIndex = rowIndexByUserId[userId];
+      const desired = {
+        userId,
+        shopId,
+        staffName: franchise.contactName || franchise.displayName || '',
+        role: franchise.role || 'member',
+        passwordHash: franchise.passwordHash || '',
+        lastLogin: '',
+        createdAt: franchise.createdAt || now,
+      };
+
+      if (rowIndex === undefined) {
+        const row = new Array(rawUserHeaders.length).fill('');
+        Object.keys(indexes).forEach((key) => {
+          const index = indexes[key];
+          if (index === -1) return;
+          row[index] = desired[key] || '';
+        });
+        newRows.push(row);
+        rowIndexByUserId[userId] = existingRows.length + newRows.length - 1;
+        createdUserCount += 1;
+        return;
+      }
+
+      const row = existingRows[rowIndex];
+      let changed = false;
+      Object.keys(indexes).forEach((key) => {
+        const index = indexes[key];
+        if (index === -1) return;
+        if (key === 'lastLogin') return;
+        const currentValue = String(row[index] || '').trim();
+        if (currentValue) return;
+        const nextValue = desired[key];
+        if (nextValue === undefined || nextValue === null || nextValue === '') return;
+        row[index] = nextValue;
+        changed = true;
+      });
+
+      if (changed) updatedUserCount += 1;
+      else skippedUserCount += 1;
+    } catch (error) {
+      logSetupStep_('sync franchise user failed', {
+        franchiseId,
+        userId,
+        shopId,
+        message: error && error.message ? error.message : String(error),
+        stack: error && error.stack ? error.stack : '',
+      });
+      throw error;
+    }
+  });
+
+  if (existingRows.length > 0 && updatedUserCount > 0) {
+    userSheet.getRange(2, 1, existingRows.length, rawUserHeaders.length).setValues(existingRows);
+  }
+  if (newRows.length > 0) {
+    userSheet
+      .getRange(userSheet.getLastRow() + 1, 1, newRows.length, rawUserHeaders.length)
+      .setValues(newRows);
+  }
+
+  return {
+    createdUserCount,
+    updatedUserCount,
+    skippedUserCount,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 function ensureFranchiseMasterColumns_(sheet) {
@@ -2456,8 +2683,9 @@ function getUserMasterColumnIndexes_(sheet) {
 }
 
 function findUserMasterRowByUserId_(userId) {
-  const sheet = getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KCO_CONFIG.USER_MASTER);
-  setupUserMaster_(SpreadsheetApp.getActiveSpreadsheet());
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  ensureUserMasterColumns_(sheet);
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return null;
   const indexes = getUserMasterColumnIndexes_(sheet);
