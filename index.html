@@ -4980,6 +4980,9 @@
       fetch(`${STYLEBOOK_API_URL}?${params.toString()}&t=${Date.now()}`)
         .then((response) => response.json())
         .then((data) => {
+          if (!data?.ok || !Array.isArray(data.posts)) {
+            throw new Error(data?.message || 'Color detail styles API returned no posts.');
+          }
           state.colorDetailStylesByCode[key] = Array.isArray(data?.posts) ? data.posts : [];
           state.colorDetailStylesLoading[key] = false;
           refreshColorChartContent();
