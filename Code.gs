@@ -457,10 +457,15 @@ function getPublicColorRankings(year, month) {
   let excludedOtherLines = 0;
   const debugOrders = [];
   const debugLines = [];
+  const debugDetailMisses = [];
+  let orderHeaders = [];
+  let detailHeaders = [];
+  const searchedOrderIds = [];
 
   if (ordersSheet && detailsSheet && ordersSheet.getLastRow() > 1 && detailsSheet.getLastRow() > 1) {
     const orderValues = ordersSheet.getDataRange().getValues();
-    const orderIndex = createIndex_(orderValues[0]);
+    orderHeaders = orderValues[0].map(String);
+    const orderIndex = createIndex_(orderHeaders);
     const validOrderNos = {};
     orderValues.slice(1).forEach((row) => {
       const orderNo = String(getRowValueByHeader_(row, orderIndex, ['注文番号', 'orderId', 'orderNo', '注文ID']) || '').trim();
@@ -489,20 +494,32 @@ function getPublicColorRankings(year, month) {
         return;
       }
       validOrderNos[orderNo] = true;
+      searchedOrderIds.push(orderNo);
       countedOrders += 1;
     });
 
     const detailValues = detailsSheet.getDataRange().getValues();
-    const detailIndex = createIndex_(detailValues[0]);
+    detailHeaders = detailValues[0].map(String);
+    const detailIndex = createIndex_(detailHeaders);
+    const detailMatchCounts = {};
     detailValues.slice(1).forEach((row) => {
       const orderNo = String(getRowValueByHeader_(row, detailIndex, ['注文番号', 'orderId', 'orderNo', '注文ID']) || '').trim();
       if (!validOrderNos[orderNo]) return;
+      detailMatchCounts[orderNo] = Number(detailMatchCounts[orderNo] || 0) + 1;
       const rawProductCode = getRowValueByHeader_(row, detailIndex, ['商品コード', 'productCode', 'カラーID', 'colorId']);
       const rawColorName = getRowValueByHeader_(row, detailIndex, ['カラー', 'カラー名', 'color', 'colorName']);
       const rawProductName = getRowValueByHeader_(row, detailIndex, ['商品名', 'productName']);
       const productCode = resolveRankingProductCode_(rawProductCode, rawColorName, rawProductName, colorProducts);
       if (!productCode || !colorProductCodes[createProductCodeKey_(productCode)]) {
         excludedOtherLines += 1;
+        debugDetailMisses.push({
+          orderNo,
+          reason: productCode ? 'not_color_product' : 'missing_product_code',
+          rawProductCode: String(rawProductCode || ''),
+          productCode: String(productCode || ''),
+          productName: String(rawProductName || ''),
+          colorName: String(rawColorName || ''),
+        });
         return;
       }
       const quantity = Number(getRowValueByHeader_(row, detailIndex, ['数量', 'quantity', '袋数']) || 0);
@@ -518,6 +535,15 @@ function getPublicColorRankings(year, month) {
         quantity,
       });
     });
+    searchedOrderIds.forEach((orderNo) => {
+      if (!detailMatchCounts[orderNo]) {
+        debugDetailMisses.push({
+          orderNo,
+          reason: 'no_detail_rows_for_order_id',
+          searchedOrderId: orderNo,
+        });
+      }
+    });
   }
 
   const debugSummary = {
@@ -525,8 +551,15 @@ function getPublicColorRankings(year, month) {
     countedOrders,
     countedLines,
     periodLabel: `${period.year}年${period.month}月`,
+    orderSheetName: ordersSheet ? ordersSheet.getName() : '',
+    detailSheetName: detailsSheet ? detailsSheet.getName() : '',
+    orderHeaders,
+    detailHeaders,
+    searchedOrderIds,
+    matchedDetailCount: countedLines,
     orders: debugOrders.slice(0, 80),
     lines: debugLines.slice(0, 120),
+    detailMisses: debugDetailMisses.slice(0, 120),
     purchaseCounts,
     excludedTestOrDeletedOrders,
     excludedOtherLines,
