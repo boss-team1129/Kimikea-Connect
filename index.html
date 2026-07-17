@@ -4950,11 +4950,12 @@
     function loadRankingData() {
       if (state.rankingData.loaded || state.rankingData.loading) return;
       state.rankingData.loading = true;
+      const rankingPeriod = getCurrentRankingPeriod();
       const productPromise = !state.products.length && canUseOrderApi()
         ? resolveWithTimeout(callServer('getPublicProducts'), 5000, [], 'Ranking products')
         : Promise.resolve(state.products);
       const orderPromise = canUseOrderApi()
-        ? resolveWithTimeout(callServer('getPublicColorRankings'), 5000, null, 'Color purchase ranking')
+        ? resolveWithTimeout(callServer('getPublicColorRankings', rankingPeriod.year, rankingPeriod.month), 5000, null, 'Color purchase ranking')
         : Promise.resolve(null);
       const stylebookPromise = STYLEBOOK_API_URL
         ? resolveWithTimeout(fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${Date.now()}`)
@@ -4968,11 +4969,13 @@
             state.products = products;
           }
           state.rankingData.purchaseCounts = orderData?.purchaseCounts || {};
-          state.rankingData.periodLabel = orderData?.periodLabel || '';
+          state.rankingData.year = Number(orderData?.year || rankingPeriod.year);
+          state.rankingData.month = Number(orderData?.month || rankingPeriod.month);
+          state.rankingData.periodLabel = orderData?.periodLabel || `${state.rankingData.year}年${state.rankingData.month}月`;
           const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
           state.colorChartStyles = Array.isArray(posts) ? posts : [];
           state.colorChartStylesLoaded = true;
-          state.rankingData.salonCounts = buildSalonRankingCounts(state.colorChartStyles);
+          state.rankingData.salonCounts = buildSalonRankingCounts(state.colorChartStyles, state.rankingData.year, state.rankingData.month);
           state.rankingData.loaded = true;
           state.rankingData.loading = false;
           refreshColorChartContent();
@@ -4985,6 +4988,32 @@
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
         });
+    }
+
+    function getCurrentRankingPeriod(date = new Date()) {
+      const parts = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: 'numeric',
+      }).formatToParts(date);
+      return {
+        year: Number(parts.find((part) => part.type === 'year')?.value || date.getFullYear()),
+        month: Number(parts.find((part) => part.type === 'month')?.value || (date.getMonth() + 1)),
+      };
+    }
+
+    function isDateInRankingMonth(value, year, month) {
+      if (!value || !year || !month) return false;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return false;
+      const parts = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: 'numeric',
+      }).formatToParts(date);
+      const dateYear = Number(parts.find((part) => part.type === 'year')?.value || 0);
+      const dateMonth = Number(parts.find((part) => part.type === 'month')?.value || 0);
+      return dateYear === Number(year) && dateMonth === Number(month);
     }
 
     function extractPostColorKeys(post) {
@@ -5020,11 +5049,12 @@
       return [...new Set(values.map(normalizeColorCode).filter(Boolean))];
     }
 
-    function buildSalonRankingCounts(posts) {
+    function buildSalonRankingCounts(posts, year, month) {
       const counts = {};
       (posts || []).forEach((post) => {
         const status = String(post.status || '').trim();
         if (post.deletedAt || post.isDeleted || status === 'draft' || status === '下書き') return;
+        if (!isDateInRankingMonth(post.createdAt || post.updatedAt, year, month)) return;
         extractPostColorKeys(post).forEach((key) => {
           counts[key] = Number(counts[key] || 0) + 1;
         });

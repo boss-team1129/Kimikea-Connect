@@ -435,10 +435,11 @@ function getPublicProducts() {
   return getClientProducts_();
 }
 
-function getPublicColorRankings() {
+function getPublicColorRankings(year, month) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const periodStart = new Date(2026, 6, 1, 0, 0, 0);
-  const periodEnd = new Date(2026, 6, 31, 23, 59, 59);
+  const period = getRankingPeriod_(year, month);
+  const periodStart = period.start;
+  const periodEnd = period.end;
   const colorProducts = getVisibleProducts_().filter((product) => (
     KCO_CATEGORY_PRICES[product.category] && product.productCode
   ));
@@ -497,12 +498,38 @@ function getPublicColorRankings() {
   return {
     periodStart: Utilities.formatDate(periodStart, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm'),
     periodEnd: Utilities.formatDate(periodEnd, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm'),
-    periodLabel: Utilities.formatDate(periodStart, Session.getScriptTimeZone(), 'yyyy年M月'),
+    periodLabel: `${period.year}年${period.month}月`,
+    year: period.year,
+    month: period.month,
     purchaseCounts,
     countedOrders,
     countedLines,
     excludedCanceledOrders,
     excludedOtherLines,
+  };
+}
+
+function getRankingPeriod_(year, month) {
+  const timeZone = 'Asia/Tokyo';
+  const now = new Date();
+  const currentYear = Number(Utilities.formatDate(now, timeZone, 'yyyy'));
+  const currentMonth = Number(Utilities.formatDate(now, timeZone, 'M'));
+  const targetYear = Number(year || currentYear);
+  const targetMonth = Number(month || currentMonth);
+  if (!targetYear || targetYear < 2000 || targetYear > 2100 || targetMonth < 1 || targetMonth > 12) {
+    throw new Error('ランキング集計年月が正しくありません。');
+  }
+
+  const start = new Date(`${targetYear}-${String(targetMonth).padStart(2, '0')}-01T00:00:00+09:00`);
+  const nextYear = targetMonth === 12 ? targetYear + 1 : targetYear;
+  const nextMonth = targetMonth === 12 ? 1 : targetMonth + 1;
+  const nextStart = new Date(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+09:00`);
+  const end = new Date(nextStart.getTime() - 1);
+  return {
+    year: targetYear,
+    month: targetMonth,
+    start,
+    end,
   };
 }
 
