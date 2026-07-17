@@ -19,6 +19,7 @@ const KCO_CONFIG = {
   FRANCHISE_MASTER: '加盟店マスタ',
   USER_MASTER: 'ユーザーマスタ',
   SETTINGS: '設定',
+  STYLEBOOK_API_URL: 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
   SHIPPING_FEE: 1000,
@@ -192,6 +193,7 @@ function handleJsonpApi_(event) {
     getPublicProducts,
     getPublicColorRankings,
     getPortalData,
+    getMyPageStylebookData,
     updateMemberEmail,
     changeMemberEmail,
     updateMyProfile,
@@ -601,6 +603,64 @@ function getPortalData(sessionToken) {
       invoices: buildMyPageInvoiceSummaries_(orders),
     },
   };
+}
+
+function getMyPageStylebookData(sessionToken) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const userId = String(franchise.userId || '').trim();
+  if (!userId) {
+    throw new Error('ログインユーザーIDを確認できません。');
+  }
+
+  const response = UrlFetchApp.fetch(`${KCO_CONFIG.STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(userId)}&t=${Date.now()}`, {
+    method: 'get',
+    muteHttpExceptions: true,
+  });
+  const statusCode = response.getResponseCode();
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(`スタイル図鑑データを取得できませんでした。status=${statusCode}`);
+  }
+
+  const payload = JSON.parse(response.getContentText() || '{}');
+  if (payload.ok === false) {
+    throw new Error(payload.message || 'スタイル図鑑データを取得できませんでした。');
+  }
+
+  const database = payload.database || payload;
+  const stylePosts = Array.isArray(database.stylePosts) ? database.stylePosts : [];
+  const savedStyles = Array.isArray(database.savedStyles) ? database.savedStyles : [];
+  const ownPosts = stylePosts.filter((post) => sameIdString_(stylePostAuthorIdForMypage_(post), userId));
+  const ownSaveIds = {};
+  const ownSaves = savedStyles.filter((save) => sameIdString_(save && save.userId, userId));
+  ownSaves.forEach((save) => {
+    const styleId = styleSavePostIdForMypage_(save);
+    if (styleId) ownSaveIds[styleId] = true;
+  });
+  const savedPosts = stylePosts.filter((post) => ownSaveIds[stylePostIdForMypage_(post)]);
+
+  return {
+    userId,
+    shopId: franchise.shopId,
+    posts: ownPosts,
+    savedPosts,
+    savedStyles: ownSaves,
+  };
+}
+
+function sameIdString_(a, b) {
+  return String(a || '').trim() === String(b || '').trim();
+}
+
+function stylePostAuthorIdForMypage_(post) {
+  return String((post && (post.authorId || post.userId || post.createdBy || post.createdByUserId)) || '').trim();
+}
+
+function stylePostIdForMypage_(post) {
+  return String((post && (post.id || post.postId || post.styleId)) || '').trim();
+}
+
+function styleSavePostIdForMypage_(save) {
+  return String((save && (save.styleId || save.stylePostId || save.postId || save.id)) || '').trim();
 }
 
 function getPublicProducts() {

@@ -6651,12 +6651,11 @@
     }
 
     function loadMyPageStylebookData(force = false) {
-      const userId = currentMemberUserId();
-      if (!STYLEBOOK_API_URL || !userId) {
+      if (!state.sessionToken || String(state.sessionToken).startsWith('public-')) {
         state.myPageStylebook = {
           loaded: true,
           loading: false,
-          error: userId ? '' : 'ログインユーザーIDを取得できませんでした。',
+          error: 'ログインが必要です。',
           posts: [],
           savedPosts: [],
           savedStyles: [],
@@ -6668,20 +6667,20 @@
 
       state.myPageStylebook.loading = true;
       state.myPageStylebook.error = '';
-      const url = `${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(userId)}&t=${Date.now()}`;
-      return fetch(url, { cache: 'no-store' })
-        .then((response) => response.json())
+      const userId = currentMemberUserId();
+      return callServer('getMyPageStylebookData', state.sessionToken)
         .then((data) => {
-          if (data && data.ok === false) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
-          const db = data.database || data;
-          const stylePosts = Array.isArray(db.stylePosts) ? db.stylePosts : [];
-          const savedStyles = Array.isArray(db.savedStyles) ? db.savedStyles : [];
-          const ownPosts = stylePosts.filter((post) => sameId(stylePostAuthorId(post), userId));
+          const stylePosts = Array.isArray(data.posts) ? data.posts : [];
+          const savedStyles = Array.isArray(data.savedStyles) ? data.savedStyles : [];
+          const returnedUserId = String(data.userId || userId || '').trim();
+          const ownPosts = stylePosts.filter((post) => sameId(stylePostAuthorId(post), returnedUserId));
           const ownSaveIds = new Set(savedStyles
-            .filter((save) => sameId(save.userId, userId))
+            .filter((save) => sameId(save.userId, returnedUserId))
             .map(saveStyleId)
             .filter(Boolean));
-          const savedPosts = stylePosts.filter((post) => ownSaveIds.has(stylePostId(post)));
+          const savedPosts = Array.isArray(data.savedPosts)
+            ? data.savedPosts.filter((post) => ownSaveIds.has(stylePostId(post)))
+            : stylePosts.filter((post) => ownSaveIds.has(stylePostId(post)));
           state.myPageStylebook = {
             loaded: true,
             loading: false,
