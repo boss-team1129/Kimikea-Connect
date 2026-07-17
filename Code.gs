@@ -17,6 +17,7 @@ const KCO_CONFIG = {
   ORDERS: '注文一覧',
   ORDER_DETAILS: '注文詳細',
   FRANCHISE_MASTER: '加盟店マスタ',
+  USER_MASTER: 'ユーザーマスタ',
   SETTINGS: '設定',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
@@ -85,6 +86,8 @@ const KCO_ORDER_HEADERS = [
   'priceType',
   'invoiceShipping',
   'invoiceTotal',
+  'shopId',
+  'userId',
 ];
 
 const KCO_SETTING_HEADERS = [
@@ -131,6 +134,15 @@ const KCO_FRANCHISE_HEADERS = [
   'passwordChangedAt',
   'createdAt',
   'updatedAt',
+];
+const KCO_USER_HEADERS = [
+  'userId',
+  'shopId',
+  'staffName',
+  'role',
+  'passwordHash',
+  'lastLogin',
+  'createdAt',
 ];
 const KCO_DEFAULT_INITIAL_PASSWORD = '0000';
 
@@ -255,6 +267,8 @@ function setupKimikeaConnectOrder() {
 
   setupProductMaster_(ss);
   setupFranchiseMaster_(ss);
+  setupUserMaster_(ss);
+  syncFranchiseUsersToUserMaster_(ss);
   setupOrders_(ss);
   setupOrderDetails_(ss);
   setupSettings_(ss);
@@ -346,9 +360,17 @@ function loginFranchise(credentials) {
   const sessionToken = Utilities.getUuid();
   CacheService.getScriptCache().put(
     createSessionKey_(sessionToken),
-    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired: false }),
+    JSON.stringify({
+      franchiseId: franchise.franchiseId,
+      userId: franchise.userId,
+      shopId: franchise.shopId,
+      loginId: franchise.loginId || franchise.email || '',
+      role: franchise.role || 'member',
+      passwordChangeRequired: false,
+    }),
     KCO_CONFIG.SESSION_SECONDS
   );
+  updateUserMasterLastLogin_(franchise.userId);
   return {
     sessionToken,
     franchise: sanitizeFranchise_(franchise),
@@ -362,7 +384,14 @@ function completeInitialPasswordSetup(sessionToken, newPassword, confirmPassword
   updateFranchisePassword_(franchise.franchiseId, newPassword);
   CacheService.getScriptCache().put(
     createSessionKey_(sessionToken),
-    JSON.stringify({ franchiseId: franchise.franchiseId, passwordChangeRequired: false }),
+    JSON.stringify({
+      franchiseId: franchise.franchiseId,
+      userId: franchise.userId,
+      shopId: franchise.shopId,
+      loginId: franchise.loginId || franchise.email || '',
+      role: franchise.role || 'member',
+      passwordChangeRequired: false,
+    }),
     KCO_CONFIG.SESSION_SECONDS
   );
   return {
@@ -913,6 +942,8 @@ function submitCartOrder(order) {
     priceType,
     shippingFee,
     invoiceTotal,
+    franchise.shopId,
+    franchise.userId,
   ]);
 
   detailsSheet
@@ -1079,6 +1110,70 @@ function setupFranchiseMaster_(ss) {
   }
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
   sheet.autoResizeColumns(1, KCO_FRANCHISE_HEADERS.length);
+}
+
+function setupUserMaster_(ss) {
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_USER_HEADERS.length).setValues([KCO_USER_HEADERS]);
+  } else {
+    ensureUserMasterColumns_(sheet);
+  }
+  applyHeaderStyle_(sheet, KCO_USER_HEADERS.length);
+  sheet.autoResizeColumns(1, KCO_USER_HEADERS.length);
+}
+
+function ensureUserMasterColumns_(sheet) {
+  const existingHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  KCO_USER_HEADERS.forEach((header) => {
+    if (existingHeaders.indexOf(normalizeMasterHeader_(header)) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    existingHeaders.push(normalizeMasterHeader_(header));
+  });
+}
+
+function syncFranchiseUsersToUserMaster_(ss) {
+  const userSheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  setupUserMaster_(ss);
+  const userValues = userSheet.getDataRange().getValues();
+  const userHeaders = userValues[0].map(normalizeMasterHeader_);
+  const userIdIndex = findMasterHeaderIndex_(userHeaders, ['userId', 'ユーザーID']);
+  const existingRowsByUserId = {};
+  userValues.slice(1).forEach((row, offset) => {
+    const userId = String(row[userIdIndex] || '').trim();
+    if (userId) existingRowsByUserId[userId] = offset + 2;
+  });
+  getFranchiseMasterRecords_().forEach((franchise) => {
+    if (!franchise.userId || !franchise.shopId) return;
+    const row = {
+      userId: franchise.userId,
+      shopId: franchise.shopId,
+      staffName: franchise.contactName || franchise.displayName || '',
+      role: franchise.role || 'member',
+      passwordHash: franchise.passwordHash || '',
+      lastLogin: franchise.lastLogin || '',
+      createdAt: franchise.createdAt || new Date(),
+    };
+    upsertUserMasterRow_(userSheet, row, existingRowsByUserId[row.userId]);
+  });
+}
+
+function upsertUserMasterRow_(sheet, row, rowNumber) {
+  ensureUserMasterColumns_(sheet);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = headers.map((header) => {
+    const key = String(header || '').trim();
+    return Object.prototype.hasOwnProperty.call(row, key) ? row[key] : '';
+  });
+  if (rowNumber) {
+    sheet.getRange(rowNumber, 1, 1, values.length).setValues([values]);
+  } else {
+    sheet.appendRow(values);
+  }
 }
 
 function ensureFranchiseMasterColumns_(sheet) {
@@ -2055,6 +2150,10 @@ function getSessionFranchise_(sessionToken, options) {
     createSessionKey_(token),
     JSON.stringify({
       franchiseId: franchise.franchiseId,
+      userId: franchise.userId,
+      shopId: franchise.shopId,
+      loginId: franchise.loginId || franchise.email || '',
+      role: franchise.role || 'member',
       passwordChangeRequired: false,
     }),
     KCO_CONFIG.SESSION_SECONDS
@@ -2067,6 +2166,7 @@ function getFranchiseOrders_(franchiseId) {
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
   if (!ordersSheet || ordersSheet.getLastRow() <= 1) return [];
+  const franchise = findFranchiseById_(franchiseId);
 
   const orderValues = ordersSheet.getDataRange().getValues();
   const orderIndex = createIndex_(orderValues[0]);
@@ -2093,7 +2193,7 @@ function getFranchiseOrders_(franchiseId) {
   }
 
   return orderValues.slice(1)
-    .filter((row) => String(row[orderIndex['加盟店ID']] || '').trim() === franchiseId)
+    .filter((row) => orderRowBelongsToFranchise_(row, orderIndex, franchise))
     .map((row) => {
       const orderNo = String(row[orderIndex['注文番号']] || '');
       const orderDate = row[orderIndex['注文日時']];
@@ -2115,6 +2215,12 @@ function getFranchiseOrders_(franchiseId) {
     .reverse();
 }
 
+function orderRowBelongsToFranchise_(row, orderIndex, franchise) {
+  const rowShopId = orderIndex.shopId === undefined ? '' : String(row[orderIndex.shopId] || '').trim();
+  if (rowShopId && franchise.shopId) return rowShopId === String(franchise.shopId || '').trim();
+  return String(row[orderIndex['加盟店ID']] || '').trim() === String(franchise.franchiseId || '').trim();
+}
+
 function getInvoicePdfData(sessionToken, orderNo) {
   const franchise = getSessionFranchise_(sessionToken);
   const targetOrderNo = String(orderNo || '').trim();
@@ -2125,7 +2231,7 @@ function getInvoicePdfData(sessionToken, orderNo) {
   const orderIndex = createIndex_(orderValues[0]);
   const orderRow = orderValues.slice(1).find((row) => (
     String(row[orderIndex['注文番号']] || '') === targetOrderNo
-    && String(row[orderIndex['加盟店ID']] || '').trim() === franchise.franchiseId
+    && orderRowBelongsToFranchise_(row, orderIndex, franchise)
   ));
   if (!orderRow) throw new Error('注文履歴が見つかりません。');
 
@@ -2332,6 +2438,47 @@ function findFranchiseById_(franchiseId) {
   return franchise;
 }
 
+function getUserMasterColumnIndexes_(sheet) {
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
+  return {
+    userId: getIndex(['userId', 'ユーザーID']),
+    shopId: getIndex(['shopId', '店舗ID']),
+    staffName: getIndex(['staffName', 'スタッフ名', '担当者名']),
+    role: getIndex(['role', '権限']),
+    passwordHash: getIndex(['passwordHash', 'パスワードハッシュ']),
+    lastLogin: getIndex(['lastLogin', '最終ログイン']),
+    createdAt: getIndex(['createdAt', '作成日', '登録日']),
+  };
+}
+
+function findUserMasterRowByUserId_(userId) {
+  const sheet = getOrCreateSheet_(SpreadsheetApp.getActiveSpreadsheet(), KCO_CONFIG.USER_MASTER);
+  setupUserMaster_(SpreadsheetApp.getActiveSpreadsheet());
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return null;
+  const indexes = getUserMasterColumnIndexes_(sheet);
+  const normalizedUserId = String(userId || '').trim();
+  const rowIndex = values.slice(1).findIndex(row => String(row[indexes.userId] || '').trim() === normalizedUserId);
+  if (rowIndex < 0) return null;
+  return { sheet, rowNumber: rowIndex + 2, indexes };
+}
+
+function updateUserMasterPasswordHash_(userId, passwordHash) {
+  const found = findUserMasterRowByUserId_(userId);
+  if (!found || found.indexes.passwordHash === -1) return;
+  found.sheet.getRange(found.rowNumber, found.indexes.passwordHash + 1).setValue(passwordHash || '');
+}
+
+function updateUserMasterLastLogin_(userId) {
+  const found = findUserMasterRowByUserId_(userId);
+  if (!found || found.indexes.lastLogin === -1) return;
+  found.sheet.getRange(found.rowNumber, found.indexes.lastLogin + 1).setValue(new Date());
+}
+
 function normalizeMasterHeader_(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -2501,7 +2648,9 @@ function updateFranchisePassword_(franchiseId, newPassword) {
   }
 
   const now = new Date();
-  sheet.getRange(franchise.rowNumber, indexes.passwordHash + 1).setValue(hashPassword_(newPassword));
+  const passwordHash = hashPassword_(newPassword);
+  sheet.getRange(franchise.rowNumber, indexes.passwordHash + 1).setValue(passwordHash);
+  updateUserMasterPasswordHash_(franchise.userId, passwordHash);
   if (indexes.initialPassword !== -1) sheet.getRange(franchise.rowNumber, indexes.initialPassword + 1).setValue('');
   if (indexes.passwordChangedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.passwordChangedAt + 1).setValue(now);
   if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(now);
@@ -2519,6 +2668,7 @@ function resetFranchisePasswordToInitial_(franchiseId) {
   if (indexes.passwordHash !== -1) {
     sheet.getRange(franchise.rowNumber, indexes.passwordHash + 1).setValue('');
   }
+  updateUserMasterPasswordHash_(franchise.userId, '');
   if (indexes.passwordChangedAt !== -1) {
     sheet.getRange(franchise.rowNumber, indexes.passwordChangedAt + 1).setValue('');
   }
