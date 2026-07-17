@@ -6516,9 +6516,11 @@
         .then((franchise) => {
           state.franchise = franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
-          renderProfile();
-          renderMyPageTab('profile');
-          setMessage('mypageMessage', 'メールアドレスを更新しました。次回から新しいメールアドレスでログインしてください。', false);
+          localStorage.removeItem('kimikeaSessionToken');
+          state.sessionToken = '';
+          state.orderUnlocked = false;
+          showOrderLogin();
+          setMessage('loginMessage', 'メールアドレスを更新しました。新しいメールアドレスで再ログインしてください。', false);
         })
         .catch((error) => {
           setMessage('mypageMessage', getErrorMessage(error), true);

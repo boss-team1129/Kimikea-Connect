@@ -120,6 +120,7 @@ const KCO_FRANCHISE_HEADERS = [
   'displayName',
   'role',
   'email',
+  'loginId',
   'phone',
   'initialPassword',
   'passwordHash',
@@ -180,6 +181,8 @@ function handleJsonpApi_(event) {
     getPublicColorRankings,
     getPortalData,
     updateMemberEmail,
+    changeMemberEmail,
+    updateMyProfile,
     changeMemberPassword,
     submitCartOrder,
     getInvoicePdfData,
@@ -304,6 +307,7 @@ function loginFranchise(credentials) {
       franchiseId: item.franchiseId,
       franchiseName: item.franchiseName,
       email: normalizeEmail_(item.email),
+      loginId: normalizeLoginIdentifier_(item.loginId || ''),
       visible: item.visible,
       membershipStatus: item.membershipStatus,
       hasPasswordHash: Boolean(item.passwordHash),
@@ -325,6 +329,7 @@ function loginFranchise(credentials) {
       franchiseId: franchise.franchiseId,
       franchiseName: franchise.franchiseName,
       email: normalizeEmail_(franchise.email),
+      loginId: normalizeLoginIdentifier_(franchise.loginId || ''),
       visible: franchise.visible,
       membershipStatus: franchise.membershipStatus,
     } : null,
@@ -376,7 +381,10 @@ function updateMemberEmail(sessionToken, newEmail) {
   const duplicate = getFranchiseMasterRecords_().find((item) => (
     item.franchiseId !== franchise.franchiseId
     && item.visible
-    && normalizeEmail_(item.email) === email
+    && (
+      normalizeEmail_(item.email) === email
+      || normalizeLoginIdentifier_(item.loginId || '') === email
+    )
   ));
   if (duplicate) {
     throw new Error('このメールアドレスはすでに登録されています。');
@@ -386,6 +394,7 @@ function updateMemberEmail(sessionToken, newEmail) {
   ensureFranchiseMasterColumns_(sheet);
   const indexes = getFranchiseMasterColumnIndexes_(sheet);
   sheet.getRange(franchise.rowNumber, indexes.email + 1).setValue(email);
+  if (indexes.loginId !== -1) sheet.getRange(franchise.rowNumber, indexes.loginId + 1).setValue(email);
   if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(new Date());
   return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
 }
@@ -408,7 +417,10 @@ function changeMemberEmail(sessionToken, currentPassword, newEmail, confirmEmail
   const duplicate = getFranchiseMasterRecords_().find((item) => (
     item.franchiseId !== franchise.franchiseId
     && item.visible
-    && normalizeEmail_(item.email) === email
+    && (
+      normalizeEmail_(item.email) === email
+      || normalizeLoginIdentifier_(item.loginId || '') === email
+    )
   ));
   if (duplicate) {
     throw new Error('このメールアドレスはすでに登録されています。');
@@ -418,7 +430,9 @@ function changeMemberEmail(sessionToken, currentPassword, newEmail, confirmEmail
   ensureFranchiseMasterColumns_(sheet);
   const indexes = getFranchiseMasterColumnIndexes_(sheet);
   sheet.getRange(franchise.rowNumber, indexes.email + 1).setValue(email);
+  if (indexes.loginId !== -1) sheet.getRange(franchise.rowNumber, indexes.loginId + 1).setValue(email);
   if (indexes.updatedAt !== -1) sheet.getRange(franchise.rowNumber, indexes.updatedAt + 1).setValue(new Date());
+  CacheService.getScriptCache().remove(createSessionKey_(sessionToken));
   return sanitizeFranchise_(findFranchiseById_(franchise.franchiseId));
 }
 
@@ -2192,6 +2206,7 @@ function getFranchiseMasterRecords_() {
   const displayNameIndex = findHeaderIndex(['displayName', '表示名', '担当者名']);
   const roleIndex = findHeaderIndex(['role', '権限']);
   const emailIndex = findHeaderIndex(['email', 'メールアドレス']);
+  const loginIdIndex = findHeaderIndex(['loginId', 'ログインID']);
   const phoneIndex = findHeaderIndex(['phone', '電話', '電話番号']);
   const passwordIndex = findHeaderIndex(['initialPassword', 'パスワード', 'password']);
   const passwordHashIndex = findHeaderIndex(['passwordHash', 'パスワードハッシュ']);
@@ -2242,6 +2257,8 @@ function getFranchiseMasterRecords_() {
       const membershipStatus = normalizeMembershipStatus_(rawStatus, visible);
       const postalCode = postalCodeIndex === -1 ? '' : String(row[postalCodeIndex] || '').trim();
       const address = addressIndex === -1 ? '' : String(row[addressIndex] || '').trim();
+      const email = String(row[emailIndex] || '').trim();
+      const loginId = loginIdIndex === -1 ? email : String(row[loginIdIndex] || email).trim();
       return {
         franchiseId: String(row[franchiseIdIndex] || '').trim(),
         memberId: String(row[franchiseIdIndex] || '').trim(),
@@ -2258,7 +2275,8 @@ function getFranchiseMasterRecords_() {
         role: roleIndex === -1 ? 'member' : String(row[roleIndex] || 'member').trim() || 'member',
         rowNumber: offset + 2,
         contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
-        email: String(row[emailIndex] || '').trim(),
+        email,
+        loginId,
         phone: normalizePhone_(row[phoneIndex]),
         initialPassword: passwordIndex === -1
           ? KCO_DEFAULT_INITIAL_PASSWORD
@@ -2352,7 +2370,8 @@ function normalizeLoginIdentifier_(value) {
 function isMatchingFranchiseLoginId_(franchise, loginId) {
   const normalizedLoginId = normalizeLoginIdentifier_(loginId);
   if (!normalizedLoginId) return false;
-  return normalizeEmail_(franchise.email) === normalizedLoginId
+  return normalizeLoginIdentifier_(franchise.loginId || '') === normalizedLoginId
+    || (!franchise.loginId && normalizeEmail_(franchise.email) === normalizedLoginId)
     || normalizeLoginIdentifier_(franchise.franchiseId) === normalizedLoginId
     || normalizeLoginIdentifier_(franchise.memberId) === normalizedLoginId;
 }
@@ -2464,6 +2483,7 @@ function getFranchiseMasterColumnIndexes_(sheet) {
   const getIndex = (candidates) => findMasterHeaderIndex_(headers, candidates);
   return {
     email: getIndex(['email', 'メールアドレス']),
+    loginId: getIndex(['loginId', 'ログインID']),
     initialPassword: getIndex(['initialPassword', 'パスワード', 'password']),
     passwordHash: getIndex(['passwordHash', 'パスワードハッシュ']),
     passwordChangedAt: getIndex(['passwordChangedAt', 'パスワード変更日']),
@@ -2533,6 +2553,7 @@ function sanitizeFranchise_(franchise) {
     staffId: franchise.staffId || '',
     displayName: franchise.displayName || franchise.contactName || franchise.franchiseName,
     role: franchise.role || 'member',
+    loginId: franchise.loginId || franchise.email || '',
     franchiseName: franchise.franchiseName,
     salonName: franchise.salonName || franchise.franchiseName,
     contactName: franchise.contactName,
