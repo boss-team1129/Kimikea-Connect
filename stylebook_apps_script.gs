@@ -82,6 +82,9 @@ function doGet(e) {
   if (action === 'colorUsageRankings') {
     return json_({ ok: true, ranking: getStylebookColorUsageRanking_() });
   }
+  if (action === 'stylesByColor') {
+    return json_(getPublicStylebookPostsByColor_(e.parameter || {}));
+  }
   return json_({ ok: false, message: '未対応の処理です。' });
 }
 
@@ -204,9 +207,7 @@ function getStylebookColorUsageRanking_() {
   posts.forEach(post => {
     if (!isPublicRankingPost_(post)) return;
     publicPostCount += 1;
-    const colorIds = splitArray_(post.extensionColorIds)
-      .map(normalizeRankingColorKey_)
-      .filter(Boolean);
+    const colorIds = extractRankingColorKeysFromPost_(post);
     const uniqueColorIds = Array.from(new Set(colorIds));
     uniqueColorIds.forEach(colorId => {
       counts[colorId] = Number(counts[colorId] || 0) + 1;
@@ -222,6 +223,99 @@ function getStylebookColorUsageRanking_() {
     counts,
     publicPostCount,
     colorSelectionCount,
+  };
+}
+
+function getPublicStylebookPostsByColor_(params) {
+  const requestedKeys = requestedRankingColorKeys_(params);
+  if (!requestedKeys.length) {
+    return { ok: false, message: 'カラー識別値が指定されていません。', posts: [] };
+  }
+  const ss = getKimikeaConnectSpreadsheet_();
+  const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
+  const matchedPosts = posts
+    .filter(post => isPublicRankingPost_(post) && postMatchesRankingColor_(post, requestedKeys))
+    .map(publicStylePostForColorDetail_);
+  logStylebookDebug_('styles by color', {
+    requestedKeys,
+    matchedCount: matchedPosts.length,
+    postIds: matchedPosts.map(post => post.id),
+  });
+  return {
+    ok: true,
+    colorKeys: requestedKeys,
+    posts: matchedPosts,
+  };
+}
+
+function requestedRankingColorKeys_(params) {
+  const values = [];
+  ['colorKey', 'productCode', 'colorCode', 'colorName', 'aliases'].forEach(key => {
+    collectRankingColorValues_(params[key], values);
+  });
+  return Array.from(new Set(values.map(normalizeRankingColorKey_).filter(Boolean)));
+}
+
+function postMatchesRankingColor_(post, requestedKeys) {
+  const postKeys = new Set(extractRankingColorKeysFromPost_(post));
+  return requestedKeys.some(key => postKeys.has(key));
+}
+
+function extractRankingColorKeysFromPost_(post) {
+  const values = [];
+  [
+    post.extensionColorIds,
+    post.extensionColors,
+    post.colorCodes,
+    post.colors,
+    post.colorLabels,
+  ].forEach(entry => collectRankingColorValues_(entry, values));
+  return Array.from(new Set(values.map(normalizeRankingColorKey_).filter(Boolean)));
+}
+
+function collectRankingColorValues_(entry, values) {
+  if (!entry) return;
+  if (Array.isArray(entry)) {
+    entry.forEach(item => collectRankingColorValues_(item, values));
+    return;
+  }
+  if (typeof entry === 'object') {
+    ['productCode', 'code', 'colorCode', 'id', 'colorId', 'colorName', 'name'].forEach(key => {
+      if (entry[key]) values.push(entry[key]);
+    });
+    return;
+  }
+  const text = String(entry || '').trim();
+  if (!text) return;
+  if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('{') && text.endsWith('}'))) {
+    try {
+      collectRankingColorValues_(JSON.parse(text), values);
+      return;
+    } catch (error) {
+      // Continue as plain text below.
+    }
+  }
+  text.split(/[\n,、|/]+/).forEach(item => {
+    const value = String(item || '').trim();
+    if (value) values.push(value);
+  });
+}
+
+function publicStylePostForColorDetail_(post) {
+  return {
+    id: post.id,
+    title: post.title || '',
+    imageUrl: post.imageUrl || '',
+    additionalImages: post.additionalImages || [],
+    salonName: post.salonName || '',
+    staffName: post.staffName || '',
+    shopId: post.shopId || '',
+    staffId: post.staffId || '',
+    extensionCount: post.extensionCount || 0,
+    extensionColorIds: post.extensionColorIds || [],
+    createdAt: post.createdAt || '',
+    status: post.status || '',
+    isPublished: post.isPublished,
   };
 }
 
@@ -735,6 +829,10 @@ function normalizePost_(row) {
     additionalImages: splitArray_(row.additionalImages || row.additionalImageUrls || row.imageUrls),
     additionalImageFileIds: splitArray_(row.additionalImageFileIds),
     extensionColorIds: splitArray_(row.extensionColorIds),
+    extensionColors: row.extensionColors || '',
+    colorCodes: row.colorCodes || '',
+    colors: row.colors || '',
+    colorLabels: row.colorLabels || '',
     styleTypeIds: splitArray_(row.styleTypeIds),
     extensionCount: Number(row.extensionCount || 0),
     shopId: row.shopId || '',

@@ -3809,6 +3809,8 @@
       colorDetailReturnTarget: 'chart',
       colorChartStyles: [],
       colorChartStylesLoaded: false,
+      colorDetailStylesByCode: {},
+      colorDetailStylesLoading: {},
       rankingMode: 'purchase',
       rankingData: {
         loaded: false,
@@ -4959,6 +4961,36 @@
         });
     }
 
+    function colorDetailCacheKey(color) {
+      return normalizeColorCode(color && (color.code || color.productCode || color.color || colorDisplayName(color)));
+    }
+
+    function loadStylesForColorDetail(color) {
+      const key = colorDetailCacheKey(color);
+      if (!key || !STYLEBOOK_API_URL || state.colorDetailStylesByCode[key] || state.colorDetailStylesLoading[key]) return;
+      state.colorDetailStylesLoading[key] = true;
+      const params = new URLSearchParams({
+        action: 'stylesByColor',
+        userId: 'public-color-detail',
+        colorKey: key,
+        productCode: color.code || color.productCode || '',
+        colorCode: color.color || '',
+        colorName: colorDisplayName(color),
+      });
+      fetch(`${STYLEBOOK_API_URL}?${params.toString()}&t=${Date.now()}`)
+        .then((response) => response.json())
+        .then((data) => {
+          state.colorDetailStylesByCode[key] = Array.isArray(data?.posts) ? data.posts : [];
+          state.colorDetailStylesLoading[key] = false;
+          refreshColorChartContent();
+        })
+        .catch((error) => {
+          console.warn('Color detail styles unavailable:', getErrorMessage(error));
+          state.colorDetailStylesLoading[key] = false;
+          refreshColorChartContent();
+        });
+    }
+
     function loadRankingData() {
       if (state.rankingData.loaded || state.rankingData.loading) return;
       state.rankingData.loading = true;
@@ -5140,7 +5172,8 @@
     function openColorDetail(code) {
       state.colorChartDetailCode = normalizeColorCode(code);
       state.colorDetailReturnTarget = currentPublicPageKey === 'popular' ? 'ranking' : 'chart';
-      window.setTimeout(loadStylebookPostsForColorChart, 0);
+      const color = getActiveColorChartProducts().find((item) => normalizeColorCode(item.code) === state.colorChartDetailCode);
+      if (color) window.setTimeout(() => loadStylesForColorDetail(color), 0);
       window.setTimeout(loadRankingData, 0);
       refreshColorChartContent();
     }
@@ -5159,7 +5192,14 @@
     }
 
     function renderColorDetail(color) {
-      const stylePosts = state.colorChartStyles.filter((post) => isPublishedStylePost(post) && colorIncludedInStyle(post, color));
+      window.setTimeout(() => loadStylesForColorDetail(color), 0);
+      const key = colorDetailCacheKey(color);
+      const cachedStyles = state.colorDetailStylesByCode[key];
+      const stylePosts = Array.isArray(cachedStyles)
+        ? cachedStyles
+        : state.colorChartStyles.filter((post) => isPublishedStylePost(post) && colorIncludedInStyle(post, color));
+      const stylesLoaded = Array.isArray(cachedStyles) || state.colorChartStylesLoaded;
+      const stylesLoading = Boolean(state.colorDetailStylesLoading[key]) || (!stylesLoaded && Boolean(STYLEBOOK_API_URL));
       const ranking = colorRankingMetrics(color);
       const backLabel = state.colorDetailReturnTarget === 'ranking' ? '← ランキングへ戻る' : '← カラー一覧へ戻る';
       return `
@@ -5180,7 +5220,7 @@
           </div>
           <section class="color-related-styles">
             <h3>この色を使ったスタイル</h3>
-            ${!state.colorChartStylesLoaded
+            ${stylesLoading
               ? '<p class="color-chart-empty">スタイルを読み込んでいます。</p>'
               : stylePosts.length
                 ? `<div class="color-style-grid">${stylePosts.map((post) => `
@@ -5333,7 +5373,8 @@
     function openRankingColorDetail(code) {
       state.colorChartDetailCode = normalizeColorCode(code);
       state.colorDetailReturnTarget = 'ranking';
-      window.setTimeout(loadStylebookPostsForColorChart, 0);
+      const color = getActiveColorChartProducts().find((item) => normalizeColorCode(item.code) === state.colorChartDetailCode);
+      if (color) window.setTimeout(() => loadStylesForColorDetail(color), 0);
       window.setTimeout(loadRankingData, 0);
       refreshCurrentPublicActions();
     }
