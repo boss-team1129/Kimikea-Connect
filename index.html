@@ -3015,6 +3015,7 @@
     .mypage-hero {
       display: grid;
       gap: 10px;
+      position: relative;
       padding: 18px;
       border: 1px solid rgba(189, 147, 64, 0.24);
       border-radius: 18px;
@@ -3023,6 +3024,26 @@
     }
     .mypage-hero h3 { margin: 0; font-size: 22px; }
     .mypage-hero p { margin: 0; color: var(--muted); line-height: 1.6; }
+    .mypage-settings-button {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(189, 147, 64, .28);
+      background: rgba(255, 255, 255, .88);
+      color: #7a5a1f;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: 0 10px 24px rgba(34, 28, 20, .08);
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .mypage-settings-button:active {
+      transform: scale(.94);
+      box-shadow: 0 5px 14px rgba(34, 28, 20, .08);
+    }
     .mypage-tabbar {
       display: flex;
       gap: 8px;
@@ -3148,6 +3169,65 @@
     }
     @keyframes kimikeaSpin {
       to { transform: rotate(360deg); }
+    }
+    .mypage-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: grid;
+      place-items: end center;
+      padding: 18px;
+      background: rgba(15, 13, 10, .36);
+      backdrop-filter: blur(12px);
+    }
+    .mypage-modal[hidden] { display: none; }
+    .mypage-modal-panel {
+      width: min(100%, 520px);
+      max-height: min(84vh, 680px);
+      overflow: auto;
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid rgba(189, 147, 64, .28);
+      background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,241,226,.96));
+      box-shadow: 0 24px 80px rgba(20, 16, 10, .26);
+    }
+    .mypage-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .mypage-modal-head h3 {
+      margin: 0;
+      font-size: 19px;
+    }
+    .mypage-modal-close {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(189, 147, 64, .22);
+      background: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .mypage-settings-menu {
+      display: grid;
+      gap: 10px;
+    }
+    .mypage-settings-menu button {
+      min-height: 54px;
+      padding: 0 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(189, 147, 64, .18);
+      background: rgba(255,255,255,.92);
+      text-align: left;
+      font-weight: 850;
+      color: var(--black);
+    }
+    .mypage-settings-menu button:last-child {
+      color: #8c2f24;
     }
     @media (max-width: 360px) {
       .mypage-summary-grid,
@@ -6502,6 +6582,74 @@
       `;
     }
 
+    function openMyPageSettings() {
+      renderMyPageModal('menu');
+    }
+
+    function closeMyPageModal() {
+      const modal = document.getElementById('mypageModal');
+      if (modal) modal.hidden = true;
+    }
+
+    function renderMyPageModal(mode = 'menu') {
+      const modal = document.getElementById('mypageModal');
+      const body = document.getElementById('mypageModalBody');
+      const title = document.getElementById('mypageModalTitle');
+      if (!modal || !body || !title) return;
+      const franchise = state.franchise || {};
+      const content = {
+        menu: {
+          title: '設定',
+          html: `
+            <div class="mypage-settings-menu">
+              <button type="button" onclick="renderMyPageModal('profile')">プロフィール編集</button>
+              <button type="button" onclick="renderMyPageModal('email')">メールアドレス変更</button>
+              <button type="button" onclick="renderMyPageModal('password')">パスワード変更</button>
+              <button type="button" onclick="handleLogout()">ログアウト</button>
+            </div>
+          `,
+        },
+        profile: {
+          title: 'プロフィール編集',
+          html: `
+            <form class="coordinator-form" onsubmit="handleMyPageProfileChange(event)">
+              <label class="field"><span>サロン名</span><input id="mypageSalonName" type="text" value="${escapeHtml(franchise.salonName || franchise.franchiseName || '')}" autocomplete="organization"></label>
+              <label class="field"><span>担当者名</span><input id="mypageContactName" type="text" value="${escapeHtml(franchise.contactName || franchise.displayName || '')}" autocomplete="name"></label>
+              <label class="field"><span>電話番号</span><input id="mypagePhone" type="tel" value="${escapeHtml(franchise.phone || '')}" autocomplete="tel"></label>
+              <button type="submit" class="button button-gold">保存する</button>
+            </form>
+          `,
+        },
+        email: {
+          title: 'メールアドレス変更',
+          html: `
+            <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">
+              <label class="field"><span>現在のパスワード</span><input id="mypageEmailCurrentPassword" type="password" autocomplete="current-password" required></label>
+              <label class="field"><span>新しいメールアドレス</span><input id="mypageNewEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
+              <label class="field"><span>新しいメールアドレス確認</span><input id="mypageConfirmEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
+              <p class="form-note">メールアドレス変更後は、新しいメールアドレスで再ログインしてください。</p>
+              <button type="submit" class="button button-gold">変更する</button>
+            </form>
+          `,
+        },
+        password: {
+          title: 'パスワード変更',
+          html: `
+            <form class="coordinator-form" onsubmit="handleMyPagePasswordChange(event)">
+              <label class="field"><span>現在のパスワード</span><input id="mypageCurrentPassword" type="password" autocomplete="current-password" required></label>
+              <label class="field"><span>新しいパスワード</span><input id="mypageNewPassword" type="password" autocomplete="new-password" required></label>
+              <label class="field"><span>確認用パスワード</span><input id="mypageConfirmPassword" type="password" autocomplete="new-password" required></label>
+              <p class="form-note">新しいパスワードは4文字以上で設定してください。</p>
+              <button type="submit" class="button button-gold">変更する</button>
+            </form>
+          `,
+        },
+      }[mode] || {};
+      title.textContent = content.title || '設定';
+      body.innerHTML = content.html || '';
+      modal.hidden = false;
+    }
+
     function loadMyPageStylebookData(force = false) {
       const userId = currentMemberUserId();
       if (!STYLEBOOK_API_URL || !userId) {
@@ -6577,28 +6725,6 @@
             <section class="mypage-card"><span>電話番号</span><strong>${escapeHtml(franchise.phone || '未登録')}</strong></section>
             <section class="mypage-card"><span>登録区分</span><strong>${escapeHtml(franchise.role || 'member')}</strong></section>
           </div>
-          <form class="coordinator-form" onsubmit="handleMyPageProfileChange(event)">
-            <h3>プロフィール編集</h3>
-            <label class="field"><span>サロン名</span><input id="mypageSalonName" type="text" value="${escapeHtml(franchise.salonName || franchise.franchiseName || '')}" autocomplete="organization"></label>
-            <label class="field"><span>担当者名</span><input id="mypageContactName" type="text" value="${escapeHtml(franchise.contactName || franchise.displayName || '')}" autocomplete="name"></label>
-            <label class="field"><span>電話番号</span><input id="mypagePhone" type="tel" value="${escapeHtml(franchise.phone || '')}" autocomplete="tel"></label>
-            <button type="submit" class="button button-gold">プロフィールを保存</button>
-          </form>
-          <form class="coordinator-form" onsubmit="handleMyPageEmailChange(event)">
-            <h3>メールアドレス変更</h3>
-            <label class="field"><span>現在のパスワード</span><input id="mypageEmailCurrentPassword" type="password" autocomplete="current-password" required></label>
-            <label class="field"><span>新しいメールアドレス</span><input id="mypageNewEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
-            <label class="field"><span>新しいメールアドレス確認</span><input id="mypageConfirmEmail" type="email" value="${escapeHtml(franchise.email || '')}" autocomplete="email" required></label>
-            <button type="submit" class="button button-gold">メールアドレスを変更</button>
-          </form>
-          <form class="coordinator-form" onsubmit="handleMyPagePasswordChange(event)">
-            <h3>パスワード変更</h3>
-            <label class="field"><span>現在のパスワード</span><input id="mypageCurrentPassword" type="password" autocomplete="current-password" required></label>
-            <label class="field"><span>新しいパスワード</span><input id="mypageNewPassword" type="password" autocomplete="new-password" required></label>
-            <label class="field"><span>確認用パスワード</span><input id="mypageConfirmPassword" type="password" autocomplete="new-password" required></label>
-            <p class="form-note">新しいパスワードは4文字以上で設定してください。</p>
-            <button type="submit" class="button button-gold">パスワードを変更</button>
-          </form>
         `;
         return;
       }
@@ -6757,6 +6883,7 @@
       document.getElementById('publicPageList').innerHTML = '';
       document.getElementById('publicPageActions').innerHTML = `
         <section class="mypage-hero">
+          <button type="button" class="mypage-settings-button" aria-label="設定メニューを開く" onclick="openMyPageSettings()">☰</button>
           <span>KIMIKEA MEMBER</span>
           <h3>${escapeHtml(franchise.franchiseName || franchise.salonName || '加盟店')}</h3>
           <p>${escapeHtml(franchise.contactName || franchise.displayName || '')}</p>
@@ -6780,6 +6907,15 @@
           </form>
         </details>` : ''}
         <p id="mypageMessage" class="message" aria-live="polite"></p>
+        <div id="mypageModal" class="mypage-modal" hidden onclick="if(event.target === this) closeMyPageModal()">
+          <div class="mypage-modal-panel" role="dialog" aria-modal="true" aria-labelledby="mypageModalTitle">
+            <div class="mypage-modal-head">
+              <h3 id="mypageModalTitle">設定</h3>
+              <button type="button" class="mypage-modal-close" aria-label="閉じる" onclick="closeMyPageModal()">×</button>
+            </div>
+            <div id="mypageModalBody"></div>
+          </div>
+        </div>
       `;
       state.myPageActiveTab = 'profile';
       state.myPageStylebook = {
@@ -6813,6 +6949,7 @@
           localStorage.removeItem('kimikeaSessionToken');
           state.sessionToken = '';
           state.orderUnlocked = false;
+          closeMyPageModal();
           showOrderLogin();
           setMessage('loginMessage', 'メールアドレスを更新しました。新しいメールアドレスで再ログインしてください。', false);
         })
@@ -6835,6 +6972,7 @@
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           renderProfile();
           renderMyPageTab('profile');
+          closeMyPageModal();
           setMessage('mypageMessage', 'プロフィールを保存しました。', false);
         })
         .catch((error) => {
@@ -6861,6 +6999,7 @@
           document.getElementById('mypageCurrentPassword').value = '';
           document.getElementById('mypageNewPassword').value = '';
           document.getElementById('mypageConfirmPassword').value = '';
+          closeMyPageModal();
           setMessage('mypageMessage', 'パスワードを更新しました。', false);
         })
         .catch((error) => {
