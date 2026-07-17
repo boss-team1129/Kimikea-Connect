@@ -3811,6 +3811,7 @@
       colorChartStylesLoaded: false,
       colorDetailStylesByCode: {},
       colorDetailStylesLoading: {},
+      colorDetailStylesFailed: {},
       rankingMode: 'purchase',
       rankingData: {
         loaded: false,
@@ -4967,7 +4968,7 @@
 
     function loadStylesForColorDetail(color) {
       const key = colorDetailCacheKey(color);
-      if (!key || !STYLEBOOK_API_URL || state.colorDetailStylesByCode[key] || state.colorDetailStylesLoading[key]) return;
+      if (!key || !STYLEBOOK_API_URL || state.colorDetailStylesByCode[key] || state.colorDetailStylesLoading[key] || state.colorDetailStylesFailed[key]) return;
       state.colorDetailStylesLoading[key] = true;
       const params = new URLSearchParams({
         action: 'stylesByColor',
@@ -4990,6 +4991,7 @@
         .catch((error) => {
           console.warn('Color detail styles unavailable:', getErrorMessage(error));
           state.colorDetailStylesLoading[key] = false;
+          state.colorDetailStylesFailed[key] = true;
           refreshColorChartContent();
         });
     }
@@ -5027,9 +5029,11 @@
               purchaseCounts: orderData.debug.purchaseCounts,
             });
           }
-          const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
-          state.colorChartStyles = Array.isArray(posts) ? posts : state.colorChartStyles;
-          state.colorChartStylesLoaded = Array.isArray(posts) || state.colorChartStylesLoaded;
+          const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts;
+          if (Array.isArray(posts)) {
+            state.colorChartStyles = posts;
+            state.colorChartStylesLoaded = true;
+          }
           state.rankingData.salonCounts = stylebookData?.ranking?.counts || stylebookData?.colorUsageCounts || buildSalonRankingCounts(state.colorChartStyles);
           if (stylebookData?.ranking || stylebookData?.colorUsageCounts) {
             console.info('[Kimikea Ranking] サロン人気集計', stylebookData.ranking || stylebookData);
