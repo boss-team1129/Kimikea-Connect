@@ -1680,6 +1680,18 @@ function clearPostForm() {
   renderSelectOptions();
 }
 
+function defaultSalonNameForCurrentUser() {
+  const user = currentUser();
+  if (!user) return '';
+  return String(user.shopName || user.salonName || getById('shops', user.shopId)?.name || '').trim();
+}
+
+function defaultStaffNameForCurrentUser() {
+  const user = currentUser();
+  if (!user) return '';
+  return String(user.displayName || user.name || getById('staff', user.staffId)?.name || '').trim();
+}
+
 function fillPostForm(post) {
   state.currentEditId = post.id;
   state.currentImageData = imageUrlFromPost(post);
@@ -1719,6 +1731,9 @@ function showPostForm(postId = '', options = {}) {
       return;
     }
     fillPostForm(post);
+  } else {
+    el.salonNameInput.value = defaultSalonNameForCurrentUser();
+    el.staffNameInput.value = defaultStaffNameForCurrentUser();
   }
   showView('post', { push, id: postId });
 }
@@ -1749,12 +1764,10 @@ async function submitPost(event) {
   ].filter(Boolean);
   const selectedColorIds = selectedValues(el.colorSelect);
   const salonName = el.salonNameInput.value.trim();
-  const matchedShop = findShopByName(salonName);
   const staffName = el.staffNameInput.value.trim();
-  const matchedStaff = findStaffByName(staffName, matchedShop?.id || '');
   const user = currentUser();
-  const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || matchedShop?.id || '');
-  const resolvedStaffId = editing ? (editing.staffId || '') : (user?.staffId || matchedStaff?.id || '');
+  const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || '');
+  const resolvedStaffId = editing ? (editing.staffId || '') : (user?.staffId || '');
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),

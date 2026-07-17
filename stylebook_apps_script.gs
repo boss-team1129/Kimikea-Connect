@@ -215,12 +215,18 @@ function savePost_(post, userId) {
   const status = post.status === 'published' ? 'published' : 'draft';
   const resolvedShopId = existing ? String(existing.object.shopId || '') : String(user.shopId || '');
   const resolvedStaffId = existing ? String(existing.object.staffId || '') : String(user.staffId || '');
-  const resolvedSalonName = existing
-    ? String(existing.object.salonName || getShopName_(existing.object.shopId) || '')
-    : String(getShopName_(resolvedShopId) || user.shopName || user.name || post.salonName || '');
-  const resolvedStaffName = existing
-    ? String(existing.object.staffName || getStaffName_(existing.object.staffId) || '')
-    : String(user.displayName || user.name || post.staffName || '');
+  const hasSubmittedSalonName = Object.prototype.hasOwnProperty.call(post || {}, 'salonName');
+  const hasSubmittedStaffName = Object.prototype.hasOwnProperty.call(post || {}, 'staffName');
+  const submittedSalonName = String(post.salonName || '').trim();
+  const submittedStaffName = String(post.staffName || '').trim();
+  const fallbackSalonName = String(getShopName_(resolvedShopId) || user.shopName || user.name || '').trim();
+  const fallbackStaffName = String(getStaffName_(resolvedStaffId) || user.displayName || user.name || '').trim();
+  const resolvedSalonName = submittedSalonName
+    || (hasSubmittedSalonName ? fallbackSalonName : (existing ? String(existing.object.salonName || '').trim() : ''))
+    || fallbackSalonName;
+  const resolvedStaffName = submittedStaffName
+    || (hasSubmittedStaffName ? fallbackStaffName : (existing ? String(existing.object.staffName || '').trim() : ''))
+    || fallbackStaffName;
   const row = {
     id,
     title: post.title || '',
