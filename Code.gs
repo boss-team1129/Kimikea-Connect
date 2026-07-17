@@ -584,6 +584,7 @@ function logoutFranchise(sessionToken) {
 function getPortalData(sessionToken) {
   const franchise = getSessionFranchise_(sessionToken);
   const rules = getOrderRules_(SpreadsheetApp.getActiveSpreadsheet());
+  const orders = getFranchiseOrders_(franchise.franchiseId);
   return {
     franchise: sanitizeFranchise_(franchise),
     products: getClientProducts_(),
@@ -591,7 +592,14 @@ function getPortalData(sessionToken) {
       shippingFee: rules.shippingFee,
       freeShippingBags: rules.freeShippingBags,
     },
-    orders: getFranchiseOrders_(franchise.franchiseId),
+    orders,
+    myPage: {
+      userId: franchise.userId,
+      shopId: franchise.shopId,
+      role: franchise.role || 'member',
+      orderSummary: buildMyPageOrderSummary_(orders),
+      invoices: buildMyPageInvoiceSummaries_(orders),
+    },
   };
 }
 
@@ -2434,12 +2442,62 @@ function getFranchiseOrders_(franchiseId) {
         productTotal: Number(row[orderIndex['商品合計']] || 0),
         invoiceTotal: Number(row[orderIndex['invoiceTotal']] || row[orderIndex['請求合計']] || 0),
         priceType: orderIndex['priceType'] === undefined ? '' : String(row[orderIndex['priceType']] || ''),
+        paymentStatus: String(row[orderIndex['入金状況']] || '未確認'),
         shippingStatus: String(row[orderIndex['発送状況']] || '発送準備'),
+        shopId: orderIndex.shopId === undefined ? franchise.shopId : String(row[orderIndex.shopId] || franchise.shopId || ''),
+        userId: orderIndex.userId === undefined ? '' : String(row[orderIndex.userId] || ''),
         note: String(row[orderIndex['備考']] || ''),
         items: detailsByOrder[orderNo] || [],
       };
     })
     .reverse();
+}
+
+function buildMyPageOrderSummary_(orders) {
+  const now = new Date();
+  const monthKey = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM');
+  return (orders || []).reduce((summary, order) => {
+    const status = String(order.shippingStatus || '');
+    const cancelled = status.includes('キャンセル') || status.toLowerCase() === 'cancelled';
+    const amount = Number(order.invoiceTotal || 0);
+    const bags = Number(order.totalBags || 0);
+    if (!cancelled) {
+      summary.totalAmount += amount;
+      summary.totalBags += bags;
+      summary.orderCount += 1;
+      if (String(order.orderDate || '').startsWith(monthKey)) {
+        summary.monthAmount += amount;
+        summary.monthBags += bags;
+      }
+    }
+    return summary;
+  }, {
+    totalAmount: 0,
+    totalBags: 0,
+    orderCount: 0,
+    monthAmount: 0,
+    monthBags: 0,
+  });
+}
+
+function buildMyPageInvoiceSummaries_(orders) {
+  const groups = {};
+  (orders || []).forEach((order) => {
+    const key = String(order.orderDate || '').slice(0, 7).replace('/', '-');
+    if (!key) return;
+    if (!groups[key]) groups[key] = {
+      key,
+      orderCount: 0,
+      amount: 0,
+      bags: 0,
+    };
+    groups[key].orderCount += 1;
+    if (!String(order.shippingStatus || '').includes('キャンセル')) {
+      groups[key].amount += Number(order.invoiceTotal || 0);
+      groups[key].bags += Number(order.totalBags || 0);
+    }
+  });
+  return Object.values(groups).sort((a, b) => String(b.key).localeCompare(String(a.key)));
 }
 
 function orderRowBelongsToFranchise_(row, orderIndex, franchise) {

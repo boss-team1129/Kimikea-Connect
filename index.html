@@ -3092,10 +3092,70 @@
     }
     .mypage-list-card dt { color: var(--muted); font-size: 11px; font-weight: 800; }
     .mypage-list-card dd { margin: 2px 0 0; font-weight: 800; }
+    .mypage-loading {
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border: 1px solid rgba(189, 147, 64, .18);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(249,244,232,.86));
+      color: var(--muted);
+      font-weight: 800;
+    }
+    .mypage-loading::before {
+      content: "";
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      border: 3px solid rgba(189, 147, 64, .18);
+      border-top-color: #b88a2c;
+      animation: kimikeaSpin .75s linear infinite;
+    }
+    .mypage-style-card {
+      grid-template-columns: 92px 1fr;
+      align-items: stretch;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .mypage-style-card:active {
+      transform: scale(.985);
+      box-shadow: 0 8px 18px rgba(34, 28, 20, .08);
+    }
+    .mypage-style-thumb {
+      width: 92px;
+      min-height: 112px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #f4eee2;
+    }
+    .mypage-style-thumb img {
+      width: 100%;
+      height: 100%;
+      min-height: 112px;
+      object-fit: cover;
+      display: block;
+    }
+    .mypage-style-body {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .mypage-style-body strong,
+    .mypage-style-body span,
+    .mypage-style-body small {
+      overflow-wrap: anywhere;
+    }
+    @keyframes kimikeaSpin {
+      to { transform: rotate(360deg); }
+    }
     @media (max-width: 360px) {
       .mypage-summary-grid,
       .mypage-section-grid,
       .mypage-list-card dl { grid-template-columns: 1fr; }
+      .mypage-style-card { grid-template-columns: 1fr; }
+      .mypage-style-thumb { width: 100%; aspect-ratio: 4 / 3; min-height: 0; }
+      .mypage-style-thumb img { min-height: 0; }
     }
 
 
@@ -3886,6 +3946,7 @@
       franchise: null,
       products: [],
       orders: [],
+      myPage: null,
       cart: [],
       orderUnlocked: false,
       pendingOpenOrder: false,
@@ -3910,6 +3971,16 @@
         debug: null,
       },
       orderProductSearch: '',
+      myPageActiveTab: 'profile',
+      myPageLoading: false,
+      myPageStylebook: {
+        loaded: false,
+        loading: false,
+        error: '',
+        posts: [],
+        savedPosts: [],
+        savedStyles: [],
+      },
     };
     let manifestObjectUrl = '';
     const OFFICIAL_PUBLIC_URL = 'https://boss-team1129.github.io/Kimikea-Connect/';
@@ -4000,9 +4071,20 @@
       state.franchise = null;
       state.products = [];
       state.orders = [];
+      state.myPage = null;
       state.cart = [];
       state.orderUnlocked = false;
       state.pendingOpenOrder = false;
+      state.myPageActiveTab = 'profile';
+      state.myPageLoading = false;
+      state.myPageStylebook = {
+        loaded: false,
+        loading: false,
+        error: '',
+        posts: [],
+        savedPosts: [],
+        savedStyles: [],
+      };
     }
 
     function handleSessionError(error) {
@@ -4225,6 +4307,7 @@
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.products = data.products || [];
           state.orders = data.orders || [];
+          state.myPage = data.myPage || null;
           state.orderSettings = data.orderSettings || state.orderSettings;
           renderProfile();
           populateCategorySelect();
@@ -6296,6 +6379,7 @@
     }
 
     function myPageOrderSummary() {
+      if (state.myPage?.orderSummary) return state.myPage.orderSummary;
       const orders = state.orders || [];
       const now = new Date();
       const monthKey = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -6318,6 +6402,14 @@
     }
 
     function myPageInvoices() {
+      if (Array.isArray(state.myPage?.invoices)) {
+        return state.myPage.invoices.map((invoice) => ({
+          key: invoice.key,
+          orders: new Array(Number(invoice.orderCount || 0)).fill(null),
+          amount: Number(invoice.amount || 0),
+          bags: Number(invoice.bags || 0),
+        }));
+      }
       const groups = {};
       (state.orders || []).forEach((order) => {
         const key = String(order.orderDate || '').slice(0, 7).replace('/', '-');
@@ -6332,13 +6424,149 @@
       return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
     }
 
+    function currentMemberUserId() {
+      const franchise = state.franchise || {};
+      return String(franchise.userId || franchise.id || '').trim();
+    }
+
+    function currentMemberShopId() {
+      const franchise = state.franchise || {};
+      return String(franchise.shopId || '').trim();
+    }
+
+    function isCurrentMemberAdmin() {
+      const role = String(state.franchise?.role || '').trim();
+      return role === 'admin' || role === 'headquarters_admin';
+    }
+
+    function sameId(a, b) {
+      return String(a || '').trim() === String(b || '').trim();
+    }
+
+    function stylePostAuthorId(post) {
+      return String(post?.authorId || post?.userId || post?.createdBy || '').trim();
+    }
+
+    function stylePostId(post) {
+      return String(post?.id || post?.postId || post?.styleId || '').trim();
+    }
+
+    function saveStyleId(save) {
+      return String(save?.styleId || save?.stylePostId || save?.postId || save?.id || '').trim();
+    }
+
+    function firstStyleImage(post) {
+      if (Array.isArray(post?.imageUrls) && post.imageUrls.length) return post.imageUrls[0];
+      if (typeof post?.imageUrls === 'string' && post.imageUrls.trim()) {
+        try {
+          const parsed = JSON.parse(post.imageUrls);
+          if (Array.isArray(parsed) && parsed[0]) return parsed[0];
+        } catch (error) {
+          return post.imageUrls.split(/[\n,]/).map(item => item.trim()).filter(Boolean)[0] || '';
+        }
+      }
+      return post?.imageUrl || post?.thumbnailUrl || '';
+    }
+
+    function myPageLoadingMarkup(label = '読み込み中です') {
+      return `<div class="mypage-loading"><strong>${escapeHtml(label)}</strong><span>最新データを取得しています。</span></div>`;
+    }
+
+    function openStylebookDetail(postId) {
+      window.location.href = `./stylebook/?view=detail&id=${encodeURIComponent(postId)}`;
+    }
+
+    function openStylebookMine() {
+      window.location.href = './stylebook/?view=mine';
+    }
+
+    function renderMyPageStyleCard(post, label = '投稿') {
+      const postId = stylePostId(post);
+      const imageUrl = firstStyleImage(post);
+      const salonName = post.salonName || post.shopName || 'サロン名未設定';
+      const staffName = post.staffName || post.authorName || '担当者未設定';
+      const status = post.status === 'draft' || post.isPublished === false ? '下書き' : '公開';
+      return `
+        <button type="button" class="mypage-list-card mypage-style-card" onclick="openStylebookDetail('${escapeHtml(postId)}')">
+          <span class="mypage-style-thumb">
+            ${imageUrl
+              ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(post.title || salonName)}" loading="lazy" decoding="async">`
+              : '<span class="history-empty">画像なし</span>'}
+          </span>
+          <span class="mypage-style-body">
+            <header><strong>${escapeHtml(post.title || label)}</strong><span>${escapeHtml(status)}</span></header>
+            <small>${escapeHtml(salonName)} / ${escapeHtml(staffName)}</small>
+            <small>${escapeHtml(post.createdAt || post.updatedAt || '')}</small>
+          </span>
+        </button>
+      `;
+    }
+
+    function loadMyPageStylebookData(force = false) {
+      const userId = currentMemberUserId();
+      if (!STYLEBOOK_API_URL || !userId) {
+        state.myPageStylebook = {
+          loaded: true,
+          loading: false,
+          error: userId ? '' : 'ログインユーザーIDを取得できませんでした。',
+          posts: [],
+          savedPosts: [],
+          savedStyles: [],
+        };
+        return Promise.resolve(state.myPageStylebook);
+      }
+      if (state.myPageStylebook.loading) return Promise.resolve(state.myPageStylebook);
+      if (state.myPageStylebook.loaded && !force) return Promise.resolve(state.myPageStylebook);
+
+      state.myPageStylebook.loading = true;
+      state.myPageStylebook.error = '';
+      const url = `${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(userId)}&t=${Date.now()}`;
+      return fetch(url, { cache: 'no-store' })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data && data.ok === false) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
+          const db = data.database || data;
+          const stylePosts = Array.isArray(db.stylePosts) ? db.stylePosts : [];
+          const savedStyles = Array.isArray(db.savedStyles) ? db.savedStyles : [];
+          const ownPosts = stylePosts.filter((post) => sameId(stylePostAuthorId(post), userId));
+          const ownSaveIds = new Set(savedStyles
+            .filter((save) => sameId(save.userId, userId))
+            .map(saveStyleId)
+            .filter(Boolean));
+          const savedPosts = stylePosts.filter((post) => ownSaveIds.has(stylePostId(post)));
+          state.myPageStylebook = {
+            loaded: true,
+            loading: false,
+            error: '',
+            posts: ownPosts,
+            savedPosts,
+            savedStyles,
+          };
+          return state.myPageStylebook;
+        })
+        .catch((error) => {
+          state.myPageStylebook = {
+            ...state.myPageStylebook,
+            loaded: true,
+            loading: false,
+            error: getErrorMessage(error),
+          };
+          return state.myPageStylebook;
+        });
+    }
+
     function renderMyPageTab(tab = 'profile') {
+      state.myPageActiveTab = tab;
       document.querySelectorAll('.mypage-tabbar button').forEach((button) => {
         button.classList.toggle('is-active', button.dataset.tab === tab);
       });
       const franchise = state.franchise || {};
       const target = document.getElementById('mypageContent');
       if (!target) return;
+      if (state.myPageLoading) {
+        target.innerHTML = myPageLoadingMarkup('マイページ情報を読み込んでいます');
+        return;
+      }
       if (tab === 'profile') {
         target.innerHTML = `
           <div class="mypage-section-grid">
@@ -6375,12 +6603,57 @@
         return;
       }
       if (tab === 'posts') {
+        const book = state.myPageStylebook;
+        if (!book.loaded || book.loading) {
+          target.innerHTML = myPageLoadingMarkup('投稿履歴を読み込んでいます');
+          if (!book.loading) {
+            loadMyPageStylebookData().then(() => {
+              if (state.myPageActiveTab === 'posts') renderMyPageTab('posts');
+            });
+          }
+          return;
+        }
+        if (book.error) {
+          target.innerHTML = `<p class="message error">${escapeHtml(book.error)}</p>`;
+          return;
+        }
+        const cards = book.posts.map((post) => renderMyPageStyleCard(post, '自分の投稿')).join('');
         target.innerHTML = `
+          <div class="mypage-summary-grid">
+            <section class="mypage-card"><span>投稿履歴</span><strong>${book.posts.length}件</strong><small>userIdで取得</small></section>
+            <section class="mypage-card"><span>管理操作</span><strong>自分の投稿ページ</strong><small>編集・削除は本人投稿のみ</small></section>
+          </div>
           <div class="mypage-list">
-            <button type="button" class="mypage-list-card" onclick="openStylebook()">
-              <header><strong>スタイル図鑑の投稿履歴を開く</strong><span>本人投稿のみ</span></header>
-              <small>編集・削除は「自分の投稿」ページ内だけで操作できます。</small>
-            </button>
+            ${cards || '<p class="message">投稿履歴はまだありません。</p>'}
+            <button type="button" class="button button-outline" onclick="openStylebookMine()">自分の投稿を管理する</button>
+          </div>
+        `;
+        return;
+      }
+      if (tab === 'saved') {
+        const book = state.myPageStylebook;
+        if (!book.loaded || book.loading) {
+          target.innerHTML = myPageLoadingMarkup('保存したスタイルを読み込んでいます');
+          if (!book.loading) {
+            loadMyPageStylebookData().then(() => {
+              if (state.myPageActiveTab === 'saved') renderMyPageTab('saved');
+            });
+          }
+          return;
+        }
+        if (book.error) {
+          target.innerHTML = `<p class="message error">${escapeHtml(book.error)}</p>`;
+          return;
+        }
+        const cards = book.savedPosts.map((post) => renderMyPageStyleCard(post, '保存したスタイル')).join('');
+        target.innerHTML = `
+          <div class="mypage-summary-grid">
+            <section class="mypage-card"><span>保存したスタイル</span><strong>${book.savedPosts.length}件</strong><small>userIdで取得</small></section>
+            <section class="mypage-card"><span>保存データ</span><strong>${book.savedStyles.length}件</strong><small>userId + styleIdで管理</small></section>
+          </div>
+          <div class="mypage-list">
+            ${cards || '<p class="message">保存したスタイルはまだありません。</p>'}
+            <button type="button" class="button button-outline" onclick="openStylebook()">スタイル図鑑を開く</button>
           </div>
         `;
         return;
@@ -6401,7 +6674,7 @@
         `).join('');
         target.innerHTML = `
           <div class="mypage-summary-grid">
-            <section class="mypage-card"><span>累計注文金額</span><strong>${yen(summary.totalAmount)}</strong></section>
+            <section class="mypage-card"><span>累計注文金額</span><strong>${yen(summary.totalAmount)}</strong><small>shopIdで集計</small></section>
             <section class="mypage-card"><span>累計注文袋数</span><strong>${summary.totalBags}袋</strong></section>
             <section class="mypage-card"><span>注文回数</span><strong>${summary.orderCount}回</strong></section>
             <section class="mypage-card"><span>今月の注文</span><strong>${yen(summary.monthAmount)} / ${summary.monthBags}袋</strong></section>
@@ -6438,16 +6711,26 @@
     function refreshMyPageData() {
       const message = document.getElementById('mypageMessage');
       if (message) message.textContent = 'マイページ情報を読み込んでいます...';
-      return callServer('getPortalData', state.sessionToken)
-        .then((data) => {
+      state.myPageLoading = true;
+      renderMyPageTab(state.myPageActiveTab || 'profile');
+      const stylebookPromise = loadMyPageStylebookData(true);
+      return Promise.all([
+        callServer('getPortalData', state.sessionToken),
+        stylebookPromise,
+      ])
+        .then(([data]) => {
           state.franchise = data.franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.orders = data.orders || [];
+          state.myPage = data.myPage || null;
           state.orderSettings = data.orderSettings || state.orderSettings;
-          renderMyPageTab('profile');
+          state.myPageLoading = false;
+          renderMyPageTab(state.myPageActiveTab || 'profile');
           if (message) message.textContent = '';
         })
         .catch((error) => {
+          state.myPageLoading = false;
+          renderMyPageTab(state.myPageActiveTab || 'profile');
           if (message) {
             message.textContent = getErrorMessage(error);
             message.classList.add('error');
@@ -6465,6 +6748,7 @@
       rememberKimikeaRoute('public', 'mypage');
       currentPublicPageKey = 'mypage';
       const franchise = state.franchise || {};
+      const isAdmin = isCurrentMemberAdmin();
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
       document.getElementById('publicPageView').hidden = false;
@@ -6480,12 +6764,13 @@
         <div class="mypage-tabbar" role="tablist">
           <button type="button" data-tab="profile" class="is-active" onclick="renderMyPageTab('profile')">プロフィール</button>
           <button type="button" data-tab="posts" onclick="renderMyPageTab('posts')">投稿履歴</button>
+          <button type="button" data-tab="saved" onclick="renderMyPageTab('saved')">保存したスタイル</button>
           <button type="button" data-tab="orders" onclick="renderMyPageTab('orders')">注文履歴</button>
           <button type="button" data-tab="invoices" onclick="renderMyPageTab('invoices')">請求書一覧</button>
           <button type="button" data-tab="logout" onclick="renderMyPageTab('logout')">ログアウト</button>
         </div>
         <div id="mypageContent"><p class="message">マイページ情報を読み込んでいます...</p></div>
-        <details class="coordinator-form">
+        ${isAdmin ? `<details class="coordinator-form">
           <summary>本部管理者用 ユーザー管理</summary>
           <form onsubmit="handleAdminPasswordReset(event)">
             <h3>パスワードを0000へリセット</h3>
@@ -6493,9 +6778,18 @@
             <p class="form-note">本部管理者のみ実行できます。パスワードは画面上に表示されません。</p>
             <button type="submit" class="button button-outline">0000へリセット</button>
           </form>
-        </details>
+        </details>` : ''}
         <p id="mypageMessage" class="message" aria-live="polite"></p>
       `;
+      state.myPageActiveTab = 'profile';
+      state.myPageStylebook = {
+        loaded: false,
+        loading: false,
+        error: '',
+        posts: [],
+        savedPosts: [],
+        savedStyles: [],
+      };
       renderMyPageTab('profile');
       refreshMyPageData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
