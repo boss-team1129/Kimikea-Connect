@@ -8,7 +8,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260716-loading-cache-1';
+const STYLEBOOK_ASSET_VERSION = '20260717-color-name-fix-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -245,13 +245,21 @@ function activeColors() {
 }
 
 function colorDisplayLabel(color) {
-  return String(color?.colorName || color?.color || color?.name || '').trim() || '名称未設定';
+  return String(
+    color?.productColor
+    || color?.color
+    || color?.name
+    || color?.colorName
+    || color?.colorCode
+    || color?.['カラー']
+    || ''
+  ).trim() || '名称未設定';
 }
 
 function colorSearchText(color) {
   return [
-    color?.productCode,
     color?.colorCode,
+    color?.productColor,
     color?.colorName,
     color?.color,
     color?.name,
