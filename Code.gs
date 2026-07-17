@@ -453,25 +453,39 @@ function getPublicColorRankings(year, month) {
   const purchaseCounts = {};
   let countedOrders = 0;
   let countedLines = 0;
-  let excludedCanceledOrders = 0;
+  let excludedTestOrDeletedOrders = 0;
   let excludedOtherLines = 0;
+  const debugOrders = [];
+  const debugLines = [];
 
   if (ordersSheet && detailsSheet && ordersSheet.getLastRow() > 1 && detailsSheet.getLastRow() > 1) {
     const orderValues = ordersSheet.getDataRange().getValues();
     const orderIndex = createIndex_(orderValues[0]);
     const validOrderNos = {};
     orderValues.slice(1).forEach((row) => {
-      const orderNo = String(row[orderIndex['注文番号']] || '').trim();
-      const orderDate = parseDateValue_(row[orderIndex['注文日時']]);
+      const orderNo = String(getRowValueByHeader_(row, orderIndex, ['注文番号', 'orderId', 'orderNo', '注文ID']) || '').trim();
+      const rawOrderDate = getRowValueByHeader_(row, orderIndex, ['注文日時', '注文日', 'orderDate', 'createdAt', '作成日', '登録日']);
+      const orderDate = parseDateValue_(rawOrderDate);
       const status = [
-        row[orderIndex['発送状況']],
-        row[orderIndex['入金状況']],
-        row[orderIndex['ステータス']],
+        getRowValueByHeader_(row, orderIndex, ['発送状況', 'shippingStatus']),
+        getRowValueByHeader_(row, orderIndex, ['入金状況', 'paymentStatus']),
+        getRowValueByHeader_(row, orderIndex, ['ステータス', 'status', '注文ステータス']),
+        getRowValueByHeader_(row, orderIndex, ['削除', '削除済み', 'deletedAt', 'isDeleted']),
+        getRowValueByHeader_(row, orderIndex, ['テスト', 'test', 'isTest']),
       ].map((value) => String(value || '').trim()).join(' ');
-      if (!orderNo || !orderDate) return;
-      if (orderDate < periodStart || orderDate > periodEnd) return;
-      if (status.indexOf('キャンセル') !== -1) {
-        excludedCanceledOrders += 1;
+      const inPeriod = Boolean(orderDate && orderDate >= periodStart && orderDate <= periodEnd);
+      const excluded = isExcludedRankingOrder_(orderNo, status);
+      debugOrders.push({
+        orderNo,
+        rawDate: String(rawOrderDate || ''),
+        parsedDate: orderDate ? Utilities.formatDate(orderDate, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss') : '',
+        status,
+        inPeriod,
+        excluded,
+      });
+      if (!orderNo || !orderDate || !inPeriod) return;
+      if (excluded) {
+        excludedTestOrDeletedOrders += 1;
         return;
       }
       validOrderNos[orderNo] = true;
@@ -481,19 +495,43 @@ function getPublicColorRankings(year, month) {
     const detailValues = detailsSheet.getDataRange().getValues();
     const detailIndex = createIndex_(detailValues[0]);
     detailValues.slice(1).forEach((row) => {
-      const orderNo = String(row[detailIndex['注文番号']] || '').trim();
+      const orderNo = String(getRowValueByHeader_(row, detailIndex, ['注文番号', 'orderId', 'orderNo', '注文ID']) || '').trim();
       if (!validOrderNos[orderNo]) return;
-      const productCode = String(row[detailIndex['商品コード']] || '').trim();
+      const rawProductCode = getRowValueByHeader_(row, detailIndex, ['商品コード', 'productCode', 'カラーID', 'colorId']);
+      const rawColorName = getRowValueByHeader_(row, detailIndex, ['カラー', 'カラー名', 'color', 'colorName']);
+      const rawProductName = getRowValueByHeader_(row, detailIndex, ['商品名', 'productName']);
+      const productCode = resolveRankingProductCode_(rawProductCode, rawColorName, rawProductName, colorProducts);
       if (!productCode || !colorProductCodes[createProductCodeKey_(productCode)]) {
         excludedOtherLines += 1;
         return;
       }
-      const quantity = Number(row[detailIndex['数量']] || 0);
+      const quantity = Number(getRowValueByHeader_(row, detailIndex, ['数量', 'quantity', '袋数']) || 0);
       if (quantity <= 0) return;
-      purchaseCounts[productCode] = Number(purchaseCounts[productCode] || 0) + quantity;
+      const countKey = normalizeRankingProductCode_(productCode);
+      purchaseCounts[countKey] = Number(purchaseCounts[countKey] || 0) + quantity;
       countedLines += 1;
+      debugLines.push({
+        orderNo,
+        productCode: countKey,
+        productName: String(rawProductName || ''),
+        colorName: String(rawColorName || ''),
+        quantity,
+      });
     });
   }
+
+  const debugSummary = {
+    totalOrders: ordersSheet ? Math.max(0, ordersSheet.getLastRow() - 1) : 0,
+    countedOrders,
+    countedLines,
+    periodLabel: `${period.year}年${period.month}月`,
+    orders: debugOrders.slice(0, 80),
+    lines: debugLines.slice(0, 120),
+    purchaseCounts,
+    excludedTestOrDeletedOrders,
+    excludedOtherLines,
+  };
+  logOrderDebug_('public color ranking summary', debugSummary);
 
   return {
     periodStart: Utilities.formatDate(periodStart, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm'),
@@ -504,8 +542,9 @@ function getPublicColorRankings(year, month) {
     purchaseCounts,
     countedOrders,
     countedLines,
-    excludedCanceledOrders,
+    excludedTestOrDeletedOrders,
     excludedOtherLines,
+    debug: debugSummary,
   };
 }
 
@@ -536,8 +575,76 @@ function getRankingPeriod_(year, month) {
 function parseDateValue_(value) {
   if (value instanceof Date && !isNaN(value.getTime())) return value;
   if (value === null || value === undefined || value === '') return null;
-  const parsed = new Date(value);
+  if (typeof value === 'object') {
+    const seconds = value.seconds || value._seconds;
+    if (seconds) {
+      const timestamp = new Date(Number(seconds) * 1000 + Number(value.nanoseconds || value._nanoseconds || 0) / 1000000);
+      return isNaN(timestamp.getTime()) ? null : timestamp;
+    }
+  }
+  if (typeof value === 'number') {
+    if (value > 100000000000) return new Date(value);
+    if (value > 1000000000) return new Date(value * 1000);
+    if (value > 20000 && value < 100000) {
+      return new Date(Math.round((value - 25569) * 86400 * 1000));
+    }
+  }
+  const text = String(value || '').normalize('NFKC').trim();
+  if (!text) return null;
+  const japaneseMatch = text.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s*(\d{1,2})[:時](\d{1,2})?)?/);
+  if (japaneseMatch) {
+    const y = Number(japaneseMatch[1]);
+    const m = Number(japaneseMatch[2]);
+    const d = Number(japaneseMatch[3]);
+    const hh = Number(japaneseMatch[4] || 0);
+    const mm = Number(japaneseMatch[5] || 0);
+    return new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+09:00`);
+  }
+  const normalized = text
+    .replace(/\./g, '/')
+    .replace(/-/g, '/')
+    .replace(/\s+/, ' ');
+  const slashMatch = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (slashMatch) {
+    const y = Number(slashMatch[1]);
+    const m = Number(slashMatch[2]);
+    const d = Number(slashMatch[3]);
+    const hh = Number(slashMatch[4] || 0);
+    const mm = Number(slashMatch[5] || 0);
+    const ss = Number(slashMatch[6] || 0);
+    return new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}+09:00`);
+  }
+  const parsed = new Date(text);
   return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isExcludedRankingOrder_(orderNo, statusText) {
+  const text = `${orderNo || ''} ${statusText || ''}`.normalize('NFKC').toLowerCase();
+  return /test|テスト|削除|deleted|removed/.test(text);
+}
+
+function resolveRankingProductCode_(productCode, colorName, productName, colorProducts) {
+  const direct = String(productCode || '').trim();
+  if (direct) return direct;
+  const candidates = [colorName, productName]
+    .map((value) => normalize_(value))
+    .filter(Boolean);
+  if (!candidates.length) return '';
+  const match = colorProducts.find((product) => {
+    const keys = [
+      product.color,
+      product.colorName,
+      product.productName,
+      `${product.category} ${product.color}`,
+      `${product.category}${product.color}`,
+    ].map((value) => normalize_(value));
+    return candidates.some((candidate) => keys.includes(candidate));
+  });
+  return match ? match.productCode : '';
+}
+
+function normalizeRankingProductCode_(productCode) {
+  return String(productCode || '').normalize('NFKC').trim().replace(/\s+/g, '').toUpperCase();
 }
 
 function getVisibleProducts(sessionToken) {

@@ -2659,6 +2659,17 @@
       box-shadow: 0 10px 22px rgba(189,147,64,.18);
     }
     .ranking-tab:active { transform: scale(.96); }
+    .ranking-loading-message {
+      margin: 14px 0 10px;
+      padding: 13px 16px;
+      border: 1px solid rgba(202, 164, 90, .35);
+      border-radius: 18px;
+      background: rgba(255, 252, 245, .82);
+      color: #6f5630;
+      font-weight: 900;
+      text-align: center;
+      box-shadow: 0 12px 28px rgba(129, 99, 42, .08);
+    }
     .ranking-loading-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -3806,6 +3817,7 @@
         periodLabel: '',
         purchaseCounts: {},
         salonCounts: {},
+        debug: null,
       },
       orderProductSearch: '',
     };
@@ -4972,6 +4984,16 @@
           state.rankingData.year = Number(orderData?.year || rankingPeriod.year);
           state.rankingData.month = Number(orderData?.month || rankingPeriod.month);
           state.rankingData.periodLabel = orderData?.periodLabel || `${state.rankingData.year}年${state.rankingData.month}月`;
+          state.rankingData.debug = orderData?.debug || null;
+          if (orderData?.debug) {
+            console.info('[Kimikea Ranking] 注文ランキング集計', {
+              fetchedOrders: orderData.debug.totalOrders,
+              countedOrders: orderData.debug.countedOrders,
+              orderDates: orderData.debug.orders,
+              orderItems: orderData.debug.lines,
+              purchaseCounts: orderData.debug.purchaseCounts,
+            });
+          }
           const posts = stylebookData?.database?.stylePosts || stylebookData?.stylePosts || [];
           state.colorChartStyles = Array.isArray(posts) ? posts : [];
           state.colorChartStylesLoaded = true;
@@ -5211,6 +5233,13 @@
       };
     }
 
+    function compareRankingColorOrder(left, right) {
+      const collator = new Intl.Collator('ja-JP', { numeric: true, sensitivity: 'base' });
+      const nameCompare = collator.compare(colorDisplayName(left), colorDisplayName(right));
+      if (nameCompare !== 0) return nameCompare;
+      return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+    }
+
     function buildRankingRows(mode = state.rankingMode) {
       const colors = getActiveColorChartProducts();
       const rows = colors.map((color) => {
@@ -5218,12 +5247,12 @@
         const score = mode === 'purchase' ? metrics.purchase : mode === 'salon' ? metrics.salon : metrics.total;
         return { color, ...metrics, score };
       }).filter((row) => row.score > 0)
-        .sort((a, b) => b.score - a.score || Number(a.color.sortOrder || 0) - Number(b.color.sortOrder || 0))
+        .sort((a, b) => b.score - a.score || compareRankingColorOrder(a.color, b.color))
         .map((row, index) => ({ ...row, rank: index + 1 }));
 
-      const purchaseRanks = [...rows].filter(row => row.purchase > 0).sort((a, b) => b.purchase - a.purchase);
-      const salonRanks = [...rows].filter(row => row.salon > 0).sort((a, b) => b.salon - a.salon);
-      const totalRanks = [...rows].filter(row => row.total > 0).sort((a, b) => b.total - a.total);
+      const purchaseRanks = [...rows].filter(row => row.purchase > 0).sort((a, b) => b.purchase - a.purchase || compareRankingColorOrder(a.color, b.color));
+      const salonRanks = [...rows].filter(row => row.salon > 0).sort((a, b) => b.salon - a.salon || compareRankingColorOrder(a.color, b.color));
+      const totalRanks = [...rows].filter(row => row.total > 0).sort((a, b) => b.total - a.total || compareRankingColorOrder(a.color, b.color));
       const rankMap = new Map();
       rows.forEach((row) => rankMap.set(row.color.code, row));
       purchaseRanks.forEach((row, index) => { if (rankMap.get(row.color.code)) rankMap.get(row.color.code).purchaseRank = index + 1; });
@@ -5240,9 +5269,9 @@
         const purchase = Number(state.rankingData.purchaseCounts[colorCode] || 0);
         const salon = Number(state.rankingData.salonCounts[colorCode] || state.rankingData.salonCounts[name] || 0);
         const score = mode === 'purchase' ? purchase : mode === 'salon' ? salon : purchase + salon;
-        return { code: colorCode, score, sortOrder: Number(color.sortOrder || 0) };
+        return { code: colorCode, score, color, sortOrder: Number(color.sortOrder || 0) };
       }).filter((row) => row.score > 0)
-        .sort((a, b) => b.score - a.score || a.sortOrder - b.sortOrder);
+        .sort((a, b) => b.score - a.score || compareRankingColorOrder(a.color, b.color));
       const index = rows.findIndex((row) => row.code === normalizedCode);
       return index >= 0 ? index + 1 : 0;
     }
@@ -5321,7 +5350,7 @@
               ['total', '総合'],
             ].map(([mode, label]) => `<button type="button" class="ranking-tab${state.rankingMode === mode ? ' is-active' : ''}" onclick="setRankingMode('${mode}')">${label}</button>`).join('')}
           </div>
-          ${loading ? '<div class="ranking-loading-grid"><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div></div>' : ''}
+          ${loading ? '<div class="ranking-loading-message">ランキングを集計しています…</div><div class="ranking-loading-grid"><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div></div>' : ''}
           ${!loading && !rows.length ? `<div class="ranking-empty">${escapeHtml(config.empty)}</div>` : ''}
           ${!loading && topRows.length ? `<div class="ranking-podium">${topRows.map(renderRankingPodiumCard).join('')}</div>` : ''}
           ${!loading && restRows.length ? `<div class="ranking-list">${restRows.map(renderRankingListCard).join('')}</div>` : ''}
