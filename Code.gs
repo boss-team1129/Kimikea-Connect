@@ -350,6 +350,7 @@ function setupKimikeaConnectOrder() {
     runSetupStep_('order details', () => setupOrderDetails_(ss));
     runSetupStep_('notices', () => setupNotices_(ss));
     runSetupStep_('map entries', () => setupMapEntries_(ss));
+    runSetupStep_('sync franchise map entries', () => syncFranchiseMapEntries_(ss));
     runSetupStep_('settings', () => setupSettings_(ss));
     runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
 
@@ -899,6 +900,7 @@ function getPublicMapEntries() {
   entries.forEach((entry) => {
     if (prefectures.indexOf(entry.prefecture) === -1) prefectures.push(entry.prefecture);
   });
+  prioritizeDefaultPrefecture_(prefectures);
   const types = [];
   entries.forEach((entry) => {
     if (types.indexOf(entry.type) === -1) types.push(entry.type);
@@ -951,10 +953,51 @@ function comparePublicMapEntries_(a, b) {
   return String(a.salonName || a.staffName || '').localeCompare(String(b.salonName || b.staffName || ''), 'ja');
 }
 
+function prioritizeDefaultPrefecture_(prefectures) {
+  const index = prefectures.indexOf('静岡県');
+  if (index > 0) {
+    prefectures.splice(index, 1);
+    prefectures.unshift('静岡県');
+  }
+  return prefectures;
+}
+
 function parseMapCoordinate_(value) {
   if (value === null || value === undefined || String(value).trim() === '') return NaN;
   const number = Number(String(value).trim());
   return Number.isFinite(number) ? number : NaN;
+}
+
+function parseJapaneseAddress_(address) {
+  const text = String(address || '').trim();
+  const result = {
+    prefecture: '',
+    city: '',
+    address: text,
+  };
+  if (!text) return result;
+  const prefectureMatch = text.match(/^(.{2,3}[都道府県])/);
+  if (prefectureMatch) result.prefecture = prefectureMatch[1];
+  const afterPrefecture = result.prefecture ? text.slice(result.prefecture.length) : text;
+  const cityMatch = afterPrefecture.match(/^(.+?[市区町村])/);
+  if (cityMatch) result.city = cityMatch[1];
+  return result;
+}
+
+function geocodeAddressForMap_(address) {
+  const text = String(address || '').trim();
+  if (!text) return null;
+  const response = Maps.newGeocoder()
+    .setRegion('jp')
+    .setLanguage('ja')
+    .geocode(text);
+  const result = response && response.results && response.results[0];
+  if (!result || !result.geometry || !result.geometry.location) return null;
+  const location = result.geometry.location;
+  const latitude = Number(location.lat);
+  const longitude = Number(location.lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
 }
 
 function getPublicColorRankings(year, month) {
@@ -1561,6 +1604,131 @@ function setupMapEntries_(ss) {
   applyHeaderStyle_(sheet, KCO_MAP_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_MAP_HEADERS.length);
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+}
+
+function syncFranchiseMapEntries_(ss) {
+  const startedAt = Date.now();
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.MAP_ENTRIES);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_MAP_HEADERS.length).setValues([KCO_MAP_HEADERS]);
+  } else {
+    ensureMapEntryHeaders_(sheet);
+  }
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map((header) => String(header || '').trim());
+  const index = createIndex_(headers);
+  const existingRows = values.length <= 1
+    ? []
+    : values.slice(1).map((row) => row.slice(0, headers.length));
+  const rowIndexByShopId = {};
+  let maxMapSequence = 0;
+
+  existingRows.forEach((row, rowIndex) => {
+    const shopId = String(row[index.shopId] || '').trim();
+    if (shopId && rowIndexByShopId[shopId] === undefined) rowIndexByShopId[shopId] = rowIndex;
+    const mapId = String(row[index.mapId] || '').trim();
+    const match = mapId.match(/^MAP-K-(\d+)$/i);
+    if (match) maxMapSequence = Math.max(maxMapSequence, Number(match[1] || 0));
+  });
+
+  const franchises = getFranchiseMasterRecords_();
+  const newRows = [];
+  let createdCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let geocodedCount = 0;
+  let geocodeFailedCount = 0;
+  const now = new Date();
+
+  franchises.forEach((franchise) => {
+    const shopId = String(franchise.shopId || '').trim();
+    if (!shopId) {
+      skippedCount += 1;
+      return;
+    }
+
+    const addressParts = parseJapaneseAddress_(franchise.address || franchise.fullAddress || '');
+    const rowIndex = rowIndexByShopId[shopId];
+    const isNew = rowIndex === undefined;
+    const row = isNew ? new Array(headers.length).fill('') : existingRows[rowIndex];
+    let changed = false;
+
+    const setBasicValue = (header, value, options) => {
+      const col = index[header];
+      if (col === undefined) return;
+      const nextValue = value === undefined || value === null ? '' : value;
+      if (options && options.onlyIfBlank && String(row[col] || '').trim()) return;
+      if (String(row[col] || '') === String(nextValue || '')) return;
+      row[col] = nextValue;
+      changed = true;
+    };
+
+    if (isNew && !String(row[index.mapId] || '').trim()) {
+      maxMapSequence += 1;
+      setBasicValue('mapId', `MAP-K-${String(maxMapSequence).padStart(3, '0')}`);
+    }
+    setBasicValue('shopId', shopId);
+    setBasicValue('type', '加盟店');
+    setBasicValue('prefecture', addressParts.prefecture);
+    setBasicValue('city', addressParts.city);
+    setBasicValue('salonName', franchise.salonName || franchise.franchiseName || '');
+    setBasicValue('address', franchise.address || franchise.fullAddress || '');
+    setBasicValue('phone', franchise.phone || '');
+    setBasicValue('status', isNew ? '公開' : (String(row[index.status] || '').trim() || '公開'), { onlyIfBlank: !isNew });
+    setBasicValue('createdAt', franchise.createdAt || now, { onlyIfBlank: true });
+    setBasicValue('updatedAt', now);
+
+    const latitudeCol = index.latitude;
+    const longitudeCol = index.longitude;
+    const hasLatitude = latitudeCol !== undefined && String(row[latitudeCol] || '').trim();
+    const hasLongitude = longitudeCol !== undefined && String(row[longitudeCol] || '').trim();
+    const address = String(franchise.address || franchise.fullAddress || '').trim();
+    if (address && (!hasLatitude || !hasLongitude)) {
+      try {
+        const location = geocodeAddressForMap_(address);
+        if (location) {
+          setBasicValue('latitude', location.latitude, { onlyIfBlank: true });
+          setBasicValue('longitude', location.longitude, { onlyIfBlank: true });
+          geocodedCount += 1;
+        } else {
+          geocodeFailedCount += 1;
+        }
+      } catch (error) {
+        geocodeFailedCount += 1;
+        logSetupStep_('map geocode failed', {
+          shopId,
+          address,
+          message: error && error.message ? error.message : String(error),
+        });
+      }
+    }
+
+    if (isNew) {
+      newRows.push(row);
+      rowIndexByShopId[shopId] = existingRows.length + newRows.length - 1;
+      createdCount += 1;
+      return;
+    }
+    if (changed) updatedCount += 1;
+    else skippedCount += 1;
+  });
+
+  if (existingRows.length > 0 && updatedCount > 0) {
+    sheet.getRange(2, 1, existingRows.length, headers.length).setValues(existingRows);
+  }
+  if (newRows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
+  }
+
+  return {
+    franchiseCount: franchises.length,
+    createdCount,
+    updatedCount,
+    skippedCount,
+    geocodedCount,
+    geocodeFailedCount,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 function setupFranchiseMaster_(ss) {
@@ -2745,6 +2913,23 @@ function handleOrderStatusEdit(event) {
   if (!event || !event.range) return;
 
   const sheet = event.range.getSheet();
+  if (sheet.getName() === KCO_CONFIG.FRANCHISE_MASTER && event.range.getRow() > 1) {
+    try {
+      logSetupStep_('franchise edit map sync start', {
+        row: event.range.getRow(),
+        column: event.range.getColumn(),
+      });
+      const result = syncFranchiseMapEntries_(SpreadsheetApp.getActiveSpreadsheet());
+      logSetupStep_('franchise edit map sync completed', result);
+    } catch (error) {
+      logSetupStep_('franchise edit map sync failed', {
+        message: error && error.message ? error.message : String(error),
+        stack: error && error.stack ? error.stack : '',
+      });
+    }
+    return;
+  }
+
   if (sheet.getName() !== KCO_CONFIG.ORDERS || event.range.getRow() <= 1) return;
 
   const headers = sheet
