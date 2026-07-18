@@ -7003,10 +7003,37 @@
       syncKimikeaMapCarouselMetrics();
       const carouselRect = carousel.getBoundingClientRect();
       const cardRect = card.getBoundingClientRect();
-      const targetLeft = carousel.scrollLeft + (cardRect.left + cardRect.width / 2) - (carouselRect.left + carouselRect.width / 2);
+      const rawTargetLeft = carousel.scrollLeft + (cardRect.left + cardRect.width / 2) - (carouselRect.left + carouselRect.width / 2);
+      const targetLeft = Math.min(Math.max(0, rawTargetLeft), Math.max(0, carousel.scrollWidth - carousel.clientWidth));
       kimikeaMapCarouselCorrecting = true;
-      carousel.scrollTo({ left: Math.max(0, targetLeft), behavior });
-      window.setTimeout(() => { kimikeaMapCarouselCorrecting = false; }, behavior === 'auto' ? 80 : 360);
+      if (behavior === 'auto') {
+        const previousBehavior = carousel.style.scrollBehavior;
+        carousel.style.scrollBehavior = 'auto';
+        carousel.scrollLeft = targetLeft;
+        carousel.style.scrollBehavior = previousBehavior;
+        window.setTimeout(() => { kimikeaMapCarouselCorrecting = false; }, 80);
+        return;
+      }
+      carousel.scrollTo({ left: targetLeft, behavior });
+      const correctFinalPosition = () => {
+        const latestCard = document.getElementById(`kimikeaMapCard-${mapId}`);
+        if (latestCard) {
+          const latestCarouselRect = carousel.getBoundingClientRect();
+          const latestCardRect = latestCard.getBoundingClientRect();
+          const remainingDelta = (latestCardRect.left + latestCardRect.width / 2) - (latestCarouselRect.left + latestCarouselRect.width / 2);
+          if (Math.abs(remainingDelta) > 2) {
+            const previousBehavior = carousel.style.scrollBehavior;
+            carousel.style.scrollBehavior = 'auto';
+            carousel.scrollLeft = Math.min(Math.max(0, carousel.scrollLeft + remainingDelta), Math.max(0, carousel.scrollWidth - carousel.clientWidth));
+            carousel.style.scrollBehavior = previousBehavior;
+          }
+        }
+      };
+      window.setTimeout(() => {
+        correctFinalPosition();
+        window.setTimeout(correctFinalPosition, 320);
+        kimikeaMapCarouselCorrecting = false;
+      }, 420);
     }
 
     function nearestKimikeaMapCarouselCard() {
