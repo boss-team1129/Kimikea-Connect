@@ -17,7 +17,9 @@
   <link id="manifestLink" rel="manifest">
   <link rel="canonical" href="https://boss-team1129.github.io/Kimikea-Connect/">
   <title>Kimikea Connect</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="./shared-nav.css?v=20260714-nav-1">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --black: #111111;
@@ -1755,86 +1757,59 @@
     }
     .kimikea-map-stage {
       position: relative;
-      height: clamp(300px, 46svh, 520px);
+      height: clamp(360px, 50svh, 430px);
       overflow: hidden;
       border-radius: 28px;
       background:
         radial-gradient(circle at 24% 18%, rgba(255,255,255,.78), transparent 23%),
         linear-gradient(145deg, #dceff5 0%, #eef8f7 45%, #f7f0df 100%);
-      touch-action: none;
+      touch-action: auto;
       user-select: none;
     }
-    .kimikea-map-world {
-      position: absolute;
-      inset: 0;
-      transform-origin: 50% 50%;
-      will-change: transform;
-      transition: transform 260ms cubic-bezier(.2,.8,.2,1);
-    }
-    .kimikea-pref-map {
+    .kimikea-leaflet-map {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
     }
-    .kimikea-pref-map .pref-land {
-      fill: rgba(255, 249, 235, .96);
-      stroke: rgba(179, 135, 45, .82);
-      stroke-width: 4;
-      vector-effect: non-scaling-stroke;
-      filter: drop-shadow(0 22px 34px rgba(84, 61, 23, .16));
+    .kimikea-leaflet-map .leaflet-control-zoom {
+      overflow: hidden;
+      border: 1px solid rgba(183, 144, 62, .28);
+      border-radius: 16px;
+      box-shadow: 0 14px 34px rgba(63, 49, 28, .15);
     }
-    .kimikea-pref-map .pref-coast {
-      fill: none;
-      stroke: rgba(255,255,255,.78);
-      stroke-width: 2;
-      vector-effect: non-scaling-stroke;
-    }
-    .kimikea-pref-map .pref-highlight {
-      fill: rgba(255,255,255,.22);
-      stroke: rgba(206, 172, 99, .3);
-      stroke-width: 1.5;
-      vector-effect: non-scaling-stroke;
-    }
-    .kimikea-pref-label {
-      position: absolute;
-      left: 50%;
-      top: 13%;
-      transform: translateX(-50%);
-      padding: 7px 12px;
-      border: 1px solid rgba(181, 142, 60, .22);
-      border-radius: 999px;
-      background: rgba(255,255,255,.62);
-      color: rgba(76, 62, 36, .7);
-      font-size: 12px;
+    .kimikea-leaflet-map .leaflet-control-zoom a {
+      width: 36px;
+      height: 36px;
+      border: 0;
+      background: rgba(255,255,255,.9);
+      color: #6b4d13;
       font-weight: 950;
-      letter-spacing: .12em;
-      pointer-events: none;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      line-height: 36px;
     }
-    .kimikea-map-pin {
-      position: absolute;
-      z-index: 5;
+    .kimikea-leaflet-map .leaflet-control-attribution {
+      padding: 3px 6px;
+      border-radius: 999px 0 0 0;
+      background: rgba(255,255,255,.82);
+      color: #4d463a;
+      font-size: 10px;
+    }
+    .kimikea-leaflet-pin {
       display: grid;
       place-items: center;
       width: 46px;
       height: 46px;
-      border: 0;
       border-radius: 50% 50% 50% 13px;
       background:
         radial-gradient(circle at 34% 24%, rgba(255,255,255,.98), transparent 22%),
         linear-gradient(145deg, #fff0b6, #c99b35 58%, #7a5515);
       color: #211809;
       box-shadow: 0 16px 32px rgba(94, 66, 18, .28), inset 0 1px 0 rgba(255,255,255,.78);
-      cursor: pointer;
-      transform: translate(-50%, -92%) rotate(-45deg) translateZ(0);
+      transform: rotate(-45deg) translateZ(0);
       transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
       -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
     }
-    .kimikea-map-pin::before {
+    .kimikea-leaflet-pin::before {
       display: grid;
       place-items: center;
       width: 20px;
@@ -1846,49 +1821,32 @@
       box-shadow: inset 0 0 0 5px rgba(86, 59, 14, .1);
       transform: rotate(45deg);
     }
-    .kimikea-map-pin.is-coordinator {
+    .kimikea-leaflet-pin.is-coordinator {
       border-radius: 999px;
       background:
         radial-gradient(circle at 34% 24%, rgba(255,255,255,.98), transparent 22%),
         linear-gradient(145deg, #eaf7ff, #5da8df 58%, #1c5f99);
       box-shadow: 0 16px 32px rgba(30, 92, 145, .24), inset 0 1px 0 rgba(255,255,255,.78);
-      transform: translate(-50%, -50%) translateZ(0);
+      transform: translateZ(0);
     }
-    .kimikea-map-pin.is-coordinator::before {
+    .kimikea-leaflet-pin.is-coordinator::before {
       content: "👤";
       box-shadow: inset 0 0 0 5px rgba(24, 84, 130, .1);
       transform: none;
     }
-    .kimikea-map-pin.is-selected {
+    .kimikea-leaflet-pin.is-selected {
       filter: brightness(1.08);
       box-shadow: 0 20px 42px rgba(105, 74, 20, .34), 0 0 0 10px rgba(218, 180, 91, .18), inset 0 1px 0 rgba(255,255,255,.82);
-      transform: translate(-50%, -100%) rotate(-45deg) scale(1.16);
+      transform: rotate(-45deg) scale(1.18);
       animation: kimikeaPinFloat 1.9s ease-in-out infinite;
     }
-    .kimikea-map-pin.is-coordinator.is-selected {
+    .kimikea-leaflet-pin.is-coordinator.is-selected {
       box-shadow: 0 20px 42px rgba(30, 92, 145, .3), 0 0 0 10px rgba(105, 174, 225, .18), inset 0 1px 0 rgba(255,255,255,.82);
-      transform: translate(-50%, -56%) scale(1.16);
+      transform: scale(1.18);
     }
     @keyframes kimikeaPinFloat {
       0%, 100% { margin-top: 0; }
       50% { margin-top: -8px; }
-    }
-    .kimikea-map-reset {
-      position: absolute;
-      right: 14px;
-      bottom: 14px;
-      z-index: 8;
-      min-height: 44px;
-      padding: 0 15px;
-      border: 1px solid rgba(180, 142, 62, .3);
-      border-radius: 999px;
-      background: rgba(255,255,255,.84);
-      color: #73551c;
-      font-size: 13px;
-      font-weight: 900;
-      box-shadow: 0 14px 28px rgba(55, 44, 28, .14);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
     }
     .kimikea-map-carousel {
       display: flex;
@@ -2036,7 +1994,7 @@
         align-items: end;
       }
       .kimikea-map-stage {
-        height: min(54vh, 560px);
+        height: 430px;
       }
       .kimikea-map-card {
         flex-basis: 410px;
@@ -6284,42 +6242,14 @@
       `;
     }
 
-    const NETWORK_DEFAULT_VIEW = { x: 0, y: 0, scale: 1 };
-    const NETWORK_MIN_SCALE = 0.72;
-    const NETWORK_MAX_SCALE = 4.6;
-    const KIMIKEA_MAP_PREF_BOUNDS = {
-      '静岡県': { minLat: 34.55, maxLat: 35.65, minLng: 137.45, maxLng: 139.25, labelX: 52, labelY: 16 },
-      '愛知県': { minLat: 34.45, maxLat: 35.55, minLng: 136.6, maxLng: 137.9, labelX: 52, labelY: 16 },
-      '東京都': { minLat: 35.45, maxLat: 35.9, minLng: 139.45, maxLng: 139.95, labelX: 52, labelY: 16 },
-      '大阪府': { minLat: 34.35, maxLat: 34.9, minLng: 135.25, maxLng: 135.75, labelX: 52, labelY: 16 },
-    };
-    const KIMIKEA_PREFECTURE_SVGS = {
-      '静岡県': {
-        viewBox: '0 0 1000 520',
-        land: 'M74 231 C124 188 179 165 236 176 C293 187 330 222 383 214 C433 206 480 159 532 137 C576 119 626 128 661 163 C694 196 735 201 786 181 C845 159 908 167 952 209 C920 238 856 249 799 240 C748 232 710 248 675 287 C642 324 617 380 581 456 C545 414 544 364 566 311 C507 303 453 289 392 302 C323 317 264 286 206 262 C158 243 117 254 74 231 Z',
-        coast: 'M94 233 C150 214 196 224 242 248 C305 281 351 304 414 287 C477 270 522 298 575 306 C548 361 551 411 582 451 M641 324 C673 274 711 235 770 234 C833 233 894 231 945 211',
-        highlight: 'M316 247 C372 241 424 224 474 192 C519 164 575 145 620 162 C574 181 536 210 493 232 C438 260 377 266 316 247 Z',
-      },
-    };
+    const KIMIKEA_MAP_DEFAULT_CENTER = [34.98, 138.38];
     const KIMIKEA_MAP_TYPE_LABELS = {
       '加盟店': '🏠 加盟店',
       'コーディネーター': '👤 コーディネーター',
     };
-    const networkMapState = {
-      x: NETWORK_DEFAULT_VIEW.x,
-      y: NETWORK_DEFAULT_VIEW.y,
-      scale: NETWORK_DEFAULT_VIEW.scale,
-    };
-    const networkPointerState = {
-      pointers: new Map(),
-      startX: 0,
-      startY: 0,
-      startMapX: 0,
-      startMapY: 0,
-      startScale: 1,
-      startDistance: 0,
-      lastTapAt: 0,
-    };
+    let kimikeaLeafletMap = null;
+    let kimikeaLeafletLayer = null;
+    const kimikeaLeafletMarkers = new Map();
 
     function loadKimikeaMapEntries(force = false) {
       const map = state.kimikeaMap;
@@ -6458,6 +6388,11 @@
         const prefecture = normalizeKimikeaMapText(getKimikeaMapValue(row, ['prefecture', '都道府県', '県'])) || extractPrefectureFromKimikeaAddress(address) || '静岡県';
         const salonName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['salonName', 'salon_name', 'shopName', 'shop_name', 'name', '店舗名', 'サロン名', '加盟店名']));
         const staffName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['staffName', 'staff_name', '担当者名', '氏名']));
+        const coordinates = normalizeKimikeaMapCoordinates(
+          getKimikeaMapValue(row, ['latitude', 'lat', '緯度']),
+          getKimikeaMapValue(row, ['longitude', 'lng', 'lon', '経度']),
+          prefecture
+        );
         const reasons = [];
         if (status !== '公開') reasons.push(`status=${status || 'empty'}`);
         if (!type) reasons.push('type empty');
@@ -6472,8 +6407,10 @@
           salonName,
           staffName,
           address,
-          latitude: parseKimikeaMapCoordinate(getKimikeaMapValue(row, ['latitude', 'lat', '緯度'])),
-          longitude: parseKimikeaMapCoordinate(getKimikeaMapValue(row, ['longitude', 'lng', 'lon', '経度'])),
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+          coordinateStatus: coordinates.status,
+          coordinateWarning: coordinates.warning,
           phone: normalizeKimikeaMapText(getKimikeaMapValue(row, ['phone', '電話番号', '電話'])),
           imageUrl: normalizeKimikeaMapText(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])),
           description: normalizeKimikeaMapText(getKimikeaMapValue(row, ['description', '紹介文', '説明'])),
@@ -6505,6 +6442,28 @@
     function parseKimikeaMapCoordinate(value) {
       const number = Number(String(value || '').trim());
       return Number.isFinite(number) ? number : NaN;
+    }
+
+    function normalizeKimikeaMapCoordinates(latitudeValue, longitudeValue, prefecture) {
+      let latitude = parseKimikeaMapCoordinate(latitudeValue);
+      let longitude = parseKimikeaMapCoordinate(longitudeValue);
+      let warning = '';
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return { latitude: NaN, longitude: NaN, status: 'missing', warning: '位置情報未設定' };
+      }
+      if (Math.abs(latitude) > 90 && Math.abs(longitude) <= 90) {
+        const swapped = latitude;
+        latitude = longitude;
+        longitude = swapped;
+        warning = '緯度経度を補正';
+      }
+      if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        return { latitude: NaN, longitude: NaN, status: 'invalid', warning: '位置情報が不正です' };
+      }
+      if (prefecture === '静岡県' && (latitude < 33.8 || latitude > 36.2 || longitude < 136.8 || longitude > 140.1)) {
+        warning = warning || '静岡県外の座標です';
+      }
+      return { latitude, longitude, status: warning ? 'warning' : 'ok', warning };
     }
 
     function prioritizeKimikeaMapPrefectures(prefectures) {
@@ -6550,102 +6509,36 @@
     function setKimikeaMapPrefecture(prefecture) {
       state.kimikeaMap.activePrefecture = String(prefecture || '').trim();
       ensureKimikeaMapSelection();
-      resetNetworkMapView();
       refreshCurrentPublicActions();
       window.requestAnimationFrame(initializeNetworkMap);
     }
 
-    function projectNetworkPoint(entry) {
-      const bounds = KIMIKEA_MAP_PREF_BOUNDS[state.kimikeaMap.activePrefecture] || boundsForKimikeaMapEntries(visibleKimikeaMapEntries());
-      const fallback = fallbackNetworkPoint(entry);
-      const lng = Number.isFinite(Number(entry.longitude)) ? Number(entry.longitude) : fallback.longitude;
-      const lat = Number.isFinite(Number(entry.latitude)) ? Number(entry.latitude) : fallback.latitude;
-      const x = ((lng - bounds.minLng) / Math.max(bounds.maxLng - bounds.minLng, 0.01)) * 100;
-      const y = ((bounds.maxLat - lat) / Math.max(bounds.maxLat - bounds.minLat, 0.01)) * 100;
-      return {
-        x: Math.min(92, Math.max(8, x)),
-        y: Math.min(86, Math.max(14, y)),
-      };
+    function kimikeaMapHasCoordinates(entry) {
+      return Number.isFinite(Number(entry.latitude)) && Number.isFinite(Number(entry.longitude));
     }
 
-    function fallbackNetworkPoint(entry) {
-      const entries = visibleKimikeaMapEntries();
-      const bounds = KIMIKEA_MAP_PREF_BOUNDS[state.kimikeaMap.activePrefecture] || boundsForKimikeaMapEntries(entries);
-      const key = `${entry.prefecture || ''}${entry.city || ''}${entry.shopId || entry.mapId || ''}`;
-      let hash = 0;
-      for (let i = 0; i < key.length; i += 1) {
-        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    function visibleKimikeaMapMarkerEntries() {
+      return visibleKimikeaMapEntries().filter(kimikeaMapHasCoordinates);
+    }
+
+    function kimikeaLeafletIcon(entry, selected = false) {
+      const isCoordinator = entry.type === 'コーディネーター';
+      return L.divIcon({
+        className: '',
+        html: `<div class="kimikea-leaflet-pin${isCoordinator ? ' is-coordinator' : ''}${selected ? ' is-selected' : ''}"></div>`,
+        iconSize: selected ? [54, 54] : [46, 46],
+        iconAnchor: isCoordinator ? [23, 23] : [23, 43],
+      });
+    }
+
+    function fitKimikeaLeafletMap(entries = visibleKimikeaMapMarkerEntries()) {
+      if (!kimikeaLeafletMap) return;
+      const points = entries.map((entry) => [Number(entry.latitude), Number(entry.longitude)]);
+      if (points.length) {
+        kimikeaLeafletMap.fitBounds(points, { padding: [28, 28], maxZoom: 14, animate: true });
+      } else {
+        kimikeaLeafletMap.setView(KIMIKEA_MAP_DEFAULT_CENTER, 9);
       }
-      const index = Math.max(0, entries.findIndex((item) => String(item.mapId || '') === String(entry.mapId || '')));
-      const lngRatio = 0.24 + (((hash % 41) + (index * 9)) % 52) / 100;
-      const latRatio = 0.28 + ((((hash >> 8) % 31) + (index * 7)) % 44) / 100;
-      return {
-        longitude: bounds.minLng + (bounds.maxLng - bounds.minLng) * lngRatio,
-        latitude: bounds.minLat + (bounds.maxLat - bounds.minLat) * latRatio,
-      };
-    }
-
-    function boundsForKimikeaMapEntries(entries) {
-      const lats = entries.map((entry) => Number(entry.latitude)).filter(Number.isFinite);
-      const lngs = entries.map((entry) => Number(entry.longitude)).filter(Number.isFinite);
-      if (!lats.length || !lngs.length) return KIMIKEA_MAP_PREF_BOUNDS['静岡県'];
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-      return {
-        minLat: minLat - 0.12,
-        maxLat: maxLat + 0.12,
-        minLng: minLng - 0.18,
-        maxLng: maxLng + 0.18,
-        labelX: 52,
-        labelY: 16,
-      };
-    }
-
-    function renderNetworkPins() {
-      return visibleKimikeaMapEntries().map((entry) => {
-        const point = projectNetworkPoint(entry);
-        const selected = String(entry.mapId || '') === String(state.kimikeaMap.selectedMapId || '');
-        const isCoordinator = entry.type === 'コーディネーター';
-        return `
-          <button
-            type="button"
-            class="kimikea-map-pin${isCoordinator ? ' is-coordinator' : ''}${selected ? ' is-selected' : ''}"
-            data-network-action="select-map-entry"
-            data-map-id="${escapeHtml(entry.mapId)}"
-            style="left:${point.x}%; top:${point.y}%;"
-            aria-label="${escapeHtml(mapEntryDisplayName(entry))}を表示"
-            onclick="handleNetworkAction(event)"
-          ></button>
-        `;
-      }).join('');
-    }
-
-    function renderNetworkMapArt() {
-      const prefecture = state.kimikeaMap.activePrefecture || '静岡県';
-      const mapSvg = KIMIKEA_PREFECTURE_SVGS[prefecture] || KIMIKEA_PREFECTURE_SVGS['静岡県'];
-      return `
-        <svg class="kimikea-pref-map" viewBox="${escapeHtml(mapSvg.viewBox)}" role="img" aria-label="${escapeHtml(prefecture)}のKimikea MAP">
-          <defs>
-            <linearGradient id="kimikeaMapSea" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#dcecf1"/>
-              <stop offset="1" stop-color="#f7f2e6"/>
-            </linearGradient>
-            <linearGradient id="kimikeaMapLand" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#fffaf0"/>
-              <stop offset="1" stop-color="#e9dec8"/>
-            </linearGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#kimikeaMapSea)"/>
-          <circle cx="830" cy="402" r="94" fill="rgba(255,255,255,.24)"/>
-          <circle cx="174" cy="112" r="72" fill="rgba(255,255,255,.2)"/>
-          <path class="pref-land" d="${escapeHtml(mapSvg.land)}" fill="url(#kimikeaMapLand)"/>
-          <path class="pref-highlight" d="${escapeHtml(mapSvg.highlight)}"/>
-          <path class="pref-coast" d="${escapeHtml(mapSvg.coast)}"/>
-        </svg>
-        <span class="kimikea-pref-label">${escapeHtml(prefecture)}</span>
-      `;
     }
 
     function renderNetworkMapPage() {
@@ -6691,11 +6584,7 @@
 
           <section class="kimikea-map-shell" aria-label="県別マップ">
             <div id="networkMapViewport" class="kimikea-map-stage">
-              <div id="networkMapWorld" class="kimikea-map-world">
-                ${renderNetworkMapArt()}
-                <div id="networkPinLayer">${renderNetworkPins()}</div>
-              </div>
-              <button type="button" class="kimikea-map-reset" onclick="resetNetworkMapView()">${escapeHtml(map.activePrefecture || '静岡県')}へ戻る</button>
+              <div id="networkLeafletMap" class="kimikea-leaflet-map" aria-label="${escapeHtml(map.activePrefecture || '静岡県')}の実地図"></div>
             </div>
           </section>
 
@@ -6770,6 +6659,7 @@
             <p class="kimikea-map-meta">
               ${addressLines.map((line) => escapeHtml(line)).join('<br>')}
               ${entry.phone && !isCoordinator ? `<br><a class="kimikea-map-phone-link" href="${escapeHtml(phoneUrl)}" onclick="event.stopPropagation()">TEL ${escapeHtml(entry.phone)}</a>` : ''}
+              ${entry.coordinateWarning ? `<br>${escapeHtml(entry.coordinateWarning)}` : ''}
             </p>
             ${entry.staffName && !isCoordinator ? `<p class="kimikea-map-meta">担当：${escapeHtml(entry.staffName)}</p>` : ''}
             <p class="kimikea-map-description">${escapeHtml(entry.description || '')}</p>
@@ -6824,42 +6714,17 @@
         });
     }
 
-    function applyNetworkMapTransform() {
-      const world = document.getElementById('networkMapWorld');
-      if (!world) return;
-      world.style.transform = `translate3d(${networkMapState.x}px, ${networkMapState.y}px, 0) scale(${networkMapState.scale})`;
-      const pinLayer = document.getElementById('networkPinLayer');
-      if (pinLayer) pinLayer.innerHTML = renderNetworkPins();
-    }
-
-    function resetNetworkMapView() {
-      networkMapState.x = NETWORK_DEFAULT_VIEW.x;
-      networkMapState.y = NETWORK_DEFAULT_VIEW.y;
-      networkMapState.scale = NETWORK_DEFAULT_VIEW.scale;
-      applyNetworkMapTransform();
-    }
-
-    function zoomNetworkMap(deltaScale, originX, originY) {
-      const viewport = document.getElementById('networkMapViewport');
-      if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
-      const ox = Number.isFinite(originX) ? originX - rect.left : rect.width / 2;
-      const oy = Number.isFinite(originY) ? originY - rect.top : rect.height / 2;
-      const oldScale = networkMapState.scale;
-      const newScale = Math.min(NETWORK_MAX_SCALE, Math.max(NETWORK_MIN_SCALE, oldScale * deltaScale));
-      const scaleRatio = newScale / oldScale;
-      networkMapState.x = ox - (ox - networkMapState.x) * scaleRatio;
-      networkMapState.y = oy - (oy - networkMapState.y) * scaleRatio;
-      networkMapState.scale = newScale;
-      applyNetworkMapTransform();
-    }
-
     function selectKimikeaMapEntry(mapId, skipScroll = false) {
       const entry = getKimikeaMapEntry(mapId);
       if (!entry) return;
       state.kimikeaMap.selectedMapId = entry.mapId;
-      applyNetworkMapTransform();
       updateKimikeaMapCardSelection(skipScroll);
+      updateKimikeaLeafletMarkerSelection();
+      if (kimikeaLeafletMap && kimikeaMapHasCoordinates(entry)) {
+        kimikeaLeafletMap.flyTo([Number(entry.latitude), Number(entry.longitude)], Math.max(kimikeaLeafletMap.getZoom(), 13), {
+          duration: 0.45,
+        });
+      }
     }
 
     function updateKimikeaMapCardSelection(skipScroll = false) {
@@ -6870,6 +6735,14 @@
         const card = document.getElementById(`kimikeaMapCard-${state.kimikeaMap.selectedMapId}`);
         card?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       }
+    }
+
+    function updateKimikeaLeafletMarkerSelection() {
+      kimikeaLeafletMarkers.forEach((marker, mapId) => {
+        const entry = getKimikeaMapEntry(mapId);
+        if (!entry) return;
+        marker.setIcon(kimikeaLeafletIcon(entry, String(mapId) === String(state.kimikeaMap.selectedMapId || '')));
+      });
     }
 
     function openNetworkShopStyles(shopId) {
@@ -6911,54 +6784,44 @@
     }
 
     function initializeNetworkMap() {
-      const viewport = document.getElementById('networkMapViewport');
-      if (!viewport || viewport.dataset.bound === 'true') {
-        applyNetworkMapTransform();
-        return;
-      }
-      viewport.dataset.bound = 'true';
-      applyNetworkMapTransform();
-      viewport.addEventListener('pointerdown', (event) => {
-        if (event.target.closest('button, a')) return;
-        viewport.setPointerCapture?.(event.pointerId);
-        networkPointerState.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-        networkPointerState.startMapX = networkMapState.x;
-        networkPointerState.startMapY = networkMapState.y;
-        networkPointerState.startScale = networkMapState.scale;
-        networkPointerState.startX = event.clientX;
-        networkPointerState.startY = event.clientY;
-        if (networkPointerState.pointers.size === 2) {
-          const points = Array.from(networkPointerState.pointers.values());
-          networkPointerState.startDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
-        }
-      });
-      viewport.addEventListener('pointermove', (event) => {
-        if (!networkPointerState.pointers.has(event.pointerId)) return;
-        networkPointerState.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-        const points = Array.from(networkPointerState.pointers.values());
-        if (points.length === 1) {
-          networkMapState.x = networkPointerState.startMapX + (event.clientX - networkPointerState.startX);
-          networkMapState.y = networkPointerState.startMapY + (event.clientY - networkPointerState.startY);
-          applyNetworkMapTransform();
-        }
-        if (points.length >= 2 && networkPointerState.startDistance) {
-          const distance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
-          networkMapState.scale = Math.min(NETWORK_MAX_SCALE, Math.max(NETWORK_MIN_SCALE, networkPointerState.startScale * (distance / networkPointerState.startDistance)));
-          applyNetworkMapTransform();
-        }
-      });
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
-        viewport.addEventListener(eventName, (event) => {
-          networkPointerState.pointers.delete(event.pointerId);
-          if (networkPointerState.pointers.size === 0) {
-            networkPointerState.startDistance = 0;
-          }
+      const mapElement = document.getElementById('networkLeafletMap');
+      if (!mapElement || typeof L === 'undefined') return;
+      if (!kimikeaLeafletMap || kimikeaLeafletMap.getContainer() !== mapElement) {
+        if (kimikeaLeafletMap) kimikeaLeafletMap.remove();
+        kimikeaLeafletMap = L.map(mapElement, {
+          center: KIMIKEA_MAP_DEFAULT_CENTER,
+          zoom: 9,
+          zoomControl: true,
+          attributionControl: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          dragging: true,
+          touchZoom: true,
+          tap: true,
         });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+        }).addTo(kimikeaLeafletMap);
+        kimikeaLeafletLayer = L.layerGroup().addTo(kimikeaLeafletMap);
+      }
+      kimikeaLeafletLayer.clearLayers();
+      kimikeaLeafletMarkers.clear();
+      const markerEntries = visibleKimikeaMapMarkerEntries();
+      markerEntries.forEach((entry) => {
+        const marker = L.marker([Number(entry.latitude), Number(entry.longitude)], {
+          icon: kimikeaLeafletIcon(entry, String(entry.mapId || '') === String(state.kimikeaMap.selectedMapId || '')),
+          title: mapEntryDisplayName(entry),
+        });
+        marker.on('click', () => selectKimikeaMapEntry(entry.mapId));
+        marker.addTo(kimikeaLeafletLayer);
+        kimikeaLeafletMarkers.set(String(entry.mapId || ''), marker);
       });
-      viewport.addEventListener('dblclick', (event) => {
-        event.preventDefault();
-        zoomNetworkMap(1.28, event.clientX, event.clientY);
-      });
+      window.setTimeout(() => {
+        kimikeaLeafletMap.invalidateSize();
+        fitKimikeaLeafletMap(markerEntries);
+        updateKimikeaLeafletMarkerSelection();
+      }, 80);
       updateKimikeaMapCardSelection();
     }
 
