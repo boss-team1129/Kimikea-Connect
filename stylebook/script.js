@@ -559,7 +559,17 @@ function normalizeDatabase(database) {
   const db = database || seedData();
   db.stylePosts = Array.isArray(db.stylePosts) ? db.stylePosts : [];
   db.savedStyles = Array.isArray(db.savedStyles) ? db.savedStyles : [];
-  db.saveSummaries = Array.isArray(db.saveSummaries) ? db.saveSummaries : buildSaveSummariesFromSaves(db.stylePosts, db.savedStyles);
+  db.savedStyles = db.savedStyles.filter(save => {
+    const styleId = saveStyleId(save);
+    const post = db.stylePosts.find(item => String(item.id || '').trim() === styleId);
+    return !post || !isDeletedStylePost(post);
+  });
+  db.saveSummaries = Array.isArray(db.saveSummaries)
+    ? db.saveSummaries.filter(summary => {
+      const post = db.stylePosts.find(item => String(item.id || '').trim() === String(summary.styleId || '').trim());
+      return !post || !isDeletedStylePost(post);
+    })
+    : buildSaveSummariesFromSaves(db.stylePosts, db.savedStyles);
   db.extensionColors = Array.isArray(db.extensionColors) ? db.extensionColors : [];
   db.styleTypes = Array.isArray(db.styleTypes) ? db.styleTypes : [];
   db.shops = Array.isArray(db.shops) ? db.shops : [];
@@ -596,7 +606,7 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
   const data = await requestJson(url, { cache: 'no-store' });
   if (!data.ok) throw new Error(data.message || '自分の投稿を取得できませんでした。');
   const posts = Array.isArray(data.posts) ? data.posts : [];
-  return posts.filter(post => isSameUserId(postAuthorId(post), userId));
+  return posts.filter(post => !isDeletedStylePost(post) && isSameUserId(postAuthorId(post), userId));
 }
 
 async function loadDb() {
@@ -733,6 +743,17 @@ function postAuthorId(post) {
   return String(post?.authorId || post?.createdByUserId || post?.userId || '').trim();
 }
 
+function isDeletedStylePost(post) {
+  const status = String(post?.status || '').normalize('NFKC').trim().toLowerCase();
+  const isDeleted = post?.isDeleted === true || String(post?.isDeleted || '').normalize('NFKC').trim().toUpperCase() === 'TRUE';
+  return Boolean(
+    post?.deletedAt
+    || isDeleted
+    || ['deleted', 'delete', '削除', '削除済み'].includes(status)
+    || String(post?.visibility || '').normalize('NFKC').trim().toLowerCase() === 'deleted'
+  );
+}
+
 function normalizeUserId(value) {
   return String(value ?? '').trim();
 }
@@ -792,7 +813,7 @@ function getById(collection, id) {
 
 function activePosts({ includePrivate = false, includeDeleted = false } = {}) {
   return state.db.stylePosts.filter(post => {
-    if (!includeDeleted && post.deletedAt) return false;
+    if (!includeDeleted && isDeletedStylePost(post)) return false;
     if (includePrivate) return true;
     return post.isPublished && post.status === 'published';
   });
@@ -1327,7 +1348,7 @@ function showDetail(postId, options = {}) {
   const detailMode = normalizeDetailMode(mode);
   sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
   const post = state.db.stylePosts.find(item => item.id === postId);
-  if (!post || post.deletedAt) return;
+  if (!post || isDeletedStylePost(post)) return;
   state.currentDetailId = postId;
   state.currentDetailMode = detailMode;
   const salonName = displaySalonName(post);
@@ -1475,7 +1496,7 @@ function ownPosts({ draftsOnly = false } = {}) {
   const user = currentUser();
   if (!user) return [];
   return state.db.stylePosts
-    .filter(post => !post.deletedAt && isSameUserId(postAuthorId(post), user.id))
+    .filter(post => !isDeletedStylePost(post) && isSameUserId(postAuthorId(post), user.id))
     .filter(post => {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
       return draftsOnly ? isDraft : true;
@@ -1895,9 +1916,6 @@ async function logicalDeletePost(postId) {
   if (!confirm('この投稿を削除します。よろしいですか？')) return;
   const reason = '投稿者本人による削除';
   const previousPost = { ...post };
-  markLocalPostDeleted(postId);
-  if (state.currentView === 'drafts') renderDrafts();
-  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine();
   try {
     if (state.backendMode === 'remote') {
       const result = await apiRequest('deletePost', { postId, reason });
@@ -1910,13 +1928,17 @@ async function logicalDeletePost(postId) {
       post.status = 'deleted';
       saveDb();
     }
+    state.db.savedStyles = state.db.savedStyles.filter(save => saveStyleId(save) !== postId);
+    state.db.saveSummaries = (state.db.saveSummaries || []).filter(summary => String(summary.styleId || '').trim() !== postId);
+    saveDb();
     alert('投稿を削除しました。');
   } catch (error) {
     upsertLocalPost(previousPost);
     alert(error.message || '削除できませんでした。');
     return;
   }
-  if (state.currentView === 'drafts') renderDrafts();
+  if (state.currentView === 'detail') showMine({ push: false });
+  else if (state.currentView === 'drafts') renderDrafts();
   else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine();
   else if (state.currentView === 'admin' || state.currentDetailMode === 'admin') renderAdmin();
   else showView('gallery');

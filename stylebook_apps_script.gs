@@ -169,7 +169,7 @@ function getOwnStylebookPosts_(userId, draftsOnly) {
   if (!normalizedUserId) return [];
   return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
     .map(normalizePost_)
-    .filter(post => !post.deletedAt)
+    .filter(post => !isDeletedStylebookPost_(post))
     .filter(post => sameUserId_(postAuthorId_(post), normalizedUserId))
     .filter(post => {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
@@ -321,10 +321,23 @@ function publicStylePostForColorDetail_(post) {
 
 function isPublicRankingPost_(post) {
   const status = String(post.status || '').trim();
-  if (post.deletedAt || post.isDeleted || status === 'deleted' || status === '削除済み') return false;
+  if (isDeletedStylebookPost_(post)) return false;
   if (status === 'draft' || status === 'private' || status === '下書き') return false;
   if (post.isPublished === false || String(post.isPublished).toUpperCase() === 'FALSE') return false;
   return status === 'published' || status === '公開' || post.isPublished === true || String(post.isPublished).toUpperCase() === 'TRUE';
+}
+
+function isDeletedStylebookPost_(post) {
+  const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
+  const visibility = String((post && post.visibility) || '').normalize('NFKC').trim().toLowerCase();
+  const isDeleted = (post && post.isDeleted) === true
+    || String((post && post.isDeleted) || '').normalize('NFKC').trim().toUpperCase() === 'TRUE';
+  return Boolean(
+    (post && post.deletedAt)
+    || isDeleted
+    || ['deleted', 'delete', '削除', '削除済み'].indexOf(status) >= 0
+    || visibility === 'deleted'
+  );
 }
 
 function normalizeRankingColorKey_(value) {
