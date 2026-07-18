@@ -6677,14 +6677,18 @@
     }
 
     function formatKimikeaPhone(phone) {
-      const digits = String(phone || '').normalize('NFKC').replace(/[^\d]/g, '');
+      const original = String(phone || '').normalize('NFKC').trim();
+      if (/^0\d{1,4}-\d{1,4}-\d{3,4}$/.test(original)) return original;
+      const digits = original.replace(/[^\d]/g, '');
       if (!digits) return '';
       if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+      if (digits.length === 10 && digits.startsWith('0120')) return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+      if (digits.length === 10 && digits.startsWith('0545')) return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
       if (digits.length === 10) {
         if (digits.startsWith('03') || digits.startsWith('06')) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
         return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
       }
-      return String(phone || '').trim();
+      return original;
     }
 
     function mapEntryGoogleMapUrl(entry) {

@@ -3402,7 +3402,7 @@ function getFranchiseMasterRecords_() {
         contactName: contactNameIndex === -1 ? '' : String(row[contactNameIndex] || '').trim(),
         email,
         loginId,
-        phone: normalizePhone_(row[phoneIndex]),
+        phone: normalizePhoneText_(row[phoneIndex]),
         initialPassword: passwordIndex === -1
           ? KCO_DEFAULT_INITIAL_PASSWORD
           : normalizeInitialPasswordValue_(row[passwordIndex]),
