@@ -6316,16 +6316,23 @@
       return callServer('getPublicMapEntries')
         .then((data) => {
           console.log('MAP DATA', data);
-          const entries = Array.isArray(data.entries) ? data.entries : [];
-          const prefectures = Array.isArray(data.prefectures) ? data.prefectures : [];
-          const types = Array.isArray(data.types) && data.types.length ? data.types : ['加盟店', 'コーディネーター'];
+          const rawEntries = extractKimikeaMapRawEntries(data);
+          const normalizedResult = normalizeKimikeaMapEntries(rawEntries);
+          const entries = normalizedResult.entries;
+          const prefectures = entries.length
+            ? prioritizeKimikeaMapPrefectures([...new Set(entries.map((entry) => entry.prefecture).filter(Boolean))])
+            : (Array.isArray(data.prefectures) ? data.prefectures.map(normalizeKimikeaMapText).filter(Boolean) : []);
+          const types = entries.length
+            ? [...new Set(entries.map((entry) => entry.type).filter(Boolean))]
+            : (Array.isArray(data.types) && data.types.length ? data.types.map(normalizeKimikeaMapText).filter(Boolean) : ['加盟店', 'コーディネーター']);
           const debug = {
             apiUrl: `${ORDER_API_URL}?api=getPublicMapEntries`,
             http: 'JSONP 200',
-            rawCount: Number(data.debug?.rawRowCount || entries.length || 0),
+            rawCount: Number(data.debug?.rawRowCount || rawEntries.length || entries.length || 0),
             entriesCount: entries.length,
             firstSalon: entries[0]?.salonName || data.debug?.firstSalonName || '',
             error: 'none',
+            rows: normalizedResult.rowResults.length ? normalizedResult.rowResults : (data.debug?.rowResults || []),
             server: data.debug || null,
           };
           state.kimikeaMap = {
@@ -6337,8 +6344,8 @@
             entries,
             prefectures,
             types,
-            activeType: types.includes(state.kimikeaMap.activeType) ? state.kimikeaMap.activeType : (types[0] || '加盟店'),
-            activePrefecture: prefectures.includes(state.kimikeaMap.activePrefecture) ? state.kimikeaMap.activePrefecture : (prefectures[0] || ''),
+            activeType: types.includes(state.kimikeaMap.activeType) ? state.kimikeaMap.activeType : (types.includes('加盟店') ? '加盟店' : (types[0] || '加盟店')),
+            activePrefecture: prefectures.includes(state.kimikeaMap.activePrefecture) ? state.kimikeaMap.activePrefecture : (prefectures.includes('静岡県') ? '静岡県' : (prefectures[0] || '静岡県')),
           };
           ensureKimikeaMapSelection();
           refreshCurrentPublicActions();
@@ -6364,6 +6371,126 @@
           refreshCurrentPublicActions();
           return state.kimikeaMap;
         });
+    }
+
+    function normalizeKimikeaMapText(value) {
+      return String(value || '').normalize('NFKC').replace(/\u3000/g, ' ').trim();
+    }
+
+    function getKimikeaMapValue(row, keys) {
+      if (!row || typeof row !== 'object') return '';
+      for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+          return row[key];
+        }
+      }
+      return '';
+    }
+
+    function normalizeKimikeaMapStatus(value) {
+      const text = String(value || '').normalize('NFKC').replace(/\s+/g, '').trim();
+      if (['公開', '公開中', 'TRUE', 'true', '1', '表示'].includes(text)) return '公開';
+      if (['非公開', 'FALSE', 'false', '0', '非表示'].includes(text)) return '非公開';
+      return text;
+    }
+
+    function normalizeKimikeaMapType(value, shopId) {
+      const text = normalizeKimikeaMapText(value);
+      if (text === '加盟店' || text === 'コーディネーター') return text;
+      if (!text && normalizeKimikeaMapText(shopId)) return '加盟店';
+      return text || '加盟店';
+    }
+
+    function extractPrefectureFromKimikeaAddress(address) {
+      const text = normalizeKimikeaMapText(address);
+      const match = text.match(/(北海道|東京都|京都府|大阪府|.{2,3}県)/);
+      return match ? match[1] : '';
+    }
+
+    function extractKimikeaMapRawEntries(data) {
+      const candidates = [
+        data?.entries,
+        data?.data,
+        data?.items,
+        data?.rows,
+        data?.allEntries,
+        data?.mapEntries,
+        data?.data?.entries,
+        data?.data?.items,
+        data?.data?.rows,
+      ];
+      const found = candidates.find(Array.isArray);
+      return found || [];
+    }
+
+    function normalizeKimikeaMapEntries(rawEntries) {
+      const rowResults = [];
+      const entries = (Array.isArray(rawEntries) ? rawEntries : []).map((row, index) => {
+        const address = normalizeKimikeaMapText(getKimikeaMapValue(row, ['address', '住所']));
+        const shopId = normalizeKimikeaMapText(getKimikeaMapValue(row, ['shopId', '店舗ID', '加盟店ID']));
+        const mapId = normalizeKimikeaMapText(getKimikeaMapValue(row, ['mapId', 'マップID', 'id'])) || shopId || `map-row-${index + 1}`;
+        const status = normalizeKimikeaMapStatus(getKimikeaMapValue(row, ['status', 'ステータス', '公開状態']));
+        const type = normalizeKimikeaMapType(getKimikeaMapValue(row, ['type', '種別', 'タイプ']), shopId);
+        const prefecture = normalizeKimikeaMapText(getKimikeaMapValue(row, ['prefecture', '都道府県', '県'])) || extractPrefectureFromKimikeaAddress(address) || '静岡県';
+        const salonName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['salonName', 'salon_name', 'shopName', 'shop_name', 'name', '店舗名', 'サロン名', '加盟店名']));
+        const staffName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['staffName', 'staff_name', '担当者名', '氏名']));
+        const reasons = [];
+        if (status !== '公開') reasons.push(`status=${status || 'empty'}`);
+        if (!type) reasons.push('type empty');
+        if (!prefecture) reasons.push('prefecture empty');
+        if (!salonName && !staffName && !shopId) reasons.push('display name empty');
+        const entry = {
+          mapId,
+          shopId: shopId || mapId,
+          type,
+          prefecture,
+          city: normalizeKimikeaMapText(getKimikeaMapValue(row, ['city', '市区町村', '市町村', '活動エリア'])),
+          salonName,
+          staffName,
+          address,
+          latitude: parseKimikeaMapCoordinate(getKimikeaMapValue(row, ['latitude', 'lat', '緯度'])),
+          longitude: parseKimikeaMapCoordinate(getKimikeaMapValue(row, ['longitude', 'lng', 'lon', '経度'])),
+          phone: normalizeKimikeaMapText(getKimikeaMapValue(row, ['phone', '電話番号', '電話'])),
+          imageUrl: normalizeKimikeaMapText(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])),
+          description: normalizeKimikeaMapText(getKimikeaMapValue(row, ['description', '紹介文', '説明'])),
+          linkLabel1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkLabel1', 'link_label_1', 'ボタン名1', 'リンク名1'])),
+          linkUrl1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl1', 'link_url_1', 'URL1', 'リンクURL1'])),
+          linkLabel2: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkLabel2', 'link_label_2', 'ボタン名2', 'リンク名2'])),
+          linkUrl2: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl2', 'link_url_2', 'URL2', 'リンクURL2'])),
+          status,
+          sortOrder: Number(getKimikeaMapValue(row, ['sortOrder', '表示順']) || 9999),
+        };
+        rowResults.push({
+          rowNumber: index + 1,
+          salonName: salonName || staffName || shopId || mapId,
+          included: reasons.length === 0,
+          reason: reasons.length ? reasons.join(', ') : 'included',
+        });
+        return { entry, included: reasons.length === 0 };
+      })
+        .filter((item) => item.included)
+        .map((item) => item.entry)
+        .sort((a, b) => {
+          const orderDiff = Number(a.sortOrder || 9999) - Number(b.sortOrder || 9999);
+          if (orderDiff) return orderDiff;
+          return String(a.salonName || a.staffName || '').localeCompare(String(b.salonName || b.staffName || ''), 'ja');
+        });
+      return { entries, rowResults };
+    }
+
+    function parseKimikeaMapCoordinate(value) {
+      const number = Number(String(value || '').trim());
+      return Number.isFinite(number) ? number : NaN;
+    }
+
+    function prioritizeKimikeaMapPrefectures(prefectures) {
+      const list = prefectures.map(normalizeKimikeaMapText).filter(Boolean);
+      const shizuokaIndex = list.indexOf('静岡県');
+      if (shizuokaIndex > 0) {
+        list.splice(shizuokaIndex, 1);
+        list.unshift('静岡県');
+      }
+      return list;
     }
 
     function visibleKimikeaMapEntries() {
@@ -6513,7 +6640,11 @@
         return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(map.error)}</div>${renderKimikeaMapDebug()}</article>`;
       }
       if (!map.entries.length) {
-        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">公開中の加盟店・コーディネーターはまだ登録されていません。</div>${renderKimikeaMapDebug()}</article>`;
+        const rawCount = Number(map.debug?.rawCount || 0);
+        const emptyMessage = rawCount > 0
+          ? 'データは取得できましたが表示条件に合いませんでした。'
+          : '公開中の加盟店・コーディネーターはまだ登録されていません。';
+        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(emptyMessage)}</div>${renderKimikeaMapDebug()}</article>`;
       }
       ensureKimikeaMapSelection();
       const types = map.types.length ? map.types : ['加盟店', 'コーディネーター'];
@@ -6563,6 +6694,14 @@
 
     function renderKimikeaMapDebug() {
       const debug = state.kimikeaMap.debug || {};
+      const rowLines = Array.isArray(debug.rows)
+        ? debug.rows.slice(0, 12).map((row, index) => {
+          const label = row.rowNumber ? `ROW ${row.rowNumber}` : `ROW ${index + 1}`;
+          const status = row.included ? 'included' : `excluded / reason: ${row.reason || 'unknown'}`;
+          const name = row.salonName ? ` / ${row.salonName}` : '';
+          return `${label}: ${status}${name}`;
+        }).join('\n')
+        : '';
       return `
         <pre class="kimikea-map-debug">MAP DEBUG
 API: ${escapeHtml(debug.apiUrl || `${ORDER_API_URL}?api=getPublicMapEntries`)}
@@ -6570,7 +6709,7 @@ HTTP: ${escapeHtml(debug.http || 'not requested')}
 rawCount: ${escapeHtml(String(debug.rawCount ?? ''))}
 entriesCount: ${escapeHtml(String(debug.entriesCount ?? state.kimikeaMap.entries.length))}
 firstSalon: ${escapeHtml(debug.firstSalon || '')}
-error: ${escapeHtml(debug.error || 'none')}</pre>
+error: ${escapeHtml(debug.error || 'none')}${rowLines ? `\n${escapeHtml(rowLines)}` : ''}</pre>
       `;
     }
 

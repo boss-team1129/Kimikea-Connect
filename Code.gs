@@ -900,8 +900,24 @@ function getPublicMapEntries() {
   const index = createIndex_(values[0].map((header) => String(header || '').trim()));
   const allEntries = values.slice(1)
     .map((row, offset) => normalizeMapEntryForClient_(row, index, offset + 2));
+  const rowResults = allEntries.map((entry, offset) => {
+    const reasons = [];
+    if (entry.status !== '公開') reasons.push(`status=${entry.status || 'empty'}`);
+    if (!entry.type) reasons.push('type empty');
+    if (!entry.prefecture) reasons.push('prefecture empty');
+    if (!entry.salonName && !entry.staffName && !entry.shopId) reasons.push('display name empty');
+    return {
+      rowNumber: offset + 2,
+      salonName: entry.salonName || entry.staffName || '',
+      status: entry.status || '',
+      type: entry.type || '',
+      prefecture: entry.prefecture || '',
+      included: reasons.length === 0,
+      reason: reasons.length ? reasons.join(', ') : 'included',
+    };
+  });
   const entries = allEntries
-    .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type)
+    .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type && (entry.salonName || entry.staffName || entry.shopId))
     .sort(comparePublicMapEntries_);
   logOrderDebug_('getPublicMapEntries result', {
     spreadsheetName: ss.getName(),
@@ -915,6 +931,7 @@ function getPublicMapEntries() {
       counts[status] = Number(counts[status] || 0) + 1;
       return counts;
     }, {}),
+    rowResults,
   });
   const prefectures = [];
   entries.forEach((entry) => {
@@ -940,19 +957,21 @@ function getPublicMapEntries() {
       entriesWithoutCoordinates: entries.filter((entry) => !Number.isFinite(entry.latitude) || !Number.isFinite(entry.longitude)).length,
       firstStatus: allEntries[0] ? allEntries[0].status : '',
       firstSalonName: allEntries[0] ? allEntries[0].salonName : '',
+      rowResults,
     },
   };
 }
 
 function normalizeMapEntryForClient_(row, index, rowNumber) {
-  const type = String(getRowValueByHeader_(row, index, ['type', '種別', 'タイプ']) || '').trim() || '加盟店';
-  const prefecture = String(getRowValueByHeader_(row, index, ['prefecture', '都道府県', '県']) || '').trim();
-  const city = String(getRowValueByHeader_(row, index, ['city', '市区町村', '市町村', '活動エリア']) || '').trim();
-  const salonName = String(getRowValueByHeader_(row, index, ['salonName', '店舗名', 'サロン名', '加盟店名']) || '').trim();
-  const staffName = String(getRowValueByHeader_(row, index, ['staffName', '担当者名', '氏名']) || '').trim();
-  const address = String(getRowValueByHeader_(row, index, ['address', '住所']) || '').trim();
-  const mapId = String(getRowValueByHeader_(row, index, ['mapId', 'マップID']) || '').trim() || `map-row-${rowNumber}`;
-  const shopId = String(getRowValueByHeader_(row, index, ['shopId', '店舗ID', '加盟店ID']) || '').trim() || mapId;
+  const address = normalizeMapText_(getRowValueByHeader_(row, index, ['address', '住所']));
+  const parsedAddress = parseJapaneseAddress_(address);
+  const mapId = normalizeMapText_(getRowValueByHeader_(row, index, ['mapId', 'マップID'])) || `map-row-${rowNumber}`;
+  const shopId = normalizeMapText_(getRowValueByHeader_(row, index, ['shopId', '店舗ID', '加盟店ID'])) || mapId;
+  const type = normalizeMapType_(getRowValueByHeader_(row, index, ['type', '種別', 'タイプ']), shopId);
+  const prefecture = normalizeMapText_(getRowValueByHeader_(row, index, ['prefecture', '都道府県', '県'])) || parsedAddress.prefecture || '静岡県';
+  const city = normalizeMapText_(getRowValueByHeader_(row, index, ['city', '市区町村', '市町村', '活動エリア'])) || parsedAddress.city;
+  const salonName = normalizeMapText_(getRowValueByHeader_(row, index, ['salonName', '店舗名', 'サロン名', '加盟店名', 'shopName', 'name']));
+  const staffName = normalizeMapText_(getRowValueByHeader_(row, index, ['staffName', '担当者名', '氏名']));
   return {
     mapId,
     shopId,
@@ -964,13 +983,13 @@ function normalizeMapEntryForClient_(row, index, rowNumber) {
     address,
     latitude: parseMapCoordinate_(getRowValueByHeader_(row, index, ['latitude', '緯度'])),
     longitude: parseMapCoordinate_(getRowValueByHeader_(row, index, ['longitude', '経度'])),
-    phone: String(getRowValueByHeader_(row, index, ['phone', '電話番号', '電話']) || '').trim(),
-    imageUrl: String(getRowValueByHeader_(row, index, ['imageUrl', '画像URL']) || '').trim(),
-    description: String(getRowValueByHeader_(row, index, ['description', '紹介文', '説明']) || '').trim(),
-    linkLabel1: String(getRowValueByHeader_(row, index, ['linkLabel1', 'ボタン名1', 'リンク名1']) || '').trim(),
-    linkUrl1: String(getRowValueByHeader_(row, index, ['linkUrl1', 'URL1', 'リンクURL1']) || '').trim(),
-    linkLabel2: String(getRowValueByHeader_(row, index, ['linkLabel2', 'ボタン名2', 'リンク名2']) || '').trim(),
-    linkUrl2: String(getRowValueByHeader_(row, index, ['linkUrl2', 'URL2', 'リンクURL2']) || '').trim(),
+    phone: normalizeMapText_(getRowValueByHeader_(row, index, ['phone', '電話番号', '電話'])),
+    imageUrl: normalizeMapText_(getRowValueByHeader_(row, index, ['imageUrl', '画像URL'])),
+    description: normalizeMapText_(getRowValueByHeader_(row, index, ['description', '紹介文', '説明'])),
+    linkLabel1: normalizeMapText_(getRowValueByHeader_(row, index, ['linkLabel1', 'ボタン名1', 'リンク名1'])),
+    linkUrl1: normalizeMapText_(getRowValueByHeader_(row, index, ['linkUrl1', 'URL1', 'リンクURL1'])),
+    linkLabel2: normalizeMapText_(getRowValueByHeader_(row, index, ['linkLabel2', 'ボタン名2', 'リンク名2'])),
+    linkUrl2: normalizeMapText_(getRowValueByHeader_(row, index, ['linkUrl2', 'URL2', 'リンクURL2'])),
     status: normalizeMapStatus_(getRowValueByHeader_(row, index, ['status', 'ステータス', '公開状態'])),
     sortOrder: Number(getRowValueByHeader_(row, index, ['sortOrder', '表示順']) || 9999),
     createdAt: formatDateTimeForClient_(parseDateValue_(getRowValueByHeader_(row, index, ['createdAt', '作成日'])) || getRowValueByHeader_(row, index, ['createdAt', '作成日'])),
@@ -999,9 +1018,20 @@ function parseMapCoordinate_(value) {
   return Number.isFinite(number) ? number : NaN;
 }
 
+function normalizeMapText_(value) {
+  return String(value || '').normalize('NFKC').replace(/\u3000/g, ' ').trim();
+}
+
+function normalizeMapType_(value, shopId) {
+  const text = normalizeMapText_(value);
+  if (text === '加盟店' || text === 'コーディネーター') return text;
+  if (!text && shopId) return '加盟店';
+  return text || '加盟店';
+}
+
 function normalizeMapStatus_(value) {
   const text = String(value || '').normalize('NFKC').replace(/\s+/g, '').trim();
-  if (text === '公開' || text.toUpperCase() === 'TRUE' || text === '表示') return '公開';
+  if (text === '公開' || text === '公開中' || text.toUpperCase() === 'TRUE' || text === '1' || text === '表示') return '公開';
   if (text === '非公開' || text.toUpperCase() === 'FALSE' || text === '非表示') return '非公開';
   return text;
 }
