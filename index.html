@@ -6291,6 +6291,7 @@
       refreshCurrentPublicActions();
       return callServer('getPublicMapEntries')
         .then((data) => {
+          console.log('MAP DATA', data);
           const entries = Array.isArray(data.entries) ? data.entries : [];
           const prefectures = Array.isArray(data.prefectures) ? data.prefectures : [];
           const types = Array.isArray(data.types) && data.types.length ? data.types : ['加盟店', 'コーディネーター'];
@@ -6363,13 +6364,31 @@
 
     function projectNetworkPoint(entry) {
       const bounds = KIMIKEA_MAP_PREF_BOUNDS[state.kimikeaMap.activePrefecture] || boundsForKimikeaMapEntries(visibleKimikeaMapEntries());
-      const lng = Number(entry.longitude);
-      const lat = Number(entry.latitude);
+      const fallback = fallbackNetworkPoint(entry);
+      const lng = Number.isFinite(Number(entry.longitude)) ? Number(entry.longitude) : fallback.longitude;
+      const lat = Number.isFinite(Number(entry.latitude)) ? Number(entry.latitude) : fallback.latitude;
       const x = ((lng - bounds.minLng) / Math.max(bounds.maxLng - bounds.minLng, 0.01)) * 100;
       const y = ((bounds.maxLat - lat) / Math.max(bounds.maxLat - bounds.minLat, 0.01)) * 100;
       return {
         x: Math.min(92, Math.max(8, x)),
         y: Math.min(86, Math.max(14, y)),
+      };
+    }
+
+    function fallbackNetworkPoint(entry) {
+      const entries = visibleKimikeaMapEntries();
+      const bounds = KIMIKEA_MAP_PREF_BOUNDS[state.kimikeaMap.activePrefecture] || boundsForKimikeaMapEntries(entries);
+      const key = `${entry.prefecture || ''}${entry.city || ''}${entry.shopId || entry.mapId || ''}`;
+      let hash = 0;
+      for (let i = 0; i < key.length; i += 1) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+      }
+      const index = Math.max(0, entries.findIndex((item) => String(item.mapId || '') === String(entry.mapId || '')));
+      const lngRatio = 0.24 + (((hash % 41) + (index * 9)) % 52) / 100;
+      const latRatio = 0.28 + ((((hash >> 8) % 31) + (index * 7)) % 44) / 100;
+      return {
+        longitude: bounds.minLng + (bounds.maxLng - bounds.minLng) * lngRatio,
+        latitude: bounds.minLat + (bounds.maxLat - bounds.minLat) * latRatio,
       };
     }
 

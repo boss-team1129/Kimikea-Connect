@@ -892,10 +892,21 @@ function getPublicMapEntries() {
 
   const values = sheet.getDataRange().getValues();
   const index = createIndex_(values[0].map((header) => String(header || '').trim()));
-  const entries = values.slice(1)
-    .map((row, offset) => normalizeMapEntryForClient_(row, index, offset + 2))
-    .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type && Number.isFinite(entry.latitude) && Number.isFinite(entry.longitude))
+  const allEntries = values.slice(1)
+    .map((row, offset) => normalizeMapEntryForClient_(row, index, offset + 2));
+  const entries = allEntries
+    .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type)
     .sort(comparePublicMapEntries_);
+  logOrderDebug_('getPublicMapEntries result', {
+    totalRows: Math.max(values.length - 1, 0),
+    publicEntryCount: entries.length,
+    entriesWithoutCoordinates: entries.filter((entry) => !Number.isFinite(entry.latitude) || !Number.isFinite(entry.longitude)).length,
+    statusCounts: allEntries.reduce((counts, entry) => {
+      const status = String(entry.status || '未設定').trim() || '未設定';
+      counts[status] = Number(counts[status] || 0) + 1;
+      return counts;
+    }, {}),
+  });
   const prefectures = [];
   entries.forEach((entry) => {
     if (prefectures.indexOf(entry.prefecture) === -1) prefectures.push(entry.prefecture);
