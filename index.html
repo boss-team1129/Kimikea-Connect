@@ -1714,11 +1714,12 @@
     .kimikea-map-select {
       display: grid;
       gap: 6px;
-      padding: 12px 14px;
-      border: 1px solid rgba(183, 144, 62, .18);
-      border-radius: 20px;
-      background: rgba(255,255,255,.72);
-      box-shadow: 0 16px 40px rgba(63, 49, 28, .09);
+      padding: 14px 16px;
+      border: 1px solid rgba(183, 144, 62, .28);
+      border-radius: 22px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.9), rgba(248, 239, 222, .76));
+      box-shadow: 0 18px 44px rgba(63, 49, 28, .11), inset 0 1px 0 rgba(255,255,255,.92);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
     }
@@ -1730,8 +1731,10 @@
     }
     .kimikea-map-select select {
       width: 100%;
-      min-height: 44px;
+      min-height: 48px;
+      padding: 0 38px 0 0;
       border: 0;
+      border-bottom: 1px solid rgba(183, 144, 62, .2);
       background: transparent;
       color: #1b160d;
       font-size: 18px;
@@ -1752,12 +1755,12 @@
     }
     .kimikea-map-stage {
       position: relative;
-      height: clamp(360px, 58svh, 640px);
+      height: clamp(300px, 46svh, 520px);
       overflow: hidden;
       border-radius: 28px;
       background:
         radial-gradient(circle at 24% 18%, rgba(255,255,255,.78), transparent 23%),
-        linear-gradient(145deg, #dceff5 0%, #eef8f7 48%, #f7f0df 100%);
+        linear-gradient(145deg, #dceff5 0%, #eef8f7 45%, #f7f0df 100%);
       touch-action: none;
       user-select: none;
     }
@@ -1774,6 +1777,25 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
+    }
+    .kimikea-pref-map .pref-land {
+      fill: rgba(255, 249, 235, .96);
+      stroke: rgba(179, 135, 45, .82);
+      stroke-width: 4;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 22px 34px rgba(84, 61, 23, .16));
+    }
+    .kimikea-pref-map .pref-coast {
+      fill: none;
+      stroke: rgba(255,255,255,.78);
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+    .kimikea-pref-map .pref-highlight {
+      fill: rgba(255,255,255,.22);
+      stroke: rgba(206, 172, 99, .3);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
     }
     .kimikea-pref-label {
       position: absolute;
@@ -1872,7 +1894,7 @@
       display: flex;
       gap: 12px;
       margin: -26px -14px 0;
-      padding: 30px 14px 10px;
+      padding: 30px 14px 96px;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
       scrollbar-width: none;
@@ -1938,6 +1960,14 @@
       font-weight: 750;
       line-height: 1.6;
     }
+    .kimikea-map-phone-link {
+      color: #5b4212;
+      font-weight: 950;
+      text-decoration: none;
+    }
+    .kimikea-map-phone-link:active {
+      opacity: .72;
+    }
     .kimikea-map-actions {
       display: flex;
       flex-wrap: wrap;
@@ -2000,26 +2030,13 @@
       text-align: center;
       box-shadow: 0 18px 48px rgba(63, 49, 28, .08);
     }
-    .kimikea-map-debug {
-      margin: 12px 0 0;
-      padding: 12px;
-      overflow-x: auto;
-      border: 1px solid rgba(180, 142, 62, .22);
-      border-radius: 16px;
-      background: rgba(255,255,255,.84);
-      color: #3d3324;
-      font-size: 11px;
-      line-height: 1.55;
-      white-space: pre-wrap;
-      box-shadow: 0 12px 30px rgba(63, 49, 28, .08);
-    }
     @media (min-width: 760px) {
       .kimikea-map-controls {
         grid-template-columns: minmax(320px, 420px) minmax(240px, 320px);
         align-items: end;
       }
       .kimikea-map-stage {
-        height: min(66vh, 680px);
+        height: min(54vh, 560px);
       }
       .kimikea-map-card {
         flex-basis: 410px;
@@ -6276,6 +6293,14 @@
       '東京都': { minLat: 35.45, maxLat: 35.9, minLng: 139.45, maxLng: 139.95, labelX: 52, labelY: 16 },
       '大阪府': { minLat: 34.35, maxLat: 34.9, minLng: 135.25, maxLng: 135.75, labelX: 52, labelY: 16 },
     };
+    const KIMIKEA_PREFECTURE_SVGS = {
+      '静岡県': {
+        viewBox: '0 0 1000 520',
+        land: 'M74 231 C124 188 179 165 236 176 C293 187 330 222 383 214 C433 206 480 159 532 137 C576 119 626 128 661 163 C694 196 735 201 786 181 C845 159 908 167 952 209 C920 238 856 249 799 240 C748 232 710 248 675 287 C642 324 617 380 581 456 C545 414 544 364 566 311 C507 303 453 289 392 302 C323 317 264 286 206 262 C158 243 117 254 74 231 Z',
+        coast: 'M94 233 C150 214 196 224 242 248 C305 281 351 304 414 287 C477 270 522 298 575 306 C548 361 551 411 582 451 M641 324 C673 274 711 235 770 234 C833 233 894 231 945 211',
+        highlight: 'M316 247 C372 241 424 224 474 192 C519 164 575 145 620 162 C574 181 536 210 493 232 C438 260 377 266 316 247 Z',
+      },
+    };
     const KIMIKEA_MAP_TYPE_LABELS = {
       '加盟店': '🏠 加盟店',
       'コーディネーター': '👤 コーディネーター',
@@ -6315,7 +6340,6 @@
       refreshCurrentPublicActions();
       return callServer('getPublicMapEntries')
         .then((data) => {
-          console.log('MAP DATA', data);
           const rawEntries = extractKimikeaMapRawEntries(data);
           const normalizedResult = normalizeKimikeaMapEntries(rawEntries);
           const entries = normalizedResult.entries;
@@ -6600,29 +6624,25 @@
 
     function renderNetworkMapArt() {
       const prefecture = state.kimikeaMap.activePrefecture || '静岡県';
+      const mapSvg = KIMIKEA_PREFECTURE_SVGS[prefecture] || KIMIKEA_PREFECTURE_SVGS['静岡県'];
       return `
-        <svg class="kimikea-pref-map" viewBox="0 0 1000 620" role="img" aria-label="${escapeHtml(prefecture)}のKimikea MAP">
+        <svg class="kimikea-pref-map" viewBox="${escapeHtml(mapSvg.viewBox)}" role="img" aria-label="${escapeHtml(prefecture)}のKimikea MAP">
           <defs>
             <linearGradient id="kimikeaMapSea" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stop-color="#dcecf1"/>
-              <stop offset="1" stop-color="#edf6f6"/>
+              <stop offset="1" stop-color="#f7f2e6"/>
             </linearGradient>
             <linearGradient id="kimikeaMapLand" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stop-color="#fffaf0"/>
               <stop offset="1" stop-color="#e9dec8"/>
             </linearGradient>
-            <filter id="kimikeaMapLandShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#58401c" flood-opacity=".12"/>
-            </filter>
           </defs>
-          <rect width="1000" height="620" fill="url(#kimikeaMapSea)"/>
-          <path d="M78 166 C168 96 304 96 402 142 C510 193 608 148 720 104 C808 70 912 102 954 164 C996 226 948 302 856 318 C732 340 676 404 586 448 C474 502 356 490 262 452 C158 410 78 344 56 262 C47 226 46 196 78 166Z" fill="url(#kimikeaMapLand)" filter="url(#kimikeaMapLandShadow)" opacity=".96"/>
-          <path d="M176 356 C254 302 360 286 448 304 C546 324 622 292 720 244 C788 210 856 224 908 260 C832 315 760 338 680 324 C590 308 520 360 424 384 C326 410 236 400 176 356Z" fill="#f8efdD" stroke="#d7c39b" stroke-width="2" opacity=".98"/>
-          <path d="M310 348 C392 315 500 316 584 300 C660 284 734 260 832 278 C764 322 694 362 604 374 C502 388 404 380 310 348Z" fill="#efe2c9" stroke="#bf9b53" stroke-width="3" opacity=".98"/>
-          <path d="M160 246 C238 220 318 244 374 286" fill="none" stroke="#d8c49d" stroke-width="2" opacity=".7"/>
-          <path d="M632 176 C716 146 814 152 878 196" fill="none" stroke="#d8c49d" stroke-width="2" opacity=".7"/>
-          <circle cx="750" cy="430" r="86" fill="rgba(255,255,255,.28)"/>
-          <circle cx="196" cy="150" r="64" fill="rgba(255,255,255,.22)"/>
+          <rect width="100%" height="100%" fill="url(#kimikeaMapSea)"/>
+          <circle cx="830" cy="402" r="94" fill="rgba(255,255,255,.24)"/>
+          <circle cx="174" cy="112" r="72" fill="rgba(255,255,255,.2)"/>
+          <path class="pref-land" d="${escapeHtml(mapSvg.land)}" fill="url(#kimikeaMapLand)"/>
+          <path class="pref-highlight" d="${escapeHtml(mapSvg.highlight)}"/>
+          <path class="pref-coast" d="${escapeHtml(mapSvg.coast)}"/>
         </svg>
         <span class="kimikea-pref-label">${escapeHtml(prefecture)}</span>
       `;
@@ -6634,17 +6654,17 @@
       }
       const map = state.kimikeaMap;
       if (map.loading || !map.loaded) {
-        return `<article class="kimikea-map-app"><div class="kimikea-map-loading">Kimikea MAPを読み込み中…</div>${renderKimikeaMapDebug()}</article>`;
+        return '<article class="kimikea-map-app"><div class="kimikea-map-loading">Kimikea MAPを読み込み中…</div></article>';
       }
       if (map.error) {
-        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(map.error)}</div>${renderKimikeaMapDebug()}</article>`;
+        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(map.error)}</div></article>`;
       }
       if (!map.entries.length) {
         const rawCount = Number(map.debug?.rawCount || 0);
         const emptyMessage = rawCount > 0
           ? 'データは取得できましたが表示条件に合いませんでした。'
           : '公開中の加盟店・コーディネーターはまだ登録されていません。';
-        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(emptyMessage)}</div>${renderKimikeaMapDebug()}</article>`;
+        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(emptyMessage)}</div></article>`;
       }
       ensureKimikeaMapSelection();
       const types = map.types.length ? map.types : ['加盟店', 'コーディネーター'];
@@ -6687,29 +6707,7 @@
             <p>加盟店・エクステコーディネーターを募集しています。<br>一緒にKimikeaを全国へ広げませんか？</p>
             <button type="button" class="network-line-cta" onclick="openNpoLine()">加盟店について相談する</button>
           </section>
-          ${renderKimikeaMapDebug()}
         </article>
-      `;
-    }
-
-    function renderKimikeaMapDebug() {
-      const debug = state.kimikeaMap.debug || {};
-      const rowLines = Array.isArray(debug.rows)
-        ? debug.rows.slice(0, 12).map((row, index) => {
-          const label = row.rowNumber ? `ROW ${row.rowNumber}` : `ROW ${index + 1}`;
-          const status = row.included ? 'included' : `excluded / reason: ${row.reason || 'unknown'}`;
-          const name = row.salonName ? ` / ${row.salonName}` : '';
-          return `${label}: ${status}${name}`;
-        }).join('\n')
-        : '';
-      return `
-        <pre class="kimikea-map-debug">MAP DEBUG
-API: ${escapeHtml(debug.apiUrl || `${ORDER_API_URL}?api=getPublicMapEntries`)}
-HTTP: ${escapeHtml(debug.http || 'not requested')}
-rawCount: ${escapeHtml(String(debug.rawCount ?? ''))}
-entriesCount: ${escapeHtml(String(debug.entriesCount ?? state.kimikeaMap.entries.length))}
-firstSalon: ${escapeHtml(debug.firstSalon || '')}
-error: ${escapeHtml(debug.error || 'none')}${rowLines ? `\n${escapeHtml(rowLines)}` : ''}</pre>
       `;
     }
 
@@ -6733,6 +6731,21 @@ error: ${escapeHtml(debug.error || 'none')}${rowLines ? `\n${escapeHtml(rowLines
         : [entry.address || [entry.prefecture, entry.city].filter(Boolean).join(' ')].filter(Boolean).join('');
     }
 
+    function formatKimikeaMapAddress(address) {
+      const text = normalizeKimikeaMapText(address);
+      if (!text) return [];
+      const postalMatch = text.match(/^〒?(\d{3}-?\d{4})\s*/);
+      if (!postalMatch) return [text];
+      const postal = postalMatch[1].replace(/^(\d{3})(\d{4})$/, '$1-$2');
+      const rest = text.slice(postalMatch[0].length).trim();
+      return rest ? [`〒${postal}`, rest] : [`〒${postal}`];
+    }
+
+    function phoneHref(phone) {
+      const number = String(phone || '').replace(/[^\d+]/g, '');
+      return number ? `tel:${number}` : '';
+    }
+
     function mapEntryGoogleMapUrl(entry) {
       const query = entry.address || [entry.prefecture, entry.city, entry.salonName || entry.staffName].filter(Boolean).join(' ');
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -6742,6 +6755,8 @@ error: ${escapeHtml(debug.error || 'none')}${rowLines ? `\n${escapeHtml(rowLines
       const isSelected = String(entry.mapId || '') === String(state.kimikeaMap.selectedMapId || '');
       const isCoordinator = entry.type === 'コーディネーター';
       const styles = isCoordinator ? [] : (state.kimikeaMap.stylesByShopId[entry.shopId] || []);
+      const addressLines = isCoordinator ? [mapEntryAreaText(entry)].filter(Boolean) : formatKimikeaMapAddress(entry.address || mapEntryAreaText(entry));
+      const phoneUrl = phoneHref(entry.phone);
       if (!isCoordinator && entry.shopId && !state.kimikeaMap.stylesByShopId[entry.shopId] && !state.kimikeaMap.stylesLoading[entry.shopId]) {
         window.setTimeout(() => loadKimikeaMapStyles(entry.shopId), 0);
       }
@@ -6752,7 +6767,10 @@ error: ${escapeHtml(debug.error || 'none')}${rowLines ? `\n${escapeHtml(rowLines
           </div>
           <div>
             <h2>${escapeHtml(mapEntryDisplayName(entry))}</h2>
-            <p class="kimikea-map-meta">${escapeHtml(mapEntryAreaText(entry))}${entry.phone && !isCoordinator ? `<br>${escapeHtml(entry.phone)}` : ''}</p>
+            <p class="kimikea-map-meta">
+              ${addressLines.map((line) => escapeHtml(line)).join('<br>')}
+              ${entry.phone && !isCoordinator ? `<br><a class="kimikea-map-phone-link" href="${escapeHtml(phoneUrl)}" onclick="event.stopPropagation()">TEL ${escapeHtml(entry.phone)}</a>` : ''}
+            </p>
             ${entry.staffName && !isCoordinator ? `<p class="kimikea-map-meta">担当：${escapeHtml(entry.staffName)}</p>` : ''}
             <p class="kimikea-map-description">${escapeHtml(entry.description || '')}</p>
           </div>
