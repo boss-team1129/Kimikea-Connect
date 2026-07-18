@@ -1850,16 +1850,17 @@
     }
     .kimikea-map-carousel {
       display: flex;
-      gap: 12px;
-      margin: -26px -14px 0;
-      padding: 30px 14px 96px;
+      gap: 14px;
+      margin: -24px -14px 0;
+      padding: 32px 8% 104px;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
+      scroll-padding-inline: 8%;
       scrollbar-width: none;
     }
     .kimikea-map-carousel::-webkit-scrollbar { display: none; }
     .kimikea-map-card {
-      flex: 0 0 min(84vw, 390px);
+      flex: 0 0 min(80%, 390px);
       scroll-snap-align: center;
       display: grid;
       gap: 12px;
@@ -1868,9 +1869,9 @@
       border-radius: 28px;
       background: rgba(255,255,255,.82);
       box-shadow: 0 22px 60px rgba(45, 37, 24, .15);
-      opacity: .72;
-      transform: scale(.94);
-      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      opacity: .55;
+      transform: scale(.92);
+      transition: opacity 260ms ease, transform 260ms ease, box-shadow 260ms ease;
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
       cursor: pointer;
@@ -1881,6 +1882,13 @@
       opacity: 1;
       transform: scale(1);
       box-shadow: 0 28px 72px rgba(45, 37, 24, .2);
+    }
+    .kimikea-map-carousel.is-single {
+      justify-content: center;
+      padding-inline: 0;
+    }
+    .kimikea-map-carousel.is-single .kimikea-map-card {
+      flex-basis: min(88vw, 390px);
     }
     .kimikea-map-card.is-coordinator {
       background: linear-gradient(145deg, rgba(255,255,255,.88), rgba(232, 246, 255, .72));
@@ -6621,7 +6629,7 @@
 
     function renderKimikeaMapCarousel(entries) {
       return `
-        <section id="kimikeaMapCarousel" class="kimikea-map-carousel" aria-label="加盟店・コーディネーター一覧" onscroll="handleKimikeaMapCarouselScroll()">
+        <section id="kimikeaMapCarousel" class="kimikea-map-carousel${entries.length <= 1 ? ' is-single' : ''}" aria-label="加盟店・コーディネーター一覧" onscroll="handleKimikeaMapCarouselScroll()">
           ${entries.map((entry) => renderKimikeaMapCard(entry)).join('')}
         </section>
       `;
@@ -6654,6 +6662,17 @@
       return number ? `tel:${number}` : '';
     }
 
+    function formatKimikeaPhone(phone) {
+      const digits = String(phone || '').normalize('NFKC').replace(/[^\d]/g, '');
+      if (!digits) return '';
+      if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+      if (digits.length === 10) {
+        if (digits.startsWith('03') || digits.startsWith('06')) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+      }
+      return String(phone || '').trim();
+    }
+
     function mapEntryGoogleMapUrl(entry) {
       const query = entry.address || [entry.prefecture, entry.city, entry.salonName || entry.staffName].filter(Boolean).join(' ');
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -6665,6 +6684,7 @@
       const styles = isCoordinator ? [] : (state.kimikeaMap.stylesByShopId[entry.shopId] || []);
       const addressLines = isCoordinator ? [mapEntryAreaText(entry)].filter(Boolean) : formatKimikeaMapAddress(entry.address || mapEntryAreaText(entry));
       const phoneUrl = phoneHref(entry.phone);
+      const phoneLabel = formatKimikeaPhone(entry.phone);
       if (!isCoordinator && entry.shopId && !state.kimikeaMap.stylesByShopId[entry.shopId] && !state.kimikeaMap.stylesLoading[entry.shopId]) {
         window.setTimeout(() => loadKimikeaMapStyles(entry.shopId), 0);
       }
@@ -6677,7 +6697,7 @@
             <h2>${escapeHtml(mapEntryDisplayName(entry))}</h2>
             <p class="kimikea-map-meta">
               ${addressLines.map((line) => escapeHtml(line)).join('<br>')}
-              ${entry.phone && !isCoordinator ? `<br><a class="kimikea-map-phone-link" href="${escapeHtml(phoneUrl)}" onclick="event.stopPropagation()">TEL ${escapeHtml(entry.phone)}</a>` : ''}
+              ${phoneLabel && !isCoordinator ? `<br><a class="kimikea-map-phone-link" href="${escapeHtml(phoneUrl)}" onclick="event.stopPropagation()">TEL ${escapeHtml(phoneLabel)}</a>` : ''}
               ${entry.coordinateWarning ? `<br>${escapeHtml(entry.coordinateWarning)}` : ''}
             </p>
             ${entry.staffName && !isCoordinator ? `<p class="kimikea-map-meta">担当：${escapeHtml(entry.staffName)}</p>` : ''}

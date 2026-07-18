@@ -1669,6 +1669,7 @@ function setupMapEntries_(ss) {
     ensureMapEntryHeaders_(sheet);
   }
   applyMapEntryDropdowns_(sheet);
+  applyPhoneTextFormat_(sheet, KCO_MAP_HEADERS);
   applyHeaderStyle_(sheet, KCO_MAP_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_MAP_HEADERS.length);
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
@@ -1682,6 +1683,7 @@ function syncFranchiseMapEntries_(ss) {
   } else {
     ensureMapEntryHeaders_(sheet);
   }
+  applyPhoneTextFormat_(sheet, KCO_MAP_HEADERS);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map((header) => String(header || '').trim());
   const index = createIndex_(headers);
@@ -1741,7 +1743,7 @@ function syncFranchiseMapEntries_(ss) {
     setBasicValue('city', addressParts.city);
     setBasicValue('salonName', franchise.salonName || franchise.franchiseName || '');
     setBasicValue('address', franchise.address || franchise.fullAddress || '');
-    setBasicValue('phone', franchise.phone || '');
+    setBasicValue('phone', normalizePhoneText_(franchise.phone || ''));
     setBasicValue('status', isNew ? '公開' : (String(row[index.status] || '').trim() || '公開'), { onlyIfBlank: !isNew });
     setBasicValue('createdAt', franchise.createdAt || now, { onlyIfBlank: true });
     setBasicValue('updatedAt', now);
@@ -1787,6 +1789,7 @@ function syncFranchiseMapEntries_(ss) {
   if (newRows.length > 0) {
     sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
   }
+  applyPhoneTextFormat_(sheet, headers);
 
   return {
     franchiseCount: franchises.length,
@@ -1807,6 +1810,7 @@ function setupFranchiseMaster_(ss) {
   } else {
     ensureFranchiseMasterColumns_(sheet);
   }
+  applyPhoneTextFormat_(sheet, KCO_FRANCHISE_HEADERS);
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_FRANCHISE_HEADERS.length);
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
@@ -3543,6 +3547,20 @@ function normalizePhone_(value) {
   return String(value === null || value === undefined ? '' : value)
     .normalize('NFKC')
     .replace(/[^\d]/g, '');
+}
+
+function normalizePhoneText_(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .normalize('NFKC')
+    .trim();
+}
+
+function applyPhoneTextFormat_(sheet, headers) {
+  if (!sheet || !Array.isArray(headers)) return;
+  const phoneIndex = headers.findIndex((header) => ['phone', '電話', '電話番号'].indexOf(String(header || '').trim()) !== -1);
+  if (phoneIndex === -1) return;
+  const rows = Math.max(sheet.getMaxRows(), 1000);
+  sheet.getRange(1, phoneIndex + 1, rows, 1).setNumberFormat('@');
 }
 
 function normalizeLoginPassword_(value) {
