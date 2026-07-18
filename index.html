@@ -4576,6 +4576,8 @@
         selectedMapId: '',
         stylesByShopId: {},
         stylesLoading: {},
+        stylesLoadedByShopId: {},
+        stylesErrorByShopId: {},
       },
     };
     let manifestObjectUrl = '';
@@ -6364,6 +6366,7 @@
     let kimikeaMarkerLayer = null;
     let kimikeaMarkers = [];
     const kimikeaMarkerById = new Map();
+    const kimikeaMapStylePromises = new Map();
 
     function loadKimikeaMapEntries(force = false) {
       const map = state.kimikeaMap;
@@ -6414,6 +6417,10 @@
             types,
             activeType: types.includes(state.kimikeaMap.activeType) ? state.kimikeaMap.activeType : (types.includes('加盟店') ? '加盟店' : (types[0] || '加盟店')),
             activePrefecture: prefectures.includes(state.kimikeaMap.activePrefecture) ? state.kimikeaMap.activePrefecture : (prefectures.includes('静岡県') ? '静岡県' : (prefectures[0] || '静岡県')),
+            stylesByShopId: force ? {} : state.kimikeaMap.stylesByShopId,
+            stylesLoading: force ? {} : state.kimikeaMap.stylesLoading,
+            stylesLoadedByShopId: force ? {} : state.kimikeaMap.stylesLoadedByShopId,
+            stylesErrorByShopId: force ? {} : state.kimikeaMap.stylesErrorByShopId,
           };
           ensureKimikeaMapSelection();
           refreshCurrentPublicActions();
@@ -6789,11 +6796,12 @@
     function renderKimikeaMapCard(entry) {
       const isSelected = String(entry.mapId || '') === String(state.kimikeaMap.selectedMapId || '');
       const isCoordinator = entry.type === 'コーディネーター';
-      const styles = isCoordinator ? [] : (state.kimikeaMap.stylesByShopId[entry.shopId] || []);
+      const normalizedShopId = String(entry.shopId || '').trim();
+      const styles = isCoordinator ? [] : (state.kimikeaMap.stylesByShopId[normalizedShopId] || []);
       const addressLines = isCoordinator ? [mapEntryAreaText(entry)].filter(Boolean) : formatKimikeaMapAddress(entry.address || mapEntryAreaText(entry));
       const phoneUrl = phoneHref(entry.phone);
       const phoneLabel = formatKimikeaPhone(entry.phone);
-      if (!isCoordinator && entry.shopId && !state.kimikeaMap.stylesByShopId[entry.shopId] && !state.kimikeaMap.stylesLoading[entry.shopId]) {
+      if (!isCoordinator && normalizedShopId && !state.kimikeaMap.stylesLoadedByShopId[normalizedShopId] && !state.kimikeaMap.stylesLoading[normalizedShopId]) {
         window.setTimeout(() => loadKimikeaMapStyles(entry), 0);
       }
       return `
@@ -6824,9 +6832,13 @@
     }
 
     function renderKimikeaMapStyleStrip(entry, styles) {
-      const loading = Boolean(state.kimikeaMap.stylesLoading[entry.shopId]);
+      const normalizedShopId = String(entry.shopId || '').trim();
+      const loading = Boolean(state.kimikeaMap.stylesLoading[normalizedShopId]);
+      const loaded = Boolean(state.kimikeaMap.stylesLoadedByShopId[normalizedShopId]);
+      const error = state.kimikeaMap.stylesErrorByShopId[normalizedShopId] || '';
       const id = `kimikeaMapStyles-${String(entry.shopId || entry.mapId || '').replace(/[^a-zA-Z0-9_-]/g, '')}`;
-      if (loading) return `<div id="${escapeHtml(id)}" class="kimikea-map-styles"><p class="kimikea-map-meta">公開スタイルを読み込み中…</p></div>`;
+      if (loading || !loaded) return `<div id="${escapeHtml(id)}" class="kimikea-map-styles"><p class="kimikea-map-meta">公開スタイルを読み込み中…</p></div>`;
+      if (error) return `<div id="${escapeHtml(id)}" class="kimikea-map-styles"><p class="kimikea-map-meta">公開スタイルを読み込めませんでした。</p></div>`;
       if (!styles.length) return `<div id="${escapeHtml(id)}" class="kimikea-map-styles"><p class="kimikea-map-meta">公開スタイルはまだありません。</p></div>`;
       return `
         <div id="${escapeHtml(id)}" class="kimikea-map-styles">
@@ -6875,9 +6887,17 @@
         ? entryOrShopId
         : visibleKimikeaMapEntries().find((item) => normalizeKimikeaMapMatchKey(item.shopId) === normalizeKimikeaMapMatchKey(entryOrShopId));
       const normalizedShopId = String(entry?.shopId || entryOrShopId || '').trim();
-      if (!normalizedShopId || state.kimikeaMap.stylesLoading[normalizedShopId] || state.kimikeaMap.stylesByShopId[normalizedShopId]) return;
+      if (!normalizedShopId) return Promise.resolve([]);
+      if (state.kimikeaMap.stylesLoadedByShopId[normalizedShopId]) {
+        return Promise.resolve(state.kimikeaMap.stylesByShopId[normalizedShopId] || []);
+      }
+      if (state.kimikeaMap.stylesLoading[normalizedShopId]) {
+        return kimikeaMapStylePromises.get(normalizedShopId) || Promise.resolve(state.kimikeaMap.stylesByShopId[normalizedShopId] || []);
+      }
       state.kimikeaMap.stylesLoading[normalizedShopId] = true;
-      fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&t=${Date.now()}`)
+      state.kimikeaMap.stylesErrorByShopId[normalizedShopId] = '';
+      refreshKimikeaMapStyleStrip(normalizedShopId);
+      const promise = fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&t=${Date.now()}`)
         .then((response) => response.json())
         .then((data) => {
           const posts = data?.database?.stylePosts || data?.stylePosts || [];
@@ -6889,12 +6909,17 @@
             .filter((post) => kimikeaMapPostMatchesEntry(post, entry))
             .sort(compareKimikeaMapStyleNewest);
           state.kimikeaMap.stylesByShopId[normalizedShopId] = (exactMatches.length ? exactMatches : fallbackMatches).slice(0, 5);
+          state.kimikeaMap.stylesLoadedByShopId[normalizedShopId] = true;
+          return state.kimikeaMap.stylesByShopId[normalizedShopId];
         })
-        .catch(() => {
+        .catch((error) => {
           state.kimikeaMap.stylesByShopId[normalizedShopId] = [];
+          state.kimikeaMap.stylesErrorByShopId[normalizedShopId] = getErrorMessage(error) || 'load failed';
+          return [];
         })
         .finally(() => {
           state.kimikeaMap.stylesLoading[normalizedShopId] = false;
+          kimikeaMapStylePromises.delete(normalizedShopId);
           if (currentPublicPageKey === 'map') {
             refreshKimikeaMapStyleStrip(normalizedShopId);
             requestAnimationFrame(() => {
@@ -6902,6 +6927,8 @@
             });
           }
         });
+      kimikeaMapStylePromises.set(normalizedShopId, promise);
+      return promise;
     }
 
     function selectKimikeaMapEntry(mapId, skipScroll = false) {
