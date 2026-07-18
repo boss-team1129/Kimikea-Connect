@@ -2000,6 +2000,19 @@
       text-align: center;
       box-shadow: 0 18px 48px rgba(63, 49, 28, .08);
     }
+    .kimikea-map-debug {
+      margin: 12px 0 0;
+      padding: 12px;
+      overflow-x: auto;
+      border: 1px solid rgba(180, 142, 62, .22);
+      border-radius: 16px;
+      background: rgba(255,255,255,.84);
+      color: #3d3324;
+      font-size: 11px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      box-shadow: 0 12px 30px rgba(63, 49, 28, .08);
+    }
     @media (min-width: 760px) {
       .kimikea-map-controls {
         grid-template-columns: minmax(320px, 420px) minmax(240px, 320px);
@@ -4490,6 +4503,7 @@
         loaded: false,
         loading: false,
         error: '',
+        debug: null,
         entries: [],
         prefectures: [],
         types: [],
@@ -6288,6 +6302,16 @@
       if (map.loaded && !force) return Promise.resolve(map);
       map.loading = true;
       map.error = '';
+      map.entries = [];
+      map.prefectures = [];
+      map.debug = {
+        apiUrl: `${ORDER_API_URL}?api=getPublicMapEntries`,
+        http: 'requesting',
+        rawCount: 0,
+        entriesCount: 0,
+        firstSalon: '',
+        error: 'none',
+      };
       refreshCurrentPublicActions();
       return callServer('getPublicMapEntries')
         .then((data) => {
@@ -6295,11 +6319,21 @@
           const entries = Array.isArray(data.entries) ? data.entries : [];
           const prefectures = Array.isArray(data.prefectures) ? data.prefectures : [];
           const types = Array.isArray(data.types) && data.types.length ? data.types : ['加盟店', 'コーディネーター'];
+          const debug = {
+            apiUrl: `${ORDER_API_URL}?api=getPublicMapEntries`,
+            http: 'JSONP 200',
+            rawCount: Number(data.debug?.rawRowCount || entries.length || 0),
+            entriesCount: entries.length,
+            firstSalon: entries[0]?.salonName || data.debug?.firstSalonName || '',
+            error: 'none',
+            server: data.debug || null,
+          };
           state.kimikeaMap = {
             ...state.kimikeaMap,
             loaded: true,
             loading: false,
             error: '',
+            debug,
             entries,
             prefectures,
             types,
@@ -6317,7 +6351,15 @@
             ...state.kimikeaMap,
             loaded: true,
             loading: false,
-            error: 'Kimikea MAPを読み込めませんでした。',
+            error: '加盟店情報を取得できませんでした',
+            debug: {
+              apiUrl: `${ORDER_API_URL}?api=getPublicMapEntries`,
+              http: 'failed',
+              rawCount: 0,
+              entriesCount: 0,
+              firstSalon: '',
+              error: getErrorMessage(error),
+            },
           };
           refreshCurrentPublicActions();
           return state.kimikeaMap;
@@ -6465,13 +6507,13 @@
       }
       const map = state.kimikeaMap;
       if (map.loading || !map.loaded) {
-        return '<article class="kimikea-map-app"><div class="kimikea-map-loading">Kimikea MAPを読み込み中…</div></article>';
+        return `<article class="kimikea-map-app"><div class="kimikea-map-loading">Kimikea MAPを読み込み中…</div>${renderKimikeaMapDebug()}</article>`;
       }
       if (map.error) {
-        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(map.error)}</div></article>`;
+        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">${escapeHtml(map.error)}</div>${renderKimikeaMapDebug()}</article>`;
       }
       if (!map.entries.length) {
-        return '<article class="kimikea-map-app"><div class="kimikea-map-empty">公開中の加盟店・コーディネーターはまだ登録されていません。</div></article>';
+        return `<article class="kimikea-map-app"><div class="kimikea-map-empty">公開中の加盟店・コーディネーターはまだ登録されていません。</div>${renderKimikeaMapDebug()}</article>`;
       }
       ensureKimikeaMapSelection();
       const types = map.types.length ? map.types : ['加盟店', 'コーディネーター'];
@@ -6514,7 +6556,21 @@
             <p>加盟店・エクステコーディネーターを募集しています。<br>一緒にKimikeaを全国へ広げませんか？</p>
             <button type="button" class="network-line-cta" onclick="openNpoLine()">加盟店について相談する</button>
           </section>
+          ${renderKimikeaMapDebug()}
         </article>
+      `;
+    }
+
+    function renderKimikeaMapDebug() {
+      const debug = state.kimikeaMap.debug || {};
+      return `
+        <pre class="kimikea-map-debug">MAP DEBUG
+API: ${escapeHtml(debug.apiUrl || `${ORDER_API_URL}?api=getPublicMapEntries`)}
+HTTP: ${escapeHtml(debug.http || 'not requested')}
+rawCount: ${escapeHtml(String(debug.rawCount ?? ''))}
+entriesCount: ${escapeHtml(String(debug.entriesCount ?? state.kimikeaMap.entries.length))}
+firstSalon: ${escapeHtml(debug.firstSalon || '')}
+error: ${escapeHtml(debug.error || 'none')}</pre>
       `;
     }
 
@@ -7021,6 +7077,7 @@
         ? page.renderActions()
         : '';
       if (pageKey === 'map') {
+        if (!state.kimikeaMap.loading) loadKimikeaMapEntries(true);
         window.requestAnimationFrame(initializeNetworkMap);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
