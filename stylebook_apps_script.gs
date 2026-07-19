@@ -95,6 +95,12 @@ function doPost(e) {
     const payload = JSON.parse((e.postData && e.postData.contents) || '{}');
     const userId = payload.userId || 'user-member';
     const action = payload.action || '';
+    logStylebookDebug_('doPost received', {
+      action,
+      userId,
+      hasPost: Boolean(payload.post),
+      postId: payload.post && payload.post.id,
+    });
     if (action === 'savePost') return json_(savePost_(payload.post, userId));
     if (action === 'publishPost') return json_(publishPost_(payload.postId, userId));
     if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || ''));
@@ -464,20 +470,45 @@ function savePost_(post, userId) {
     isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
   };
   const sheetStart = Date.now();
-  upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
+  const writeResult = upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
+  SpreadsheetApp.flush();
+  const verified = findRowObject_(sheet, 'id', id);
+  if (!verified || !verified.object || String(verified.object.id || '').trim() !== String(id).trim()) {
+    throw new Error(`style_postsへの保存確認に失敗しました。postId=${id}`);
+  }
   const sheetMs = Date.now() - sheetStart;
-  const normalizedPost = normalizePost_(row);
+  const normalizedPost = normalizePost_(verified.object);
   logStylebookDebug_('savePost timing', {
     id,
     isEdit: Boolean(existing),
     status,
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: sheet.getName(),
+    writeAction: writeResult.action,
+    rowNumber: writeResult.rowNumber,
+    verifiedRowNumber: verified.row,
+    createdAt: normalizedPost.createdAt,
+    createdByUserId: normalizedPost.createdByUserId,
     setupMs,
     imageMs,
     additionalImageMs,
     sheetMs,
     totalMs: Date.now() - startedAt,
   });
-  return { ok: true, id, post: normalizedPost };
+  return {
+    ok: true,
+    success: true,
+    written: true,
+    id,
+    post: normalizedPost,
+    savedPostId: id,
+    createdAt: normalizedPost.createdAt,
+    createdByUserId: normalizedPost.createdByUserId,
+    spreadsheetId: ss.getId(),
+    sheetName: sheet.getName(),
+    rowNumber: verified.row,
+  };
 }
 
 function publishPost_(postId, userId) {
@@ -1082,8 +1113,10 @@ function findRowObject_(sheet, key, value) {
   if (values.length < 2) return null;
   const headers = values[0].map(String);
   const keyIndex = headers.indexOf(key);
+  if (keyIndex < 0) throw new Error(`${sheet.getName()}に${key}列が見つかりません。`);
+  const expected = String(value || '').trim();
   for (let row = 1; row < values.length; row += 1) {
-    if (values[row][keyIndex] === value) {
+    if (String(values[row][keyIndex] || '').trim() === expected) {
       const object = {};
       headers.forEach((header, index) => {
         object[header] = values[row][index];
@@ -1104,8 +1137,10 @@ function upsertObject_(sheet, headers, object, key) {
   });
   if (found) {
     sheet.getRange(found.row, 1, 1, headers.length).setValues([rowValues]);
+    return { action: 'update', rowNumber: found.row };
   } else {
     sheet.appendRow(rowValues);
+    return { action: 'append', rowNumber: sheet.getLastRow() };
   }
 }
 

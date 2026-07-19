@@ -12,7 +12,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260719-correct-stylebook-api-url-1';
+const STYLEBOOK_ASSET_VERSION = '20260719-post-save-verify-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -2073,8 +2073,11 @@ async function submitPost(event) {
     ? '画像を保存しています...'
     : '投稿内容を登録しています...');
   try {
-    if (state.backendMode === 'remote') {
+    if (hasRemoteApi()) {
       const result = await apiRequest('savePost', { post });
+      if (!result?.ok || !result?.post?.id || !result?.written) {
+        throw new Error(result?.message || '投稿データを本番管理表へ保存できませんでした。');
+      }
       upsertLocalPost(result.post || post);
       clearPostForm();
       setPostSubmitting(false);
