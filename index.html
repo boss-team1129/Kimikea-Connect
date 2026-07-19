@@ -6495,6 +6495,11 @@
       return clean;
     }
 
+    function kimikeaMapDefaultShopImageUrl(shopId) {
+      const normalizedShopId = normalizeKimikeaMapText(shopId).replace(/[^a-zA-Z0-9_-]/g, '');
+      return normalizedShopId ? `${KIMIKEA_MAP_SHOP_IMAGE_BASE_PATH}${normalizedShopId}.jpg` : '';
+    }
+
     function getKimikeaMapValue(row, keys) {
       if (!row || typeof row !== 'object') return '';
       for (const key of keys) {
@@ -6576,7 +6581,7 @@
           coordinateStatus: coordinates.status,
           coordinateWarning: coordinates.warning,
           phone: normalizeKimikeaMapText(getKimikeaMapValue(row, ['phone', '電話番号', '電話'])),
-          imageUrl: kimikeaMapImageUrl(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])),
+          imageUrl: kimikeaMapImageUrl(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])) || kimikeaMapDefaultShopImageUrl(shopId || mapId),
           description: normalizeKimikeaMapText(getKimikeaMapValue(row, ['description', '紹介文', '説明'])),
           linkLabel1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkLabel1', 'link_label_1', 'ボタン名1', 'リンク名1'])),
           linkUrl1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl1', 'link_url_1', 'URL1', 'リンクURL1'])),

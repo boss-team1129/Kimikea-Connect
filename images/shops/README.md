@@ -1,13 +1,17 @@
 # Kimikea MAP shop images
 
-Store MAP card images here.
+Store Kimikea MAP card images here.
 
-Example:
+Default file naming uses `shopId`.
 
-- `team-hair.jpg`
-- `hair-stage-ocean.jpg`
-- `extension-land-yoshida.jpg`
+Examples:
 
-Set the matching `imageUrl` value in the `加盟店マップ` sheet, for example:
+- `shop-k-0.jpg`
+- `shop-k-1.jpg`
+- `shop-k-4.jpg`
+- `shop-k-10.jpg`
 
-`images/shops/team-hair.jpg`
+If the `加盟店マップ` sheet has an `imageUrl` value, that URL is used first.
+If `imageUrl` is blank, the app automatically tries:
+
+`images/shops/{shopId}.jpg`
