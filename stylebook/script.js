@@ -527,7 +527,7 @@ async function loadRemoteDb() {
       url: STYLEBOOK_API_URL,
       shopId: scopedShopId,
       posts: state.db.stylePosts?.length || 0,
-      salons: Array.from(new Set((state.db.stylePosts || []).map(post => styleSalonName(post)).filter(Boolean))).slice(0, 20),
+      salons: Array.from(new Set((state.db.stylePosts || []).map(post => displaySalonName(post)).filter(Boolean))).slice(0, 20),
     });
     return;
   }
@@ -540,8 +540,8 @@ async function loadRemoteDb() {
     url: STYLEBOOK_API_URL,
     posts: state.db.stylePosts?.length || 0,
     validPublishedPosts: validPublishedPosts.length,
-    salons: Array.from(new Set(validPublishedPosts.map(post => styleSalonName(post)).filter(Boolean))).slice(0, 20),
-    staff: Array.from(new Set(validPublishedPosts.map(post => styleStaffName(post)).filter(Boolean))).slice(0, 20),
+    salons: Array.from(new Set(validPublishedPosts.map(post => displaySalonName(post)).filter(Boolean))).slice(0, 20),
+    staff: Array.from(new Set(validPublishedPosts.map(post => displayStaffName(post)).filter(Boolean))).slice(0, 20),
     colorsFromApi: state.db.extensionColors?.length || 0,
     activeColorsFromApi: (state.db.extensionColors || []).filter(color => color.isActive).length,
     types: state.db.styleTypes?.length || 0,
