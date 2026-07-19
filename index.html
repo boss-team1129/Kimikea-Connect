@@ -4206,6 +4206,7 @@
     .history-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 
     .message { margin: 12px 0 0; color: var(--success); font-weight: 750; overflow-wrap: anywhere; }
+    .message .button { margin-top: 10px; }
     .error { color: var(--danger); }
     .form-note {
       margin: 12px 0 0;
@@ -4430,7 +4431,7 @@
         加盟店・コーディネーターとしてご登録いただいた方には、IDとパスワードをお渡ししています。<br>
         ご登録をご希望の方は、<a href="#" onclick="openRegistrationGuide(); return false;">お問い合わせください</a>。
       </div>
-      <p id="loginMessage" class="message error" aria-live="polite"></p>
+      <div id="loginMessage" class="message error" aria-live="polite"></div>
     </form>
   </section>
 
@@ -4773,6 +4774,29 @@
       notifyKimikeaNavigationState();
     }
 
+    function isAuthenticatedSessionActive() {
+      return Boolean(state.sessionToken && !String(state.sessionToken).startsWith('public-'));
+    }
+
+    function isSessionExpiredError(error) {
+      const message = getErrorMessage(error);
+      return message.includes('ログインの有効期限')
+        || message.includes('再度ログイン')
+        || message.includes('ログインが必要')
+        || message.includes('session')
+        || message.includes('Session');
+    }
+
+    function setLoginActionMessage(message, isError = true) {
+      const element = document.getElementById('loginMessage');
+      if (!element) return;
+      element.classList.toggle('error', Boolean(isError));
+      element.innerHTML = `
+        <span>${escapeHtml(message || 'ログインが必要です。再度ログインしてください。')}</span>
+        <button type="button" class="button button-gold button-small" onclick="showOrderLogin()">ログインへ</button>
+      `;
+    }
+
     function showPasswordSetup() {
       document.getElementById('loginView').hidden = true;
       document.getElementById('portalView').hidden = true;
@@ -4785,8 +4809,9 @@
     function handleLogout() {
       const token = state.sessionToken;
       clearSession();
-      showDashboard();
       if (canUseOrderApi() && token) callServer('logoutFranchise', token).catch(() => {});
+      showOrderLogin();
+      setLoginActionMessage('ログアウトしました。再度ログインしてください。', false);
     }
 
     function clearSession() {
@@ -4815,8 +4840,8 @@
     function handleSessionError(error) {
       const message = getErrorMessage(error);
       clearSession();
-      showLogin();
-      setMessage('loginMessage', message, true);
+      showOrderLogin();
+      setLoginActionMessage(message || 'ログインの有効期限が切れました。再度ログインしてください。', true);
     }
 
     function getErrorMessage(error) {
@@ -5051,6 +5076,10 @@
           console.warn('Kimikea Connect portal data error:', getErrorMessage(error));
           if (getErrorMessage(error).includes('新しいパスワード設定')) {
             showPasswordSetup();
+            return;
+          }
+          if (isSessionExpiredError(error)) {
+            handleSessionError(error);
             return;
           }
           showDashboard();
@@ -5626,8 +5655,9 @@
     }
 
     function openOrderPage() {
-      if (!state.orderUnlocked || !state.sessionToken || String(state.sessionToken).startsWith('public-')) {
+      if (!state.orderUnlocked || !isAuthenticatedSessionActive()) {
         showOrderLogin();
+        setLoginActionMessage('注文機能を利用するにはログインしてください。', false);
         return;
       }
       rememberKimikeaRoute('order');
@@ -8038,6 +8068,11 @@
     }
 
     function openStylebookMine() {
+      if (!isAuthenticatedSessionActive()) {
+        showOrderLogin();
+        setLoginActionMessage('自分の投稿を管理するにはログインしてください。', false);
+        return;
+      }
       window.location.href = './stylebook/?view=mine';
     }
 
@@ -8174,6 +8209,10 @@
         })
         .catch((error) => {
           console.warn('MyPage stylebook data error:', getErrorMessage(error));
+          if (isSessionExpiredError(error)) {
+            handleSessionError(error);
+            return state.myPageStylebook;
+          }
           state.myPageStylebook = {
             ...state.myPageStylebook,
             loaded: true,
@@ -8337,6 +8376,10 @@
         })
         .catch((error) => {
           state.myPageLoading = false;
+          if (isSessionExpiredError(error)) {
+            handleSessionError(error);
+            return;
+          }
           renderMyPageTab(state.myPageActiveTab || 'profile');
           if (message) {
             message.textContent = getErrorMessage(error);
@@ -8346,10 +8389,9 @@
     }
 
     function openMyPage() {
-      const isLoggedIn = Boolean(state.sessionToken && !String(state.sessionToken).startsWith('public-'));
-      if (!isLoggedIn) {
+      if (!isAuthenticatedSessionActive()) {
         showOrderLogin();
-        setMessage('loginMessage', 'マイページは加盟店・コーディネーター専用です。ご登録時に発行されたIDとパスワードでログインしてください。', false);
+        setLoginActionMessage('マイページは加盟店・コーディネーター専用です。ログインしてください。', false);
         return;
       }
       rememberKimikeaRoute('public', 'mypage');
@@ -8751,6 +8793,10 @@
     }
 
     function submitOrder() {
+      if (!isAuthenticatedSessionActive()) {
+        handleSessionError(new Error('ログインの有効期限が切れました。再度ログインしてください。'));
+        return;
+      }
       if (state.cart.length === 0) {
         setMessage('orderMessage', 'カートに商品を追加してください。', true);
         return;
