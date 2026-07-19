@@ -394,7 +394,7 @@ function setupMasterColumns() {
       return { spreadsheetName: ss.getName() };
     });
 
-    runSetupStep_('product master', () => setupProductMaster_(ss));
+    summary.productMaster = runOptionalSetupStep_('product master', () => setupProductMaster_(ss));
     summary.franchiseMaster = runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
     runSetupStep_('franchise identity backfill', () => backfillFranchiseIdentityColumns_(ss));
     runSetupStep_('user master', () => setupUserMaster_(ss));
@@ -425,6 +425,21 @@ function setupMasterColumns() {
     });
     throw error;
   }
+}
+
+function setupFranchiseMasterColumnsOnly() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(KCO_CONFIG.FRANCHISE_MASTER);
+  if (!sheet) {
+    throw new Error(`対象シート「${KCO_CONFIG.FRANCHISE_MASTER}」が見つかりません。固定gidではなくシート名を確認してください。`);
+  }
+  const result = ensureFranchiseBusinessProfileColumns_(sheet);
+  logSetupStep_('franchise master columns only completed', {
+    ...result,
+    durationMs: Date.now() - startedAt,
+  });
+  return result;
 }
 
 function setupTriggers() {
@@ -504,6 +519,32 @@ function runSetupStep_(label, callback) {
       stack: error && error.stack ? error.stack : '',
     });
     throw error;
+  }
+}
+
+function runOptionalSetupStep_(label, callback) {
+  const startedAt = Date.now();
+  logSetupStep_(`${label} start`, { optional: true });
+  try {
+    const result = callback();
+    logSetupStep_(`${label} completed`, {
+      durationMs: Date.now() - startedAt,
+      optional: true,
+      result: result || '',
+    });
+    return { ok: true, result: result || {} };
+  } catch (error) {
+    logSetupStep_(`${label} skipped after failure`, {
+      durationMs: Date.now() - startedAt,
+      optional: true,
+      message: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? error.stack : '',
+    });
+    return {
+      ok: false,
+      skipped: true,
+      message: error && error.message ? error.message : String(error),
+    };
   }
 }
 
@@ -2411,6 +2452,64 @@ function ensureFranchiseMasterColumns_(sheet) {
   return result;
 }
 
+function ensureFranchiseBusinessProfileColumns_(sheet) {
+  if (!sheet) throw new Error('加盟店マスタ シートが見つかりません。');
+  if (sheet.getName() !== KCO_CONFIG.FRANCHISE_MASTER) {
+    throw new Error(`加盟店マスタの対象シートが一致しません。expected=${KCO_CONFIG.FRANCHISE_MASTER}, actual=${sheet.getName()}`);
+  }
+  const ss = sheet.getParent();
+  const beforeLastColumn = Math.max(sheet.getLastColumn(), 1);
+  const rawHeaders = sheet
+    .getRange(1, 1, 1, beforeLastColumn)
+    .getValues()[0]
+    .map((value) => String(value || '').trim());
+  const existingHeaders = rawHeaders.map(normalizeMasterHeader_);
+  const requiredColumns = [
+    { header: 'googlePlaceId', aliases: ['googlePlaceId', 'Google Place ID', 'GooglePlaceID', 'placeId', 'Place ID', 'プレイスID'] },
+    { header: 'GoogleマップURL', aliases: ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl'] },
+    { header: 'ホームページ', aliases: ['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL'] },
+    { header: 'Instagram', aliases: ['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム'] },
+    { header: 'LINE', aliases: ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE'] },
+    { header: 'Hot Pepper', aliases: ['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'] },
+    { header: '予約URL', aliases: ['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト'] },
+    { header: '表示順', aliases: ['sortOrder', '表示順'] },
+  ];
+  const addedHeaders = [];
+  const existingMatches = {};
+
+  requiredColumns.forEach((column) => {
+    const candidates = column.aliases.map(normalizeMasterHeader_);
+    const matchedIndex = existingHeaders.findIndex((existingHeader) => candidates.indexOf(existingHeader) !== -1);
+    if (matchedIndex !== -1) {
+      existingMatches[column.header] = rawHeaders[matchedIndex];
+      return;
+    }
+    addedHeaders.push(column.header);
+    existingHeaders.push(normalizeMasterHeader_(column.header));
+  });
+
+  if (addedHeaders.length > 0) {
+    sheet.insertColumnsAfter(beforeLastColumn, addedHeaders.length);
+    sheet
+      .getRange(1, beforeLastColumn + 1, 1, addedHeaders.length)
+      .setValues([addedHeaders]);
+  }
+
+  const afterLastColumn = sheet.getLastColumn();
+  const result = {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: sheet.getName(),
+    addedHeaders,
+    existingMatches,
+    beforeLastColumn,
+    afterLastColumn,
+    rawHeaders,
+  };
+  logSetupStep_('franchise business profile columns checked', result);
+  return result;
+}
+
 function migrateProductionFranchiseRows_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return;
@@ -4147,10 +4246,15 @@ function getSheet_(name) {
 }
 
 function getOrCreateSheet_(ss, name) {
-  const existingSheet = ss.getSheetByName(name);
+  const sheetName = String(name || '').trim();
+  if (!sheetName) throw new Error('シート名が空です。設定値を確認してください。');
+  if (/^\d+$/.test(sheetName)) {
+    throw new Error(`シート名ではなくsheetId/gidの可能性があります: ${sheetName}。固定IDではなくシート名を指定してください。`);
+  }
+  const existingSheet = ss.getSheetByName(sheetName);
   if (existingSheet) return existingSheet;
-  logSetupStep_('create sheet', { sheetName: name });
-  return ss.insertSheet(name);
+  logSetupStep_('create sheet', { sheetName });
+  return ss.insertSheet(sheetName);
 }
 
 function createIndex_(headers) {
