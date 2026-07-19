@@ -802,6 +802,38 @@ function isDeletedStylePost(post) {
   );
 }
 
+function stylePostId(post) {
+  return String(post?.id || post?.styleId || post?.postId || '').trim();
+}
+
+function hasDisplayableStyleImage(post) {
+  return Boolean(String(
+    post?.imageUrl
+    || post?.photoUrl
+    || post?.photo
+    || post?.image
+    || post?.imageUrls
+    || post?.imageFileId
+    || post?.imageFileID
+    || post?.fileId
+    || ''
+  ).trim());
+}
+
+function isValidPublishedPost(post) {
+  const status = String(post?.status || '').normalize('NFKC').trim().toLowerCase();
+  if (status !== 'published') return false;
+  if (isDeletedStylePost(post)) return false;
+  if (post?.isPublished === false || String(post?.isPublished).normalize('NFKC').trim().toUpperCase() === 'FALSE') return false;
+  if (!stylePostId(post)) return false;
+  if (!hasDisplayableStyleImage(post)) return false;
+  return true;
+}
+
+function getValidPublishedPosts(posts = state.db?.stylePosts || []) {
+  return (Array.isArray(posts) ? posts : []).filter(isValidPublishedPost);
+}
+
 function normalizeUserId(value) {
   return String(value ?? '').trim();
 }
@@ -860,10 +892,13 @@ function getById(collection, id) {
 }
 
 function activePosts({ includePrivate = false, includeDeleted = false } = {}) {
+  if (!includePrivate && !includeDeleted) {
+    return getValidPublishedPosts(state.db.stylePosts);
+  }
   return state.db.stylePosts.filter(post => {
     if (!includeDeleted && isDeletedStylePost(post)) return false;
     if (includePrivate) return true;
-    return post.isPublished && post.status === 'published';
+    return isValidPublishedPost(post);
   });
 }
 

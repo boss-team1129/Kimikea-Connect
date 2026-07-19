@@ -16,6 +16,7 @@
 
 const KC_STYLEBOOK = {
   SPREADSHEET_NAME: 'Kimikea Connect Order 管理表',
+  SPREADSHEET_ID: '1Gyp5QVyiPmViJ9IpX-cWelSwxTWa6oddBsi8OHcQhts',
   POSTS: 'style_posts',
   SAVES: 'style_saves',
   PRODUCT_MASTER: '商品マスタ',
@@ -322,11 +323,32 @@ function publicStylePostForColorDetail_(post) {
 }
 
 function isPublicRankingPost_(post) {
-  const status = String(post.status || '').trim();
+  return isValidPublishedStylebookPost_(post);
+}
+
+function hasPublicStylebookImage_(post) {
+  return Boolean(String(
+    (post && (
+      post.imageUrl
+      || post.photoUrl
+      || post.photo
+      || post.image
+      || post.imageFileId
+      || post.imageFileID
+      || post.fileId
+    ))
+    || ''
+  ).trim());
+}
+
+function isValidPublishedStylebookPost_(post) {
+  const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
+  if (status !== 'published') return false;
   if (isDeletedStylebookPost_(post)) return false;
-  if (status === 'draft' || status === 'private' || status === '下書き') return false;
-  if (post.isPublished === false || String(post.isPublished).toUpperCase() === 'FALSE') return false;
-  return status === 'published' || status === '公開' || post.isPublished === true || String(post.isPublished).toUpperCase() === 'TRUE';
+  if (post.isPublished === false || String(post.isPublished).normalize('NFKC').trim().toUpperCase() === 'FALSE') return false;
+  if (!String((post && post.id) || '').trim()) return false;
+  if (!hasPublicStylebookImage_(post)) return false;
+  return true;
 }
 
 function isDeletedStylebookPost_(post) {
@@ -849,6 +871,17 @@ function colorSwatchFromProduct_(category, colorValue) {
 }
 
 function getKimikeaConnectSpreadsheet_() {
+  if (KC_STYLEBOOK.SPREADSHEET_ID) {
+    try {
+      const fixedSpreadsheet = SpreadsheetApp.openById(KC_STYLEBOOK.SPREADSHEET_ID);
+      if (fixedSpreadsheet) return fixedSpreadsheet;
+    } catch (error) {
+      logStylebookDebug_('open fixed spreadsheet failed', {
+        spreadsheetId: KC_STYLEBOOK.SPREADSHEET_ID,
+        message: error && error.message ? error.message : String(error),
+      });
+    }
+  }
   const active = SpreadsheetApp.getActiveSpreadsheet();
   if (active && active.getName && active.getName() === KC_STYLEBOOK.SPREADSHEET_NAME) return active;
   if (active && active.getSheetByName(KC_STYLEBOOK.PRODUCT_MASTER)) return active;
