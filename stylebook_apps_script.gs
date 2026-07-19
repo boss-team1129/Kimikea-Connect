@@ -127,10 +127,17 @@ function getStylebookDatabase_(userId, options) {
   setupSheetsIfNeeded_(ss);
   const normalizedUserId = normalizeUserId_(userId);
   const scopedShopId = String((options && options.shopId) || '').trim();
-  const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
-    .map(normalizePost_)
-    .filter(post => !isDeletedStylebookPost_(post))
+  const rawPosts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS)).map(normalizePost_);
+  const scopedRawPosts = rawPosts
     .filter(post => !scopedShopId || String(post.shopId || '').trim() === scopedShopId);
+  const posts = scopedRawPosts.filter(post => !isDeletedStylebookPost_(post));
+  const validPublishedPosts = scopedRawPosts.filter(isValidPublishedStylebookPost_);
+  const deletedPosts = scopedRawPosts.filter(isDeletedStylebookPost_);
+  const draftPosts = scopedRawPosts.filter(isDraftStylebookPost_);
+  const noImagePublishedPosts = scopedRawPosts.filter(post => {
+    const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
+    return status === 'published' && !isDeletedStylebookPost_(post) && !hasPublicStylebookImage_(post);
+  });
   const allSaves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
   const ownSaves = allSaves.filter(save => sameUserId_(save.userId, normalizedUserId));
   const saveSummaries = buildSaveSummaries_(posts, allSaves);
@@ -144,7 +151,12 @@ function getStylebookDatabase_(userId, options) {
     spreadsheetName: ss.getName(),
     userId,
     shopId: scopedShopId,
+    rawPosts: scopedRawPosts.length,
     posts: posts.length,
+    validPublishedPosts: validPublishedPosts.length,
+    deletedPosts: deletedPosts.length,
+    draftPosts: draftPosts.length,
+    noImagePublishedPosts: noImagePublishedPosts.length,
     saves: ownSaves.length,
     saveSummaries: saveSummaries.length,
     colors: colors.length,
@@ -349,6 +361,13 @@ function isValidPublishedStylebookPost_(post) {
   if (!String((post && post.id) || '').trim()) return false;
   if (!hasPublicStylebookImage_(post)) return false;
   return true;
+}
+
+function isDraftStylebookPost_(post) {
+  const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
+  return ['draft', 'private', 'unpublished', '非公開', '下書き'].indexOf(status) >= 0
+    || post.isPublished === false
+    || String(post && post.isPublished).normalize('NFKC').trim().toUpperCase() === 'FALSE';
 }
 
 function isDeletedStylebookPost_(post) {
