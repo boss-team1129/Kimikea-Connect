@@ -140,6 +140,7 @@ const KCO_FRANCHISE_HEADERS = [
   'contactName',
   'description',
   'googleMapUrl',
+  'googlePlaceId',
   'homepageUrl',
   'instagramUrl',
   'lineUrl',
@@ -199,6 +200,7 @@ const KCO_MAP_HEADERS = [
   'linkLabel2',
   'linkUrl2',
   'googleMapUrl',
+  'googlePlaceId',
   'homepageUrl',
   'instagramUrl',
   'lineUrl',
@@ -215,6 +217,7 @@ const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
 const KCO_FRANCHISE_HEADER_ALIASES = {
   description: ['description', '紹介文', '店舗紹介', '説明'],
   googleMapUrl: ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl'],
+  googlePlaceId: ['googlePlaceId', 'Google Place ID', 'GooglePlaceID', 'placeId', 'Place ID', 'プレイスID'],
   homepageUrl: ['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL'],
   instagramUrl: ['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム'],
   lineUrl: ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE'],
@@ -999,6 +1002,7 @@ function normalizeFranchiseMapEntryForClient_(franchise, existingMapEntry) {
   const shopId = normalizeMapText_(source.shopId || fallback.shopId || source.memberId || source.franchiseId);
   const mapId = normalizeMapText_(fallback.mapId) || `MAP-${shopId || normalizeMapText_(source.memberId || source.franchiseId)}`;
   const googleMapUrl = normalizeMapText_(source.googleMapUrl || fallback.googleMapUrl);
+  const googlePlaceId = normalizeMapText_(source.googlePlaceId || fallback.googlePlaceId);
   const homepageUrl = normalizeMapText_(source.homepageUrl || fallback.homepageUrl);
   const instagramUrl = normalizeMapText_(source.instagramUrl || fallback.instagramUrl);
   const lineUrl = normalizeMapText_(source.lineUrl || fallback.lineUrl);
@@ -1010,6 +1014,7 @@ function normalizeFranchiseMapEntryForClient_(franchise, existingMapEntry) {
   const linkUrl2 = normalizeMapText_(fallback.linkUrl2);
   const links = createMapEntryLinks_({
     googleMapUrl,
+    googlePlaceId,
     homepageUrl,
     instagramUrl,
     lineUrl,
@@ -1039,6 +1044,7 @@ function normalizeFranchiseMapEntryForClient_(franchise, existingMapEntry) {
     linkLabel2,
     linkUrl2,
     googleMapUrl,
+    googlePlaceId,
     homepageUrl,
     instagramUrl,
     lineUrl,
@@ -1146,6 +1152,7 @@ function normalizeMapEntryForClient_(row, index, rowNumber) {
   const salonName = normalizeMapText_(getRowValueByHeader_(row, index, ['salonName', '店舗名', 'サロン名', '加盟店名', 'shopName', 'name']));
   const staffName = normalizeMapText_(getRowValueByHeader_(row, index, ['staffName', '担当者名', '氏名']));
   const googleMapUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl']));
+  const googlePlaceId = normalizeMapText_(getRowValueByHeader_(row, index, ['googlePlaceId', 'Google Place ID', 'GooglePlaceID', 'placeId', 'Place ID', 'プレイスID']));
   const homepageUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']));
   const instagramUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']));
   const lineUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']));
@@ -1157,6 +1164,7 @@ function normalizeMapEntryForClient_(row, index, rowNumber) {
   const linkUrl2 = normalizeMapText_(getRowValueByHeader_(row, index, ['linkUrl2', 'URL2', 'リンクURL2']));
   const links = createMapEntryLinks_({
     googleMapUrl,
+    googlePlaceId,
     homepageUrl,
     instagramUrl,
     lineUrl,
@@ -1186,6 +1194,7 @@ function normalizeMapEntryForClient_(row, index, rowNumber) {
     linkLabel2,
     linkUrl2,
     googleMapUrl,
+    googlePlaceId,
     homepageUrl,
     instagramUrl,
     lineUrl,
@@ -1975,6 +1984,7 @@ function syncFranchiseMapEntries_(ss, options) {
     setBasicValue('phone', normalizePhoneText_(franchise.phone || ''));
     setBasicValue('description', franchise.description || '');
     setBasicValue('googleMapUrl', franchise.googleMapUrl || '');
+    setBasicValue('googlePlaceId', franchise.googlePlaceId || '');
     setBasicValue('homepageUrl', franchise.homepageUrl || '');
     setBasicValue('instagramUrl', franchise.instagramUrl || '');
     setBasicValue('lineUrl', franchise.lineUrl || '');
@@ -3678,6 +3688,7 @@ function getFranchiseMasterRecords_() {
   const contactNameIndex = findHeaderIndex(['contactName', '担当者', '担当者名']);
   const descriptionIndex = findHeaderIndex(['description', '紹介文', '店舗紹介', '説明']);
   const googleMapUrlIndex = findHeaderIndex(['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl']);
+  const googlePlaceIdIndex = findHeaderIndex(['googlePlaceId', 'Google Place ID', 'GooglePlaceID', 'placeId', 'Place ID', 'プレイスID']);
   const homepageUrlIndex = findHeaderIndex(['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']);
   const instagramUrlIndex = findHeaderIndex(['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']);
   const lineUrlIndex = findHeaderIndex(['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']);
@@ -3758,6 +3769,7 @@ function getFranchiseMasterRecords_() {
         fullAddress: [postalCode, address].filter(Boolean).join(' '),
         description: descriptionIndex === -1 ? '' : String(row[descriptionIndex] || '').trim(),
         googleMapUrl: googleMapUrlIndex === -1 ? '' : String(row[googleMapUrlIndex] || '').trim(),
+        googlePlaceId: googlePlaceIdIndex === -1 ? '' : String(row[googlePlaceIdIndex] || '').trim(),
         homepageUrl: homepageUrlIndex === -1 ? '' : String(row[homepageUrlIndex] || '').trim(),
         instagramUrl: instagramUrlIndex === -1 ? '' : String(row[instagramUrlIndex] || '').trim(),
         lineUrl: lineUrlIndex === -1 ? '' : String(row[lineUrlIndex] || '').trim(),
