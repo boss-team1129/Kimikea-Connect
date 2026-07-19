@@ -448,7 +448,7 @@ function setupMasterColumns() {
 function setupFranchiseMasterColumnsOnly() {
   const startedAt = Date.now();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(KCO_CONFIG.FRANCHISE_MASTER);
+  const sheet = getSheetByNameCandidates_(ss, sheetNameCandidates_(KCO_CONFIG.FRANCHISE_MASTER));
   if (!sheet) {
     throw new Error(`対象シート「${KCO_CONFIG.FRANCHISE_MASTER}」が見つかりません。固定gidではなくシート名を確認してください。`);
   }
@@ -2162,7 +2162,14 @@ function syncFranchiseMapEntries_(ss, options) {
 }
 
 function setupFranchiseMaster_(ss) {
-  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
+  const sheet = getOrCreateSheetByNames_(ss, '加盟店マスタ', [
+    KCO_CONFIG.FRANCHISE_MASTER,
+    '加盟店マスタ',
+    '加盟店マスター',
+    'franchiseMaster',
+    'franchise_master',
+    'FranchiseMaster',
+  ]);
   const wasEmpty = sheet.getLastRow() === 0;
   let columnSummary = null;
   if (sheet.getLastRow() === 0) {
@@ -2187,6 +2194,7 @@ function setupFranchiseMaster_(ss) {
     spreadsheetId: ss.getId(),
     spreadsheetName: ss.getName(),
     sheet: sheet.getName(),
+    sheetId: sheet.getSheetId(),
     lastRow: sheet.getLastRow(),
     createdHeaders: wasEmpty,
     addedHeaders: columnSummary ? columnSummary.addedHeaders : [],
@@ -2196,7 +2204,14 @@ function setupFranchiseMaster_(ss) {
 }
 
 function setupUserMaster_(ss) {
-  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
+  const sheet = getOrCreateSheetByNames_(ss, 'ユーザーマスタ', [
+    KCO_CONFIG.USER_MASTER,
+    'ユーザーマスタ',
+    'ユーザーマスター',
+    'userMaster',
+    'user_master',
+    'UserMaster',
+  ]);
   const wasEmpty = sheet.getLastRow() === 0;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_USER_HEADERS.length).setValues([KCO_USER_HEADERS]);
@@ -2205,7 +2220,14 @@ function setupUserMaster_(ss) {
   }
   applyHeaderStyle_(sheet, KCO_USER_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_USER_HEADERS.length);
-  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+  return {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheet: sheet.getName(),
+    sheetId: sheet.getSheetId(),
+    lastRow: sheet.getLastRow(),
+    createdHeaders: wasEmpty,
+  };
 }
 
 function ensureUserMasterColumns_(sheet) {
@@ -2449,7 +2471,7 @@ function syncFranchiseUsersToUserMaster_(ss) {
 
 function ensureFranchiseMasterColumns_(sheet) {
   if (!sheet) throw new Error('加盟店マスタ シートが見つかりません。');
-  if (sheet.getName() !== KCO_CONFIG.FRANCHISE_MASTER) {
+  if (!isFranchiseMasterSheet_(sheet)) {
     throw new Error(`加盟店マスタの対象シートが一致しません。expected=${KCO_CONFIG.FRANCHISE_MASTER}, actual=${sheet.getName()}`);
   }
   const ss = sheet.getParent();
@@ -2491,7 +2513,7 @@ function ensureFranchiseMasterColumns_(sheet) {
 
 function ensureFranchiseBusinessProfileColumns_(sheet) {
   if (!sheet) throw new Error('加盟店マスタ シートが見つかりません。');
-  if (sheet.getName() !== KCO_CONFIG.FRANCHISE_MASTER) {
+  if (!isFranchiseMasterSheet_(sheet)) {
     throw new Error(`加盟店マスタの対象シートが一致しません。expected=${KCO_CONFIG.FRANCHISE_MASTER}, actual=${sheet.getName()}`);
   }
   const ss = sheet.getParent();
@@ -3469,7 +3491,7 @@ function handleOrderStatusEdit(event) {
   if (!event || !event.range) return;
 
   const sheet = event.range.getSheet();
-  if (sheet.getName() === KCO_CONFIG.FRANCHISE_MASTER && event.range.getRow() > 1) {
+  if (isFranchiseMasterSheet_(sheet) && event.range.getRow() > 1) {
     try {
       logSetupStep_('franchise edit master sync start', {
         row: event.range.getRow(),
@@ -4282,21 +4304,80 @@ function createProductCodeKey_(productCode) {
 }
 
 function getSheet_(name) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getSheetByNameCandidates_(ss, sheetNameCandidates_(name));
   if (!sheet) throw new Error(`${name} シートが見つかりません。setupKimikeaConnectOrder を実行してください。`);
   return sheet;
 }
 
 function getOrCreateSheet_(ss, name) {
-  const sheetName = String(name || '').trim();
-  if (!sheetName) throw new Error('シート名が空です。設定値を確認してください。');
-  if (/^\d+$/.test(sheetName)) {
-    throw new Error(`シート名ではなくsheetId/gidの可能性があります: ${sheetName}。固定IDではなくシート名を指定してください。`);
+  return getOrCreateSheetByNames_(ss, name, sheetNameCandidates_(name));
+}
+
+function getOrCreateSheetByNames_(ss, canonicalName, aliases) {
+  const canonicalSheetName = String(canonicalName || '').trim();
+  const candidates = sheetNameCandidates_(canonicalSheetName, aliases);
+  const existingSheet = getSheetByNameCandidates_(ss, candidates);
+  if (existingSheet) {
+    logSetupStep_('resolved existing sheet', {
+      spreadsheetId: ss.getId(),
+      spreadsheetName: ss.getName(),
+      requestedName: canonicalSheetName,
+      candidates,
+      resolvedSheetName: existingSheet.getName(),
+      resolvedSheetId: existingSheet.getSheetId(),
+    });
+    return existingSheet;
   }
-  const existingSheet = ss.getSheetByName(sheetName);
-  if (existingSheet) return existingSheet;
-  logSetupStep_('create sheet', { sheetName });
-  return ss.insertSheet(sheetName);
+  if (!canonicalSheetName) throw new Error('シート名が空です。設定値を確認してください。');
+  if (/^\d+$/.test(canonicalSheetName)) {
+    throw new Error(`シート名ではなくsheetId/gidの可能性があります: ${canonicalSheetName}。固定IDではなくシート名を指定してください。`);
+  }
+  logSetupStep_('create sheet', {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: canonicalSheetName,
+    candidates,
+  });
+  const createdSheet = ss.insertSheet(canonicalSheetName);
+  logSetupStep_('created sheet', {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: createdSheet.getName(),
+    sheetId: createdSheet.getSheetId(),
+  });
+  return createdSheet;
+}
+
+function getSheetByNameCandidates_(ss, candidates) {
+  const normalizedCandidates = sheetNameCandidates_('', candidates).map(normalizeMasterHeader_);
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i += 1) {
+    const sheetName = sheets[i].getName();
+    if (normalizedCandidates.indexOf(normalizeMasterHeader_(sheetName)) !== -1) return sheets[i];
+  }
+  return null;
+}
+
+function isFranchiseMasterSheet_(sheet) {
+  if (!sheet) return false;
+  return sheetNameCandidates_(KCO_CONFIG.FRANCHISE_MASTER)
+    .map(normalizeMasterHeader_)
+    .indexOf(normalizeMasterHeader_(sheet.getName())) !== -1;
+}
+
+function sheetNameCandidates_(primaryName, aliases) {
+  const values = [primaryName].concat(aliases || []);
+  const normalizedValues = values.map(normalizeMasterHeader_);
+  if (normalizedValues.some((value) => ['加盟店マスタ', '加盟店マスター', 'franchisemaster'].indexOf(value) !== -1)) {
+    values.push('加盟店マスタ', '加盟店マスター', 'franchiseMaster', 'franchise_master', 'FranchiseMaster');
+  }
+  if (normalizedValues.some((value) => ['ユーザーマスタ', 'ユーザーマスター', 'usermaster'].indexOf(value) !== -1)) {
+    values.push('ユーザーマスタ', 'ユーザーマスター', 'userMaster', 'user_master', 'UserMaster');
+  }
+  return Array.from(new Set(values
+    .map((value) => String(value || '').trim())
+    .filter((value) => value && !/^\d+$/.test(value))));
 }
 
 function createIndex_(headers) {
