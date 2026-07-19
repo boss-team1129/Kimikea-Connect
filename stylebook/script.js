@@ -694,6 +694,7 @@ function markLocalPostDeleted(postId, deletedPost = null) {
     ...(deletedPost || {}),
     status: 'deleted',
     isPublished: false,
+    isDeleted: true,
     deletedAt: deletedPost?.deletedAt || new Date().toISOString(),
   };
   saveDb();
@@ -1937,6 +1938,7 @@ async function logicalDeletePost(postId) {
       post.deletedByUserId = currentUser().id;
       post.deleteReason = reason;
       post.isPublished = false;
+      post.isDeleted = true;
       post.status = 'deleted';
       saveDb();
     }
@@ -1970,6 +1972,7 @@ async function restorePost(postId) {
       post.deleteReason = '';
       post.status = 'published';
       post.isPublished = true;
+      post.isDeleted = false;
       saveDb();
     }
     renderAdmin();

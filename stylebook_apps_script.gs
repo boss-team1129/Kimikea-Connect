@@ -52,6 +52,7 @@ const KC_POST_HEADERS = [
   'deletedByUserId',
   'deleteReason',
   'authorId',
+  'isDeleted',
 ];
 
 const KC_SAVE_HEADERS = ['id', 'userId', 'stylePostId', 'createdAt', 'styleId'];
@@ -419,6 +420,7 @@ function savePost_(post, userId) {
     deletedByUserId: existing ? existing.object.deletedByUserId : '',
     deleteReason: existing ? existing.object.deleteReason : '',
     authorId: existing ? postAuthorId_(existing.object) : user.id,
+    isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
   };
   const sheetStart = Date.now();
   upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
@@ -458,6 +460,7 @@ function deletePost_(postId, userId, reason) {
   if (!canDeletePost_(found.object, user)) throw new Error('この投稿を削除する権限がありません。');
   found.object.status = 'deleted';
   found.object.isPublished = false;
+  found.object.isDeleted = true;
   found.object.deletedAt = new Date().toISOString();
   found.object.deletedByUserId = user.id;
   found.object.deleteReason = reason || '';
@@ -890,6 +893,7 @@ function normalizePost_(row) {
     deletedByUserId: row.deletedByUserId || '',
     deleteReason: row.deleteReason || '',
     authorId: row.authorId || row.createdByUserId || '',
+    isDeleted: normalizeBoolean_(row.isDeleted),
   };
 }
 
