@@ -4541,6 +4541,7 @@
         error: '',
         periodLabel: '',
         purchaseCounts: {},
+        purchaseError: '',
         salonCounts: {},
         debug: null,
       },
@@ -5887,22 +5888,33 @@
     function loadRankingData() {
       if (state.rankingData.loaded || state.rankingData.loading) return;
       state.rankingData.loading = true;
+      state.rankingData.error = '';
+      state.rankingData.purchaseError = '';
       const rankingPeriod = getCurrentRankingPeriod();
       const productPromise = !state.products.length && canUseOrderApi()
-        ? resolveWithTimeout(callServer('getPublicProducts'), 5000, [], 'Ranking products')
+        ? resolveWithTimeout(callServer('getPublicProducts'), 20000, [], 'Ranking products')
         : Promise.resolve(state.products);
       const orderPromise = canUseOrderApi()
-        ? resolveWithTimeout(callServer('getPublicColorRankings', rankingPeriod.year, rankingPeriod.month), 5000, null, 'Color purchase ranking')
-        : Promise.resolve(null);
+        ? resolveWithTimeout(
+          callServer('getPublicColorRankings', rankingPeriod.year, rankingPeriod.month)
+            .then((data) => ({ ok: true, data }))
+            .catch((error) => ({ ok: false, error: getErrorMessage(error) })),
+          20000,
+          { ok: false, error: '購入データを取得できませんでした' },
+          'Color purchase ranking'
+        )
+        : Promise.resolve({ ok: false, error: '購入データを取得できませんでした' });
       const stylebookPromise = STYLEBOOK_API_URL
         ? resolveWithTimeout(fetchStylebookRankingData(), 45000, null, 'Stylebook ranking')
         : Promise.resolve(null);
 
       Promise.all([productPromise, orderPromise, stylebookPromise])
-        .then(([products, orderData, stylebookData]) => {
+        .then(([products, orderResult, stylebookData]) => {
           if (Array.isArray(products) && products.length) {
             state.products = products;
           }
+          const orderData = orderResult?.ok ? normalizeRankingOrderData(orderResult.data) : null;
+          state.rankingData.purchaseError = orderData ? '' : (orderResult?.error || '購入データを取得できませんでした');
           state.rankingData.purchaseCounts = orderData?.purchaseCounts || {};
           state.rankingData.year = Number(orderData?.year || rankingPeriod.year);
           state.rankingData.month = Number(orderData?.month || rankingPeriod.month);
@@ -5938,6 +5950,15 @@
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
         });
+    }
+
+    function normalizeRankingOrderData(response) {
+      const data = response?.data && typeof response.data === 'object' ? response.data : response;
+      if (!data || typeof data !== 'object') return null;
+      return {
+        ...data,
+        purchaseCounts: data.purchaseCounts && typeof data.purchaseCounts === 'object' ? data.purchaseCounts : {},
+      };
     }
 
     function fetchStylebookRankingData() {
@@ -6313,6 +6334,9 @@
       const topRows = rows.slice(0, 3);
       const restRows = rows.slice(3, 10);
       const loading = state.rankingData.loading || (!state.rankingData.loaded && !rows.length);
+      const rankingError = config.key === 'purchase' && !loading && state.rankingData.purchaseError
+        ? '購入データを取得できませんでした'
+        : '';
       return `
         <div class="ranking-shell">
           <section class="ranking-hero">
@@ -6328,7 +6352,8 @@
             ].map(([mode, label]) => `<button type="button" class="ranking-tab${state.rankingMode === mode ? ' is-active' : ''}" onclick="setRankingMode('${mode}')">${label}</button>`).join('')}
           </div>
           ${loading ? '<div class="ranking-loading-message">ランキングを集計しています…</div><div class="ranking-loading-grid"><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div><div class="ranking-skeleton"></div></div>' : ''}
-          ${!loading && !rows.length ? `<div class="ranking-empty">${escapeHtml(config.empty)}</div>` : ''}
+          ${rankingError ? `<div class="ranking-empty">${escapeHtml(rankingError)}</div>` : ''}
+          ${!loading && !rankingError && !rows.length ? `<div class="ranking-empty">${escapeHtml(config.empty)}</div>` : ''}
           ${!loading && topRows.length ? `<div class="ranking-podium">${topRows.map(renderRankingPodiumCard).join('')}</div>` : ''}
           ${!loading && restRows.length ? `<div class="ranking-list">${restRows.map(renderRankingListCard).join('')}</div>` : ''}
         </div>
