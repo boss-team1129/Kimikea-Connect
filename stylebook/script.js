@@ -744,13 +744,25 @@ function postAuthorId(post) {
 }
 
 function isDeletedStylePost(post) {
-  const status = String(post?.status || '').normalize('NFKC').trim().toLowerCase();
-  const isDeleted = post?.isDeleted === true || String(post?.isDeleted || '').normalize('NFKC').trim().toUpperCase() === 'TRUE';
+  const status = String(post?.status || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase();
+  const visibility = String(post?.visibility || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase();
+  const deletedFlags = [
+    post?.isDeleted,
+    post?.deleted,
+    post?.is_delete,
+    post?.isDeletedFlag,
+    post?.isRemoved,
+    post?.['削除'],
+    post?.['削除済み'],
+  ].map(value => String(value || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase());
+  const isDeleted = deletedFlags.some(value => ['true', '1', 'yes', 'y', 'deleted', 'delete', '削除', '削除済み'].includes(value));
   return Boolean(
     post?.deletedAt
+    || post?.deleted_at
+    || post?.['削除日時']
     || isDeleted
-    || ['deleted', 'delete', '削除', '削除済み'].includes(status)
-    || String(post?.visibility || '').normalize('NFKC').trim().toLowerCase() === 'deleted'
+    || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].includes(status)
+    || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].includes(visibility)
   );
 }
 

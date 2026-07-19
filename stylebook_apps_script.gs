@@ -127,6 +127,7 @@ function getStylebookDatabase_(userId, options) {
   const scopedShopId = String((options && options.shopId) || '').trim();
   const posts = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
     .map(normalizePost_)
+    .filter(post => !isDeletedStylebookPost_(post))
     .filter(post => !scopedShopId || String(post.shopId || '').trim() === scopedShopId);
   const allSaves = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES)).map(normalizeSave_);
   const ownSaves = allSaves.filter(save => sameUserId_(save.userId, normalizedUserId));
@@ -330,13 +331,21 @@ function isPublicRankingPost_(post) {
 function isDeletedStylebookPost_(post) {
   const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
   const visibility = String((post && post.visibility) || '').normalize('NFKC').trim().toLowerCase();
-  const isDeleted = (post && post.isDeleted) === true
-    || String((post && post.isDeleted) || '').normalize('NFKC').trim().toUpperCase() === 'TRUE';
+  const deletedFlags = [
+    post && post.isDeleted,
+    post && post.deleted,
+    post && post.is_delete,
+    post && post.isDeletedFlag,
+    post && post.isRemoved,
+    post && post['削除'],
+    post && post['削除済み'],
+  ].map(value => String(value || '').normalize('NFKC').replace(/\s+/g, '').trim().toLowerCase());
+  const isDeleted = deletedFlags.some(value => ['true', '1', 'yes', 'y', 'deleted', 'delete', '削除', '削除済み'].indexOf(value) >= 0);
   return Boolean(
-    (post && post.deletedAt)
+    (post && (post.deletedAt || post.deleted_at || post['削除日時']))
     || isDeleted
-    || ['deleted', 'delete', '削除', '削除済み'].indexOf(status) >= 0
-    || visibility === 'deleted'
+    || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].indexOf(status) >= 0
+    || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].indexOf(visibility) >= 0
   );
 }
 

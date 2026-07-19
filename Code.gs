@@ -214,12 +214,12 @@ const KCO_MAP_TYPES = ['加盟店', 'コーディネーター'];
 const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
 const KCO_FRANCHISE_HEADER_ALIASES = {
   description: ['description', '紹介文', '店舗紹介', '説明'],
-  googleMapUrl: ['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl'],
-  homepageUrl: ['homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL', 'websiteUrl'],
-  instagramUrl: ['instagramUrl', 'Instagram', 'インスタグラム'],
-  lineUrl: ['lineUrl', 'LINE', 'LINE URL', '公式LINE'],
-  hotPepperUrl: ['hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'],
-  reservationUrl: ['reservationUrl', '予約URL', '予約', '予約サイト'],
+  googleMapUrl: ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl'],
+  homepageUrl: ['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL'],
+  instagramUrl: ['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム'],
+  lineUrl: ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE'],
+  hotPepperUrl: ['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'],
+  reservationUrl: ['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト'],
   sortOrder: ['sortOrder', '表示順'],
 };
 
@@ -991,27 +991,84 @@ function formatDateTimeForClient_(value) {
   return String(value || '');
 }
 
+function normalizeFranchiseMapEntryForClient_(franchise, existingMapEntry) {
+  const source = franchise || {};
+  const fallback = existingMapEntry || {};
+  const address = normalizeMapText_(source.address || source.fullAddress || fallback.address);
+  const parsedAddress = parseJapaneseAddress_(address);
+  const shopId = normalizeMapText_(source.shopId || fallback.shopId || source.memberId || source.franchiseId);
+  const mapId = normalizeMapText_(fallback.mapId) || `MAP-${shopId || normalizeMapText_(source.memberId || source.franchiseId)}`;
+  const googleMapUrl = normalizeMapText_(source.googleMapUrl || fallback.googleMapUrl);
+  const homepageUrl = normalizeMapText_(source.homepageUrl || fallback.homepageUrl);
+  const instagramUrl = normalizeMapText_(source.instagramUrl || fallback.instagramUrl);
+  const lineUrl = normalizeMapText_(source.lineUrl || fallback.lineUrl);
+  const hotPepperUrl = normalizeMapText_(source.hotPepperUrl || fallback.hotPepperUrl);
+  const reservationUrl = normalizeMapText_(source.reservationUrl || fallback.reservationUrl);
+  const linkLabel1 = normalizeMapText_(fallback.linkLabel1);
+  const linkUrl1 = normalizeMapText_(fallback.linkUrl1);
+  const linkLabel2 = normalizeMapText_(fallback.linkLabel2);
+  const linkUrl2 = normalizeMapText_(fallback.linkUrl2);
+  const links = createMapEntryLinks_({
+    googleMapUrl,
+    homepageUrl,
+    instagramUrl,
+    lineUrl,
+    hotPepperUrl,
+    reservationUrl,
+    linkLabel1,
+    linkUrl1,
+    linkLabel2,
+    linkUrl2,
+  });
+  return {
+    mapId,
+    shopId,
+    type: '加盟店',
+    prefecture: normalizeMapText_(fallback.prefecture || parsedAddress.prefecture || '静岡県'),
+    city: normalizeMapText_(fallback.city || parsedAddress.city),
+    salonName: normalizeMapText_(source.salonName || source.franchiseName || fallback.salonName),
+    staffName: normalizeMapText_(source.contactName || source.displayName || fallback.staffName),
+    address,
+    latitude: parseMapCoordinate_(fallback.latitude),
+    longitude: parseMapCoordinate_(fallback.longitude),
+    phone: normalizeMapText_(source.phone || fallback.phone),
+    imageUrl: normalizeMapText_(fallback.imageUrl),
+    description: normalizeMapText_(source.description || fallback.description),
+    linkLabel1,
+    linkUrl1,
+    linkLabel2,
+    linkUrl2,
+    googleMapUrl,
+    homepageUrl,
+    instagramUrl,
+    lineUrl,
+    hotPepperUrl,
+    reservationUrl,
+    links,
+    status: source.membershipStatus === 'active' || source.visible !== false ? '公開' : '非公開',
+    sortOrder: Number(source.sortOrder || fallback.sortOrder || 9999),
+    createdAt: formatDateTimeForClient_(source.createdAt || fallback.createdAt),
+    updatedAt: formatDateTimeForClient_(source.updatedAt || fallback.updatedAt),
+  };
+}
+
 function getPublicMapEntries() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(KCO_CONFIG.MAP_ENTRIES);
-  if (!sheet || sheet.getLastRow() <= 1) {
-    return {
-      entries: [],
-      prefectures: [],
-      types: KCO_MAP_TYPES,
-      debug: {
-        spreadsheetName: ss ? ss.getName() : '',
-        sheetFound: Boolean(sheet),
-        rawRowCount: sheet ? Math.max(sheet.getLastRow() - 1, 0) : 0,
-        publicEntryCount: 0,
-      },
-    };
-  }
+  const mapSheet = ss.getSheetByName(KCO_CONFIG.MAP_ENTRIES);
+  const mapValues = mapSheet && mapSheet.getLastRow() > 1 ? mapSheet.getDataRange().getValues() : [];
+  const mapIndex = mapValues.length ? createIndex_(mapValues[0].map((header) => String(header || '').trim())) : {};
+  const mapEntries = mapValues.length
+    ? mapValues.slice(1).map((row, offset) => normalizeMapEntryForClient_(row, mapIndex, offset + 2))
+    : [];
+  const mapEntryByShopId = {};
+  mapEntries.forEach((entry) => {
+    const shopId = String(entry.shopId || '').trim();
+    if (shopId && mapEntryByShopId[shopId] === undefined) mapEntryByShopId[shopId] = entry;
+  });
 
-  const values = sheet.getDataRange().getValues();
-  const index = createIndex_(values[0].map((header) => String(header || '').trim()));
-  const allEntries = values.slice(1)
-    .map((row, offset) => normalizeMapEntryForClient_(row, index, offset + 2));
+  const franchiseEntries = getFranchiseMasterRecords_().map((franchise) => normalizeFranchiseMapEntryForClient_(franchise, mapEntryByShopId[String(franchise.shopId || '').trim()]));
+  const coordinatorEntries = mapEntries.filter((entry) => entry.type === 'コーディネーター');
+  const allEntries = franchiseEntries.concat(coordinatorEntries);
   const rowResults = allEntries.map((entry, offset) => {
     const reasons = [];
     if (entry.status !== '公開') reasons.push(`status=${entry.status || 'empty'}`);
@@ -1033,9 +1090,12 @@ function getPublicMapEntries() {
     .sort(comparePublicMapEntries_);
   logOrderDebug_('getPublicMapEntries result', {
     spreadsheetName: ss.getName(),
-    sheetName: sheet.getName(),
-    headers: values[0].map(String),
-    totalRows: Math.max(values.length - 1, 0),
+    source: 'franchise_master_with_map_coordinate_fallback',
+    mapSheetName: mapSheet ? mapSheet.getName() : '',
+    mapHeaders: mapValues.length ? mapValues[0].map(String) : [],
+    franchiseEntryCount: franchiseEntries.length,
+    coordinatorEntryCount: coordinatorEntries.length,
+    totalRows: allEntries.length,
     publicEntryCount: entries.length,
     entriesWithoutCoordinates: entries.filter((entry) => !Number.isFinite(entry.latitude) || !Number.isFinite(entry.longitude)).length,
     statusCounts: allEntries.reduce((counts, entry) => {
@@ -1061,9 +1121,10 @@ function getPublicMapEntries() {
     types: types.length ? types : KCO_MAP_TYPES,
     debug: {
       spreadsheetName: ss.getName(),
-      sheetName: sheet.getName(),
-      headers: values[0].map(String),
-      rawRowCount: Math.max(values.length - 1, 0),
+      source: 'franchise_master_with_map_coordinate_fallback',
+      mapSheetName: mapSheet ? mapSheet.getName() : '',
+      mapHeaders: mapValues.length ? mapValues[0].map(String) : [],
+      rawRowCount: allEntries.length,
       normalizedCount: allEntries.length,
       publicEntryCount: entries.length,
       entriesWithoutCoordinates: entries.filter((entry) => !Number.isFinite(entry.latitude) || !Number.isFinite(entry.longitude)).length,
@@ -1084,12 +1145,12 @@ function normalizeMapEntryForClient_(row, index, rowNumber) {
   const city = normalizeMapText_(getRowValueByHeader_(row, index, ['city', '市区町村', '市町村', '活動エリア'])) || parsedAddress.city;
   const salonName = normalizeMapText_(getRowValueByHeader_(row, index, ['salonName', '店舗名', 'サロン名', '加盟店名', 'shopName', 'name']));
   const staffName = normalizeMapText_(getRowValueByHeader_(row, index, ['staffName', '担当者名', '氏名']));
-  const googleMapUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl']));
-  const homepageUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL', 'websiteUrl']));
-  const instagramUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['instagramUrl', 'Instagram', 'インスタグラム']));
-  const lineUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['lineUrl', 'LINE', 'LINE URL', '公式LINE']));
-  const hotPepperUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']));
-  const reservationUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['reservationUrl', '予約URL', '予約', '予約サイト']));
+  const googleMapUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl']));
+  const homepageUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']));
+  const instagramUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']));
+  const lineUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']));
+  const hotPepperUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']));
+  const reservationUrl = normalizeMapText_(getRowValueByHeader_(row, index, ['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト']));
   const linkLabel1 = normalizeMapText_(getRowValueByHeader_(row, index, ['linkLabel1', 'ボタン名1', 'リンク名1']));
   const linkUrl1 = normalizeMapText_(getRowValueByHeader_(row, index, ['linkUrl1', 'URL1', 'リンクURL1']));
   const linkLabel2 = normalizeMapText_(getRowValueByHeader_(row, index, ['linkLabel2', 'ボタン名2', 'リンク名2']));
@@ -3616,12 +3677,12 @@ function getFranchiseMasterRecords_() {
   const addressIndex = findHeaderIndex(['address', '住所']);
   const contactNameIndex = findHeaderIndex(['contactName', '担当者', '担当者名']);
   const descriptionIndex = findHeaderIndex(['description', '紹介文', '店舗紹介', '説明']);
-  const googleMapUrlIndex = findHeaderIndex(['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl']);
-  const homepageUrlIndex = findHeaderIndex(['homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL', 'websiteUrl']);
-  const instagramUrlIndex = findHeaderIndex(['instagramUrl', 'Instagram', 'インスタグラム']);
-  const lineUrlIndex = findHeaderIndex(['lineUrl', 'LINE', 'LINE URL', '公式LINE']);
-  const hotPepperUrlIndex = findHeaderIndex(['hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']);
-  const reservationUrlIndex = findHeaderIndex(['reservationUrl', '予約URL', '予約', '予約サイト']);
+  const googleMapUrlIndex = findHeaderIndex(['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl']);
+  const homepageUrlIndex = findHeaderIndex(['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']);
+  const instagramUrlIndex = findHeaderIndex(['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']);
+  const lineUrlIndex = findHeaderIndex(['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']);
+  const hotPepperUrlIndex = findHeaderIndex(['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']);
+  const reservationUrlIndex = findHeaderIndex(['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト']);
   const sortOrderIndex = findHeaderIndex(['sortOrder', '表示順']);
   const membershipStatusIndex = findHeaderIndex(['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス']);
   const passwordChangedAtIndex = findHeaderIndex(['passwordChangedAt', 'パスワード変更日']);
