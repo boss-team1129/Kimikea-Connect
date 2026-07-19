@@ -6240,6 +6240,11 @@
         category: '原色',
         keywords: ['ピンク', '桃色', 'ブルー', '青', 'パープル', '紫', 'レッド', '赤', 'グリーン', '緑', '原色', 'OR'],
       },
+      'design-gradient': {
+        label: 'ピンク、パープル、ブルー、シルバー、ホワイト、原色系、淡色系',
+        category: 'すべて',
+        keywords: ['ピンク', '桃色', 'パープル', '紫', 'ブルー', '青', 'シルバー', '銀', 'ホワイト', '白', '原色', '淡色', 'ライト', 'グラデーション', '裾カラー', 'OR', 'LC'],
+      },
       'length-volume': {
         label: '地毛に近い色、ブラウン、ブラック、ナチュラル系',
         category: 'ダークカラー',
@@ -6322,6 +6327,21 @@
         reason: '個性的なスタイルや、しっかり目立たせたい回答が強く出ています。',
         styleKeywords: ['アクセント', 'ポイント', '原色', 'ブルー', 'ピンク', 'パープル', 'レッド'],
       },
+      gradient: {
+        id: 'gradient',
+        colorFilterKey: 'design-gradient',
+        title: 'デザイングラデーションタイプ',
+        catchcopy: '長さもカラーも、毛先まで自分らしく。',
+        style: 'グラデーション、裾カラー、バレイヤージュ風、デザインロング',
+        colorTone: 'ピンク、パープル、ブルー、シルバー、ホワイト、原色系、淡色系',
+        colorChartCategory: 'すべて',
+        colorKeywords: ['ピンク', 'パープル', 'ブルー', 'シルバー', 'ホワイト', '原色', '淡色', 'LC', 'OR'],
+        amount: '髪の量・長さ・カットラインによって変わるため、多めの本数がおすすめです。',
+        position: '髪の中間から毛先、襟足、サイド、全体',
+        finish: '地毛から毛先へ自然に色が変化し、長さとデザイン性を同時に楽しめるスタイルです。',
+        reason: '髪を長く見せながら、毛先の色で個性を表現したい回答が重なっています。',
+        styleKeywords: ['グラデーション', '裾カラー', 'バレイヤージュ', 'デザインロング', '毛先', 'ロング', 'ピンク', 'パープル', 'ブルー'],
+      },
       volume: {
         id: 'volume',
         colorFilterKey: 'length-volume',
@@ -6349,6 +6369,7 @@
           ['strong', 'しっかり変化を出したい', { highlight: 4, inner: 2, accent: 1 }],
           ['unique', '個性的なスタイルを楽しみたい', { accent: 5, highlight: 1 }],
           ['length', '髪を長く見せたい', { volume: 5 }],
+          ['lengthColor', '髪を長くして、毛先にカラーも入れたい', { gradient: 6, volume: 3, accent: 2, highlight: 1 }],
           ['undecided', 'まだ決まっていない', { natural: 2, face: 2, inner: 1 }, true],
         ],
       },
@@ -6373,7 +6394,7 @@
           ['cute', 'かわいい', { face: 3, natural: 1, accent: 1 }],
           ['cool', 'クール', { inner: 3, highlight: 1, accent: 1 }],
           ['glamorous', '華やか', { highlight: 4, face: 1 }],
-          ['unique', '個性的', { accent: 5 }],
+          ['unique', '個性的', { accent: 5, gradient: 2 }],
         ],
       },
       {
@@ -6383,7 +6404,7 @@
           ['hidden', 'ほとんど目立たせたくない', { natural: 4, inner: 1 }],
           ['little', '少しだけ変化がほしい', { natural: 2, face: 3, inner: 1 }],
           ['visible', 'しっかり見せたい', { inner: 2, highlight: 3, accent: 1 }],
-          ['bold', 'かなり目立たせたい', { accent: 4, highlight: 2 }],
+          ['bold', 'かなり目立たせたい', { accent: 4, highlight: 2, gradient: 2 }],
         ],
       },
       {
@@ -6392,7 +6413,7 @@
         options: [
           ['strict', 'かなり厳しい', { natural: 5, face: 1 }],
           ['some', '少し制限がある', { natural: 2, face: 2, inner: 1 }],
-          ['none', '特にない', { accent: 2, highlight: 2, inner: 1 }],
+          ['none', '特にない', { accent: 2, highlight: 2, inner: 1, gradient: 2 }],
           ['holiday', '休日だけ楽しみたい', { accent: 2, natural: 2, face: 1 }],
         ],
       },
@@ -6405,6 +6426,7 @@
           ['inside', '髪の内側', { inner: 4, accent: 1 }],
           ['mesh', '全体にメッシュ', { highlight: 5 }],
           ['length', '長さを出したい', { volume: 5 }],
+          ['gradient', '毛先にグラデーションを入れたい', { gradient: 6, accent: 2, volume: 2 }],
           ['omakase', 'おまかせ', { natural: 1, face: 1, inner: 1 }, true],
         ],
       },
@@ -6414,8 +6436,8 @@
         options: [
           ['short', 'ショート', { natural: 2, face: 2, highlight: 1 }],
           ['bob', 'ボブ', { natural: 2, face: 2, inner: 2 }],
-          ['medium', 'ミディアム', { inner: 2, highlight: 1, volume: 1 }],
-          ['long', 'ロング', { inner: 1, highlight: 2, volume: 3 }],
+          ['medium', 'ミディアム', { inner: 2, highlight: 1, volume: 1, gradient: 2 }],
+          ['long', 'ロング', { inner: 1, highlight: 2, volume: 3, gradient: 2 }],
         ],
       },
       {
@@ -6426,6 +6448,7 @@
           ['sixEight', '6〜8本くらい', { face: 3, inner: 2, natural: 1 }],
           ['tenTwenty', '10〜20本くらい', { highlight: 4, inner: 2 }],
           ['full', 'しっかり長さやボリュームを出したい', { volume: 5, highlight: 1 }],
+          ['designLong', '長さとデザインカラーをしっかり楽しみたい', { gradient: 6, volume: 3, accent: 2, highlight: 1 }],
           ['consult', '相談して決めたい', { natural: 1, face: 1, inner: 1 }, true],
         ],
       },
@@ -6535,6 +6558,10 @@
         mesh: 'highlight',
         accent: 'accent',
         vivid: 'accent',
+        gradient: 'design-gradient',
+        gradation: 'design-gradient',
+        design: 'design-gradient',
+        'design-gradient': 'design-gradient',
         volume: 'length-volume',
         length: 'length-volume',
         'length-volume': 'length-volume',
@@ -7089,10 +7116,12 @@
       if (answers.restriction === 'strict') {
         scores.accent -= 5;
         scores.highlight -= 4;
+        scores.gradient -= 5;
         scores.natural += 2;
       }
       if (answers.length === 'short') {
         scores.volume -= 5;
+        scores.gradient -= 5;
         scores.natural += 2;
         scores.face += 2;
         scores.highlight += 1;
@@ -7107,6 +7136,7 @@
         scores.inner += 1;
         scores.highlight += 1;
         scores.volume += 1;
+        scores.gradient += 2;
       }
       if (answers.budget === 'four') {
         scores.natural += 3;
@@ -7117,14 +7147,30 @@
       if (answers.budget === 'tenTwenty') {
         scores.highlight += 3;
         scores.inner += 2;
+        scores.gradient += 2;
         scores.natural -= 1;
+      }
+      if (answers.budget === 'full') {
+        scores.volume += 2;
+        scores.gradient += 1;
+      }
+      if (answers.budget === 'designLong') {
+        scores.gradient += 4;
+        scores.volume += 1;
       }
       if (uncertainCount >= 3) {
         scores.natural += 2;
         scores.face += 1;
       }
 
-      const priority = ['natural', 'face', 'inner', 'highlight', 'accent', 'volume'];
+      const gradientIntent = answers.change === 'lengthColor'
+        || answers.position === 'gradient'
+        || answers.budget === 'designLong'
+        || answers.mood === 'unique'
+        || answers.visibility === 'bold';
+      const priority = gradientIntent
+        ? ['gradient', 'natural', 'face', 'inner', 'highlight', 'accent', 'volume']
+        : ['natural', 'face', 'inner', 'highlight', 'accent', 'volume', 'gradient'];
       const resultId = priority
         .map((id) => ({ id, score: scores[id] }))
         .sort((a, b) => b.score - a.score || priority.indexOf(a.id) - priority.indexOf(b.id))[0]?.id || 'natural';
