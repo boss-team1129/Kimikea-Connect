@@ -6500,6 +6500,29 @@
       return normalizedShopId ? `${KIMIKEA_MAP_SHOP_IMAGE_BASE_PATH}${normalizedShopId}.jpg` : '';
     }
 
+    function normalizeKimikeaMapLinks(row) {
+      const links = [];
+      const addLink = (label, url) => {
+        const href = normalizeKimikeaMapText(url);
+        if (!href) return;
+        const text = normalizeKimikeaMapText(label) || 'URL';
+        if (links.some((link) => link.url === href)) return;
+        links.push({ label: text, url: href });
+      };
+      if (Array.isArray(row?.links)) {
+        row.links.forEach((link) => addLink(link?.label || link?.name || link?.title, link?.url || link?.href));
+      }
+      addLink('Googleマップ', getKimikeaMapValue(row, ['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl']));
+      addLink('ホームページ', getKimikeaMapValue(row, ['homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL', 'websiteUrl']));
+      addLink('Instagram', getKimikeaMapValue(row, ['instagramUrl', 'Instagram', 'インスタグラム']));
+      addLink('LINE', getKimikeaMapValue(row, ['lineUrl', 'LINE', 'LINE URL', '公式LINE']));
+      addLink('Hot Pepper', getKimikeaMapValue(row, ['hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']));
+      addLink('予約', getKimikeaMapValue(row, ['reservationUrl', '予約URL', '予約', '予約サイト']));
+      addLink(getKimikeaMapValue(row, ['linkLabel1', 'link_label_1', 'ボタン名1', 'リンク名1']) || 'URL①', getKimikeaMapValue(row, ['linkUrl1', 'link_url_1', 'URL1', 'リンクURL1']));
+      addLink(getKimikeaMapValue(row, ['linkLabel2', 'link_label_2', 'ボタン名2', 'リンク名2']) || 'URL②', getKimikeaMapValue(row, ['linkUrl2', 'link_url_2', 'URL2', 'リンクURL2']));
+      return links;
+    }
+
     function getKimikeaMapValue(row, keys) {
       if (!row || typeof row !== 'object') return '';
       for (const key of keys) {
@@ -6557,6 +6580,10 @@
         const prefecture = normalizeKimikeaMapText(getKimikeaMapValue(row, ['prefecture', '都道府県', '県'])) || extractPrefectureFromKimikeaAddress(address) || '静岡県';
         const salonName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['salonName', 'salon_name', 'shopName', 'shop_name', 'name', '店舗名', 'サロン名', '加盟店名']));
         const staffName = normalizeKimikeaMapText(getKimikeaMapValue(row, ['staffName', 'staff_name', '担当者名', '氏名']));
+        const links = normalizeKimikeaMapLinks(row);
+        const googleMapUrl = normalizeKimikeaMapText(getKimikeaMapValue(row, ['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl']))
+          || links.find((link) => link.label === 'Googleマップ')?.url
+          || '';
         const coordinates = normalizeKimikeaMapCoordinates(
           getKimikeaMapValue(row, ['latitude', 'lat', '緯度']),
           getKimikeaMapValue(row, ['longitude', 'lng', 'lon', '経度']),
@@ -6587,6 +6614,8 @@
           linkUrl1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl1', 'link_url_1', 'URL1', 'リンクURL1'])),
           linkLabel2: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkLabel2', 'link_label_2', 'ボタン名2', 'リンク名2'])),
           linkUrl2: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl2', 'link_url_2', 'URL2', 'リンクURL2'])),
+          googleMapUrl,
+          links,
           status,
           sortOrder: Number(getKimikeaMapValue(row, ['sortOrder', '表示順']) || 9999),
         };
@@ -6837,8 +6866,28 @@
     }
 
     function mapEntryGoogleMapUrl(entry) {
+      if (entry.googleMapUrl) return entry.googleMapUrl;
       const query = entry.address || [entry.prefecture, entry.city, entry.salonName || entry.staffName].filter(Boolean).join(' ');
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    }
+
+    function renderKimikeaMapActionLinks(entry) {
+      const links = Array.isArray(entry.links) ? entry.links : [];
+      const googleUrl = mapEntryGoogleMapUrl(entry);
+      const rendered = [];
+      const addAction = (label, url) => {
+        const href = normalizeKimikeaMapText(url);
+        if (!href) return;
+        if (rendered.some((link) => link.url === href)) return;
+        rendered.push({ label: normalizeKimikeaMapText(label) || 'URL', url: href });
+      };
+      addAction('Googleマップ', googleUrl);
+      links.forEach((link) => addAction(link.label, link.url));
+      if (!links.length) {
+        addAction(entry.linkLabel1 || 'URL①', entry.linkUrl1);
+        addAction(entry.linkLabel2 || 'URL②', entry.linkUrl2);
+      }
+      return rendered.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(link.label)}</a>`).join('');
     }
 
     function renderKimikeaMapCard(entry) {
@@ -6871,9 +6920,7 @@
           ${!isCoordinator ? renderKimikeaMapStyleStrip(entry, styles) : ''}
           <div class="kimikea-map-actions">
             ${!isCoordinator ? `<button type="button" data-network-action="shop-styles" data-shop-id="${escapeHtml(entry.shopId)}" onclick="handleNetworkAction(event)">この店舗のスタイルを見る</button>` : ''}
-            <a href="${escapeHtml(mapEntryGoogleMapUrl(entry))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Googleマップ</a>
-            ${entry.linkUrl1 ? `<a href="${escapeHtml(entry.linkUrl1)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(entry.linkLabel1 || 'URL①')}</a>` : ''}
-            ${entry.linkUrl2 ? `<a href="${escapeHtml(entry.linkUrl2)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(entry.linkLabel2 || 'URL②')}</a>` : ''}
+            ${renderKimikeaMapActionLinks(entry)}
           </div>
         </article>
       `;
