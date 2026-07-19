@@ -212,6 +212,16 @@ const KCO_MAP_HEADERS = [
 
 const KCO_MAP_TYPES = ['加盟店', 'コーディネーター'];
 const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
+const KCO_FRANCHISE_HEADER_ALIASES = {
+  description: ['description', '紹介文', '店舗紹介', '説明'],
+  googleMapUrl: ['googleMapUrl', 'Googleマップ', 'GoogleマップURL', 'googleMapsUrl'],
+  homepageUrl: ['homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL', 'websiteUrl'],
+  instagramUrl: ['instagramUrl', 'Instagram', 'インスタグラム'],
+  lineUrl: ['lineUrl', 'LINE', 'LINE URL', '公式LINE'],
+  hotPepperUrl: ['hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'],
+  reservationUrl: ['reservationUrl', '予約URL', '予約', '予約サイト'],
+  sortOrder: ['sortOrder', '表示順'],
+};
 
 const KCO_DETAIL_HEADERS = [
   '注文番号',
@@ -371,6 +381,7 @@ function setupMasterColumns() {
     logSetupStep_('setup master columns started', {
       spreadsheetId: ss.getId(),
       spreadsheetName: ss.getName(),
+      franchiseMasterSheetName: KCO_CONFIG.FRANCHISE_MASTER,
     });
 
     runSetupStep_('rename spreadsheet', () => {
@@ -381,7 +392,7 @@ function setupMasterColumns() {
     });
 
     runSetupStep_('product master', () => setupProductMaster_(ss));
-    runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
+    summary.franchiseMaster = runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
     runSetupStep_('franchise identity backfill', () => backfillFranchiseIdentityColumns_(ss));
     runSetupStep_('user master', () => setupUserMaster_(ss));
     runSetupStep_('orders', () => setupOrders_(ss));
@@ -393,6 +404,8 @@ function setupMasterColumns() {
     summary.durationMs = Date.now() - startedAt;
     logSetupStep_('setup master columns completed', {
       ...summary,
+      spreadsheetId: ss.getId(),
+      spreadsheetName: ss.getName(),
       nextSteps: [
         'setupTriggers',
         'syncFranchiseUsers',
@@ -2021,15 +2034,35 @@ function syncFranchiseMapEntries_(ss, options) {
 function setupFranchiseMaster_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
   const wasEmpty = sheet.getLastRow() === 0;
+  let columnSummary = null;
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, KCO_FRANCHISE_HEADERS.length).setValues([KCO_FRANCHISE_HEADERS]);
+    columnSummary = {
+      spreadsheetId: ss.getId(),
+      spreadsheetName: ss.getName(),
+      sheetName: sheet.getName(),
+      addedHeaders: KCO_FRANCHISE_HEADERS,
+      beforeLastColumn: 0,
+      afterLastColumn: sheet.getLastColumn(),
+      rawHeaders: [],
+    };
+    logSetupStep_('franchise master columns checked', columnSummary);
   } else {
-    ensureFranchiseMasterColumns_(sheet);
+    columnSummary = ensureFranchiseMasterColumns_(sheet);
   }
   applyPhoneTextFormat_(sheet, KCO_FRANCHISE_HEADERS);
   applyHeaderStyle_(sheet, KCO_FRANCHISE_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_FRANCHISE_HEADERS.length);
-  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+  return {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheet: sheet.getName(),
+    lastRow: sheet.getLastRow(),
+    createdHeaders: wasEmpty,
+    addedHeaders: columnSummary ? columnSummary.addedHeaders : [],
+    beforeLastColumn: columnSummary ? columnSummary.beforeLastColumn : '',
+    afterLastColumn: columnSummary ? columnSummary.afterLastColumn : sheet.getLastColumn(),
+  };
 }
 
 function setupUserMaster_(ss) {
@@ -2266,17 +2299,45 @@ function syncFranchiseUsersToUserMaster_(ss) {
 }
 
 function ensureFranchiseMasterColumns_(sheet) {
-  const existingHeaders = sheet
-    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+  if (!sheet) throw new Error('加盟店マスタ シートが見つかりません。');
+  if (sheet.getName() !== KCO_CONFIG.FRANCHISE_MASTER) {
+    throw new Error(`加盟店マスタの対象シートが一致しません。expected=${KCO_CONFIG.FRANCHISE_MASTER}, actual=${sheet.getName()}`);
+  }
+  const ss = sheet.getParent();
+  const beforeLastColumn = Math.max(sheet.getLastColumn(), 1);
+  const rawHeaders = sheet
+    .getRange(1, 1, 1, beforeLastColumn)
     .getValues()[0]
-    .map(normalizeMasterHeader_);
+    .map((value) => String(value || '').trim());
+  const existingHeaders = rawHeaders.map(normalizeMasterHeader_);
+  const addedHeaders = [];
 
   KCO_FRANCHISE_HEADERS.forEach((header) => {
-    if (existingHeaders.indexOf(normalizeMasterHeader_(header)) !== -1) return;
-    sheet.insertColumnAfter(sheet.getLastColumn());
-    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    const candidates = (KCO_FRANCHISE_HEADER_ALIASES[header] || [header]).map(normalizeMasterHeader_);
+    if (existingHeaders.some((existingHeader) => candidates.indexOf(existingHeader) !== -1)) return;
+    addedHeaders.push(header);
     existingHeaders.push(normalizeMasterHeader_(header));
   });
+
+  if (addedHeaders.length > 0) {
+    sheet.insertColumnsAfter(beforeLastColumn, addedHeaders.length);
+    sheet
+      .getRange(1, beforeLastColumn + 1, 1, addedHeaders.length)
+      .setValues([addedHeaders]);
+  }
+
+  const afterLastColumn = sheet.getLastColumn();
+  const result = {
+    spreadsheetId: ss.getId(),
+    spreadsheetName: ss.getName(),
+    sheetName: sheet.getName(),
+    addedHeaders,
+    beforeLastColumn,
+    afterLastColumn,
+    rawHeaders,
+  };
+  logSetupStep_('franchise master columns checked', result);
+  return result;
 }
 
 function migrateProductionFranchiseRows_(sheet) {
