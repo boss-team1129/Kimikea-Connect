@@ -1,4 +1,8 @@
-const DB_KEY = 'kimikea_stylebook_gallery_db_v1';
+const DB_KEY = 'kimikea_stylebook_gallery_db_v2';
+const LEGACY_DB_KEYS = [
+  'kimikea_stylebook_gallery_db_v1',
+  'kimikea_stylebook_gallery_db',
+];
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const CONNECT_FRANCHISE_KEY = 'kimikeaFranchise';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
@@ -8,7 +12,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260717-speed-mypage-1';
+const STYLEBOOK_ASSET_VERSION = '20260719-correct-stylebook-api-url-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -153,6 +157,14 @@ function debugStylebook(label, data = {}) {
     console.info(`[Kimikea Stylebook DEBUG] ${label}`, data);
   } catch (error) {
     console.info(`[Kimikea Stylebook DEBUG] ${label}`);
+  }
+}
+
+function logStylebookApi(label, data = {}) {
+  try {
+    console.log(`[Kimikea Stylebook API] ${label}`, data);
+  } catch (error) {
+    console.log(`[Kimikea Stylebook API] ${label}`);
   }
 }
 
@@ -404,10 +416,37 @@ function clearStylebookUserCaches(userId) {
   if (!normalized) return;
   [
     `${DB_KEY}_${normalized}`,
+    ...LEGACY_DB_KEYS.map(key => `${key}_${normalized}`),
     `myPosts_${normalized}`,
     `myDrafts_${normalized}`,
     `savedStyles_${normalized}`,
   ].forEach(key => localStorage.removeItem(key));
+}
+
+function clearLegacyStylebookCaches() {
+  try {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key) continue;
+      if (LEGACY_DB_KEYS.some(prefix => key === prefix || key.startsWith(`${prefix}_`))) {
+        keys.push(key);
+      }
+    }
+    keys.forEach(key => localStorage.removeItem(key));
+    if (keys.length) logStylebookApi('cleared legacy localStorage cache', { keys });
+  } catch (error) {
+    console.warn('古いスタイル図鑑キャッシュを削除できませんでした。', error);
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      Object.keys(sessionStorage)
+        .filter(key => LEGACY_DB_KEYS.some(prefix => key === prefix || key.startsWith(`${prefix}_`)))
+        .forEach(key => sessionStorage.removeItem(key));
+    }
+  } catch (error) {
+    console.warn('古いスタイル図鑑セッションキャッシュを削除できませんでした。', error);
+  }
 }
 
 function requestJson(url, options = {}) {
@@ -463,17 +502,20 @@ async function apiRequest(action, payload = {}) {
 async function loadRemoteDb() {
   const scopedShopId = String(state.externalShopId || '').trim();
   const action = scopedShopId ? 'shopDatabase' : 'database';
-  debugStylebook('API database request', {
+  const databaseUrl = `${STYLEBOOK_API_URL}?action=${action}&userId=${encodeURIComponent(state.currentUserId)}&shopId=${encodeURIComponent(scopedShopId)}&_=${Date.now()}`;
+  logStylebookApi('database request', {
     url: STYLEBOOK_API_URL,
+    requestUrl: databaseUrl,
     userId: state.currentUserId,
     shopId: scopedShopId,
   });
-  const data = await requestJson(`${STYLEBOOK_API_URL}?action=${action}&userId=${encodeURIComponent(state.currentUserId)}&shopId=${encodeURIComponent(scopedShopId)}&t=${Date.now()}`, {
+  const data = await requestJson(databaseUrl, {
     cache: 'no-store',
   });
   if (scopedShopId && !data.ok) {
     console.warn('shopDatabase endpoint is not deployed yet. Falling back to database response for compatibility.');
-    const fallback = await requestJson(`${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&t=${Date.now()}`, {
+    const fallbackUrl = `${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&_=${Date.now()}`;
+    const fallback = await requestJson(fallbackUrl, {
       cache: 'no-store',
     });
     if (!fallback.ok || !fallback.database) throw new Error(fallback.message || data.message || 'スタイル図鑑データを取得できませんでした。');
@@ -481,9 +523,11 @@ async function loadRemoteDb() {
     state.db.stylePosts = state.db.stylePosts.filter(post => String(post.shopId || '').trim() === scopedShopId);
     state.backendMode = 'remote';
     saveDb();
-    debugStylebook('API database compatibility fallback counts', {
+    logStylebookApi('database compatibility fallback counts', {
+      url: STYLEBOOK_API_URL,
       shopId: scopedShopId,
       posts: state.db.stylePosts?.length || 0,
+      salons: Array.from(new Set((state.db.stylePosts || []).map(post => styleSalonName(post)).filter(Boolean))).slice(0, 20),
     });
     return;
   }
@@ -491,8 +535,13 @@ async function loadRemoteDb() {
   state.db = normalizeDatabase(data.database);
   state.backendMode = 'remote';
   saveDb();
-  debugStylebook('API database response counts', {
+  const validPublishedPosts = getValidPublishedPosts(state.db.stylePosts);
+  logStylebookApi('database response counts', {
+    url: STYLEBOOK_API_URL,
     posts: state.db.stylePosts?.length || 0,
+    validPublishedPosts: validPublishedPosts.length,
+    salons: Array.from(new Set(validPublishedPosts.map(post => styleSalonName(post)).filter(Boolean))).slice(0, 20),
+    staff: Array.from(new Set(validPublishedPosts.map(post => styleStaffName(post)).filter(Boolean))).slice(0, 20),
     colorsFromApi: state.db.extensionColors?.length || 0,
     activeColorsFromApi: (state.db.extensionColors || []).filter(color => color.isActive).length,
     types: state.db.styleTypes?.length || 0,
@@ -645,6 +694,7 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
 }
 
 async function loadDb() {
+  clearLegacyStylebookCaches();
   if (hasRemoteApi()) {
     state.isLoading = true;
     const saved = localStorage.getItem(dbStorageKeyForCurrentUser());

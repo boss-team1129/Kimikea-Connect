@@ -5962,7 +5962,7 @@
 
     function loadStylebookPostsForColorChart() {
       if (state.colorChartStylesLoaded || !STYLEBOOK_API_URL) return;
-      fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-color-chart&t=${Date.now()}`)
+      fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-color-chart&_=${Date.now()}`, { cache: 'no-store' })
         .then((response) => response.json())
         .then((data) => {
           const posts = data?.database?.stylePosts || data?.stylePosts || [];
@@ -5993,7 +5993,7 @@
         colorCode: color.color || '',
         colorName: colorDisplayName(color),
       });
-      fetch(`${STYLEBOOK_API_URL}?${params.toString()}&t=${Date.now()}`)
+      fetch(`${STYLEBOOK_API_URL}?${params.toString()}&_=${Date.now()}`, { cache: 'no-store' })
         .then((response) => response.json())
         .then((data) => {
           if (!data?.ok || !Array.isArray(data.posts)) {
@@ -6089,14 +6089,14 @@
 
     function fetchStylebookRankingData() {
       const cacheBuster = Date.now();
-      return fetch(`${STYLEBOOK_API_URL}?action=colorUsageRankings&userId=public-ranking&t=${cacheBuster}`)
+      return fetch(`${STYLEBOOK_API_URL}?action=colorUsageRankings&userId=public-ranking&_=${cacheBuster}`, { cache: 'no-store' })
         .then((response) => response.json())
         .then((data) => {
           if (data?.ok && data?.ranking?.counts) return data;
-          return fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${cacheBuster}`)
+          return fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&_=${cacheBuster}`, { cache: 'no-store' })
             .then((response) => response.json());
         })
-        .catch(() => fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&t=${cacheBuster}`)
+        .catch(() => fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-ranking&_=${cacheBuster}`, { cache: 'no-store' })
           .then((response) => response.json()));
     }
 
@@ -7258,7 +7258,7 @@
 
     function loadKimikeaMapStyleDatabase() {
       if (!kimikeaMapStyleDatabasePromise) {
-        kimikeaMapStyleDatabasePromise = fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&t=${Date.now()}`)
+        kimikeaMapStyleDatabasePromise = fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&_=${Date.now()}`, { cache: 'no-store' })
           .then((response) => response.json())
           .then((data) => {
             const posts = data?.database?.stylePosts || data?.stylePosts || [];
