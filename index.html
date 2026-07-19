@@ -2914,6 +2914,332 @@
         transition: none;
       }
     }
+    .diagnosis-shell {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      padding-bottom: calc(34px + env(safe-area-inset-bottom));
+      color: #18130c;
+    }
+    .diagnosis-shell::before {
+      position: absolute;
+      inset: -28px -18px auto;
+      height: 260px;
+      content: "";
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(228, 195, 114, .28), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(255, 255, 255, .72), transparent 28%),
+        linear-gradient(135deg, rgba(255, 252, 244, .72), rgba(246, 238, 222, .18));
+      filter: blur(2px);
+      z-index: 0;
+    }
+    .diagnosis-shell > * {
+      position: relative;
+      z-index: 1;
+    }
+    .diagnosis-hero,
+    .diagnosis-panel,
+    .diagnosis-result-card,
+    .diagnosis-related-card {
+      border: 1px solid rgba(185, 145, 67, .22);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.88), rgba(250,246,236,.72)),
+        rgba(255,255,255,.72);
+      box-shadow: 0 22px 54px rgba(49, 36, 18, .11), inset 0 1px 0 rgba(255,255,255,.86);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .diagnosis-hero {
+      display: grid;
+      gap: 18px;
+      min-height: 420px;
+      align-content: center;
+      padding: 30px 20px;
+      border-radius: 30px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 72% 16%, rgba(255,255,255,.74), transparent 24%),
+        radial-gradient(circle at 18% 78%, rgba(215, 178, 98, .28), transparent 28%),
+        linear-gradient(145deg, #fffefa, #f4ead9 58%, #20180d 160%);
+    }
+    .diagnosis-kicker {
+      margin: 0;
+      color: #9a7530;
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .diagnosis-hero h3,
+    .diagnosis-result-title {
+      margin: 0;
+      color: #17130d;
+      font-size: clamp(34px, 10vw, 68px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+    .diagnosis-hero p,
+    .diagnosis-result-lead {
+      margin: 0;
+      color: rgba(38, 31, 21, .72);
+      font-size: 15px;
+      font-weight: 750;
+      line-height: 1.8;
+    }
+    .diagnosis-primary-button,
+    .diagnosis-secondary-button,
+    .diagnosis-line-button,
+    .diagnosis-back-button {
+      min-height: 52px;
+      border-radius: 999px;
+      border: 1px solid rgba(185, 145, 67, .34);
+      padding: 0 18px;
+      font-size: 15px;
+      font-weight: 950;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .diagnosis-primary-button {
+      justify-self: start;
+      background: linear-gradient(135deg, #1c1710, #3a2a15 46%, #d7b25f 160%);
+      color: #fffaf0;
+      box-shadow: 0 16px 34px rgba(49, 36, 18, .18);
+    }
+    .diagnosis-secondary-button,
+    .diagnosis-back-button {
+      background: rgba(255,255,255,.78);
+      color: #3b2c16;
+      box-shadow: 0 10px 24px rgba(49, 36, 18, .08);
+    }
+    .diagnosis-line-button {
+      background: linear-gradient(145deg, #06c755, #039d42);
+      border-color: rgba(255,255,255,.28);
+      color: #fff;
+      box-shadow: 0 16px 34px rgba(0, 122, 52, .22);
+    }
+    .diagnosis-primary-button:active,
+    .diagnosis-secondary-button:active,
+    .diagnosis-line-button:active,
+    .diagnosis-back-button:active,
+    .diagnosis-option:active,
+    .diagnosis-related-card:active {
+      transform: translateY(2px) scale(.985);
+      box-shadow: 0 8px 18px rgba(49, 36, 18, .1);
+    }
+    .diagnosis-panel {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      border-radius: 26px;
+    }
+    .diagnosis-progress {
+      display: grid;
+      gap: 8px;
+    }
+    .diagnosis-progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #8a6a30;
+      font-size: 12px;
+      font-weight: 950;
+    }
+    .diagnosis-progress-track {
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(185,145,67,.16);
+      overflow: hidden;
+    }
+    .diagnosis-progress-track span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #bc8e35, #f0d78d);
+      box-shadow: 0 0 18px rgba(188,142,53,.28);
+      transition: width .24s ease;
+    }
+    .diagnosis-question {
+      margin: 0;
+      color: #17130d;
+      font-size: clamp(23px, 6vw, 34px);
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+    .diagnosis-options {
+      display: grid;
+      gap: 10px;
+    }
+    .diagnosis-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      min-height: 58px;
+      border: 1px solid rgba(185,145,67,.2);
+      border-radius: 18px;
+      background: rgba(255,255,255,.82);
+      color: #1f1a12;
+      padding: 14px 15px;
+      font-size: 15px;
+      font-weight: 850;
+      text-align: left;
+      box-shadow: 0 10px 24px rgba(49, 36, 18, .07);
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .diagnosis-option::after {
+      content: "›";
+      color: #b58a3a;
+      font-size: 22px;
+      line-height: 1;
+    }
+    .diagnosis-option.is-selected {
+      border-color: rgba(185,145,67,.56);
+      background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(250,236,196,.86));
+      box-shadow: 0 14px 30px rgba(185,145,67,.16);
+    }
+    .diagnosis-panel-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .diagnosis-analyzing {
+      display: grid;
+      place-items: center;
+      min-height: 360px;
+      text-align: center;
+    }
+    .diagnosis-orb {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 34% 26%, #fff, transparent 22%),
+        conic-gradient(from 0deg, #19130c, #d7b25f, #fff2bd, #19130c);
+      box-shadow: 0 0 34px rgba(215,178,95,.34);
+      animation: diagnosisSpin 1.2s linear infinite;
+    }
+    @keyframes diagnosisSpin {
+      to { transform: rotate(360deg); }
+    }
+    .diagnosis-result-card {
+      display: grid;
+      gap: 18px;
+      padding: 20px;
+      border-radius: 28px;
+    }
+    .diagnosis-result-title {
+      font-size: clamp(30px, 8vw, 56px);
+    }
+    .diagnosis-result-type {
+      margin: 0;
+      color: #9a7530;
+      font-size: 13px;
+      font-weight: 950;
+      letter-spacing: .12em;
+    }
+    .diagnosis-result-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .diagnosis-result-item {
+      display: grid;
+      gap: 4px;
+      padding: 13px 14px;
+      border: 1px solid rgba(185,145,67,.16);
+      border-radius: 16px;
+      background: rgba(255,255,255,.68);
+    }
+    .diagnosis-result-item b {
+      color: #8a6422;
+      font-size: 12px;
+      font-weight: 950;
+    }
+    .diagnosis-result-item span,
+    .diagnosis-result-item p {
+      margin: 0;
+      color: rgba(29, 24, 17, .78);
+      font-size: 14px;
+      font-weight: 750;
+      line-height: 1.68;
+    }
+    .diagnosis-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .diagnosis-related-section {
+      display: grid;
+      gap: 12px;
+    }
+    .diagnosis-section-title {
+      margin: 6px 0 0;
+      color: #17130d;
+      font-size: 21px;
+      line-height: 1.35;
+    }
+    .diagnosis-related-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .diagnosis-related-card {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 18px;
+      text-align: left;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .diagnosis-related-card img {
+      width: 100%;
+      aspect-ratio: 4 / 5;
+      object-fit: cover;
+      border-radius: 14px;
+      background: #f2eadc;
+    }
+    .diagnosis-related-card strong {
+      color: #17130d;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .diagnosis-related-card span {
+      color: rgba(38,31,21,.64);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+    @media (min-width: 720px) {
+      .diagnosis-hero,
+      .diagnosis-panel,
+      .diagnosis-result-card {
+        padding: 28px;
+      }
+      .diagnosis-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .diagnosis-related-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .diagnosis-orb {
+        animation: none;
+      }
+      .diagnosis-option,
+      .diagnosis-primary-button,
+      .diagnosis-secondary-button,
+      .diagnosis-line-button,
+      .diagnosis-back-button {
+        transition: none;
+      }
+    }
     .color-chart-shell {
       display: grid;
       gap: 14px;
@@ -4690,6 +5016,13 @@
         items: [],
         latest: null,
       },
+      styleDiagnosis: {
+        mode: 'start',
+        currentIndex: 0,
+        answers: {},
+        result: null,
+        analyzing: false,
+      },
       noticeDetailId: '',
       kimikeaMap: {
         loaded: false,
@@ -5839,6 +6172,189 @@
       );
     }
 
+    const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
+    const STYLE_DIAGNOSIS_TYPES = {
+      natural: {
+        id: 'natural',
+        title: 'ナチュラルイヤリングタイプ',
+        catchcopy: 'さりげない変化で、いつもの髪に小さなきらめきを。',
+        style: 'イヤリングカラー',
+        colorTone: '地毛になじむベージュ、ブラウン、グレージュ系',
+        colorChartCategory: 'ダークカラー',
+        colorKeywords: ['ベージュ', 'ブラウン', 'グレージュ', 'NB', 'GB'],
+        amount: '左右2本ずつの合計4本、または合計6本',
+        position: '耳まわり',
+        finish: '髪を下ろすと自然で、耳にかけるとさりげなく見える仕上がりです。',
+        reason: '目立ちすぎない変化を楽しみたい回答が多く、普段のファッションや職場にもなじみやすいスタイルが向いています。',
+        styleKeywords: ['イヤリング', '耳', 'ナチュラル', 'ベージュ', 'ブラウン', 'グレージュ'],
+      },
+      face: {
+        id: 'face',
+        title: '顔まわり透明感タイプ',
+        catchcopy: '顔まわりを明るく、柔らかい透明感を足す提案です。',
+        style: 'フェイスフレーミング、顔まわりポイント',
+        colorTone: 'ベージュ、ミルクティー、グレージュ、淡いピンク系',
+        colorChartCategory: 'ライトカラー',
+        colorKeywords: ['ベージュ', 'ミルクティー', 'グレージュ', 'ピンク', 'LC'],
+        amount: '4本から8本',
+        position: '前髪横、もみあげ、顔まわり',
+        finish: '顔まわりが明るくなり、柔らかく透明感のある印象になります。',
+        reason: '顔まわりを明るく見せたい回答と、上品・かわいい雰囲気の回答が強く出ています。',
+        styleKeywords: ['顔まわり', 'フェイス', '透明感', 'ミルクティー', 'ピンク', 'ベージュ'],
+      },
+      inner: {
+        id: 'inner',
+        title: '大人インナーカラータイプ',
+        catchcopy: '控えめな上質感と、動いた時に見える余韻を楽しむスタイル。',
+        style: 'インナーカラー',
+        colorTone: 'グレージュ、シルバー、落ち着いたピンク、パープル系',
+        colorChartCategory: 'ライトカラー',
+        colorKeywords: ['グレージュ', 'シルバー', 'ピンク', 'パープル', 'LC'],
+        amount: '6本から10本',
+        position: '耳後ろから襟足寄りの内側',
+        finish: '髪を下ろすと控えめで、動いたときや結んだときに色が見えます。',
+        reason: '上品・大人っぽい雰囲気や、髪の内側で変化を出したい回答が重なっています。',
+        styleKeywords: ['インナー', '内側', '襟足', 'シルバー', 'パープル', 'ピンク'],
+      },
+      highlight: {
+        id: 'highlight',
+        title: '華やかメッシュタイプ',
+        catchcopy: '髪全体に立体感と動きを足し、華やかに印象を変える提案です。',
+        style: 'ポイントメッシュ、全体メッシュ',
+        colorTone: 'ベージュ、ハイトーン、シルバー、ホワイト系',
+        colorChartCategory: 'ライトカラー',
+        colorKeywords: ['ベージュ', 'ハイトーン', 'シルバー', 'ホワイト', 'LC'],
+        amount: '10本から20本',
+        position: '表面、顔まわり、サイド、後頭部にバランスよく配置',
+        finish: '立体感と動きが出て、華やかな印象に見えます。',
+        reason: 'しっかり変化を出したい回答と、全体に見せたい回答が多く出ています。',
+        styleKeywords: ['メッシュ', 'ハイライト', '全体', '華やか', 'ホワイト', 'シルバー'],
+      },
+      accent: {
+        id: 'accent',
+        title: '個性派アクセントタイプ',
+        catchcopy: 'ファッションの一部として、色そのものを楽しむスタイル。',
+        style: 'アクセントカラー、ポイントカラー、インナーカラー',
+        colorTone: 'ピンク、ブルー、パープル、レッド、グリーンなどの原色系',
+        colorChartCategory: '原色',
+        colorKeywords: ['ピンク', 'ブルー', 'パープル', 'レッド', 'グリーン', 'OR'],
+        amount: '4本から12本',
+        position: '耳まわり、顔まわり、内側から希望に合わせて提案',
+        finish: '色が主役になり、ファッションやメイクと合わせて楽しめる印象です。',
+        reason: '個性的なスタイルや、しっかり目立たせたい回答が強く出ています。',
+        styleKeywords: ['アクセント', 'ポイント', '原色', 'ブルー', 'ピンク', 'パープル', 'レッド'],
+      },
+      volume: {
+        id: 'volume',
+        title: '長さ・ボリュームアップタイプ',
+        catchcopy: '自然な長さと厚みを足し、シルエットそのものを整える提案です。',
+        style: '長さ出し、ボリュームアップ',
+        colorTone: '地毛に近い色を中心に選定',
+        colorChartCategory: 'ダークカラー',
+        colorKeywords: ['地毛', 'ブラウン', 'ブラック', 'ダーク', 'DC'],
+        amount: '多めの本数がおすすめです。正確な本数は髪の量とカットラインを見て相談してください。',
+        position: '後頭部、サイド、襟足を中心に全体へ配置',
+        finish: '自然な長さとボリュームをプラスし、全体のシルエットを整えます。',
+        reason: '長さを出したい回答や、しっかり本数を付けたい回答が目立っています。',
+        styleKeywords: ['長さ', 'ロング', 'ボリューム', '襟足', '全体'],
+      },
+    };
+
+    const STYLE_DIAGNOSIS_QUESTIONS = [
+      {
+        id: 'change',
+        title: 'どんな変化を楽しみたいですか？',
+        options: [
+          ['subtle', 'さりげなくイメージを変えたい', { natural: 4, face: 2, inner: 1 }],
+          ['face', '顔まわりを明るく見せたい', { face: 4, natural: 1 }],
+          ['strong', 'しっかり変化を出したい', { highlight: 4, inner: 2, accent: 1 }],
+          ['unique', '個性的なスタイルを楽しみたい', { accent: 5, highlight: 1 }],
+          ['length', '髪を長く見せたい', { volume: 5 }],
+          ['undecided', 'まだ決まっていない', { natural: 2, face: 2, inner: 1 }, true],
+        ],
+      },
+      {
+        id: 'hairColor',
+        title: '今の髪色に近いものを選んでください',
+        options: [
+          ['black', '黒髪', { natural: 2, volume: 2, inner: 1 }],
+          ['darkBrown', '暗めのブラウン', { natural: 2, face: 1, volume: 1 }],
+          ['lightBrown', '明るめのブラウン', { face: 2, inner: 2, highlight: 1 }],
+          ['highTone', 'ハイトーン', { highlight: 3, accent: 2, face: 1 }],
+          ['gray', '白髪・グレーヘア', { face: 2, inner: 2, highlight: 1 }],
+          ['other', 'その他', { natural: 1, face: 1 }, true],
+        ],
+      },
+      {
+        id: 'mood',
+        title: '好きな雰囲気は？',
+        options: [
+          ['natural', 'ナチュラル', { natural: 4, face: 1 }],
+          ['elegant', '上品・大人っぽい', { inner: 3, face: 2, natural: 1 }],
+          ['cute', 'かわいい', { face: 3, natural: 1, accent: 1 }],
+          ['cool', 'クール', { inner: 3, highlight: 1, accent: 1 }],
+          ['glamorous', '華やか', { highlight: 4, face: 1 }],
+          ['unique', '個性的', { accent: 5 }],
+        ],
+      },
+      {
+        id: 'visibility',
+        title: 'どのくらい目立たせたいですか？',
+        options: [
+          ['hidden', 'ほとんど目立たせたくない', { natural: 4, inner: 1 }],
+          ['little', '少しだけ変化がほしい', { natural: 2, face: 3, inner: 1 }],
+          ['visible', 'しっかり見せたい', { inner: 2, highlight: 3, accent: 1 }],
+          ['bold', 'かなり目立たせたい', { accent: 4, highlight: 2 }],
+        ],
+      },
+      {
+        id: 'restriction',
+        title: '学校や職場で髪色の制限はありますか？',
+        options: [
+          ['strict', 'かなり厳しい', { natural: 5, face: 1 }],
+          ['some', '少し制限がある', { natural: 2, face: 2, inner: 1 }],
+          ['none', '特にない', { accent: 2, highlight: 2, inner: 1 }],
+          ['holiday', '休日だけ楽しみたい', { accent: 2, natural: 2, face: 1 }],
+        ],
+      },
+      {
+        id: 'position',
+        title: 'どこに付けたいですか？',
+        options: [
+          ['ear', '耳まわり', { natural: 4, accent: 1 }],
+          ['face', '顔まわり', { face: 4, highlight: 1 }],
+          ['inside', '髪の内側', { inner: 4, accent: 1 }],
+          ['mesh', '全体にメッシュ', { highlight: 5 }],
+          ['length', '長さを出したい', { volume: 5 }],
+          ['omakase', 'おまかせ', { natural: 1, face: 1, inner: 1 }, true],
+        ],
+      },
+      {
+        id: 'length',
+        title: '現在の髪の長さは？',
+        options: [
+          ['short', 'ショート', { natural: 2, face: 2, highlight: 1 }],
+          ['bob', 'ボブ', { natural: 2, face: 2, inner: 2 }],
+          ['medium', 'ミディアム', { inner: 2, highlight: 1, volume: 1 }],
+          ['long', 'ロング', { inner: 1, highlight: 2, volume: 3 }],
+        ],
+      },
+      {
+        id: 'budget',
+        title: '希望するボリュームや予算に近いものを選んでください',
+        options: [
+          ['four', 'まずは4本くらい', { natural: 4, face: 2 }],
+          ['sixEight', '6〜8本くらい', { face: 3, inner: 2, natural: 1 }],
+          ['tenTwenty', '10〜20本くらい', { highlight: 4, inner: 2 }],
+          ['full', 'しっかり長さやボリュームを出したい', { volume: 5, highlight: 1 }],
+          ['consult', '相談して決めたい', { natural: 1, face: 1, inner: 1 }, true],
+        ],
+      },
+    ].map((question) => ({
+      ...question,
+      options: question.options.map(([id, label, scores, uncertain]) => ({ id, label, scores, uncertain: Boolean(uncertain) })),
+    }));
+
     function colorImageUrlFromCode(code, extension = 'jpg') {
       const normalized = normalizeColorCode(code);
       return normalized ? `${COLOR_IMAGE_BASE_PATH}${encodeURIComponent(normalized)}.${extension}?v=${COLOR_IMAGE_VERSION}` : '';
@@ -5905,6 +6421,7 @@
         category: String(product.category || product.productCategory || product['商品カテゴリー'] || '').trim(),
         color: String(product.color || product.colorName || product['カラー'] || '').trim(),
         colorName: String(product.colorName || product.name || product['カラー名'] || '').trim(),
+        colorSystem: String(product.colorSystem || product.colorTone || product.colorGroup || product['色系統'] || '').trim(),
         swatchImageUrl: String(product.swatchImageUrl || product.imageUrl || product['色見本画像URL'] || '').trim(),
         code: colorCodeFromProduct(product),
         purchaseRank: product.purchaseRank || product.monthlyPurchaseRank || product['今月購入ランキング'],
@@ -5920,7 +6437,7 @@
         const categoryMatch = state.colorChartFilter === 'すべて' || color.category === state.colorChartFilter;
         if (!categoryMatch) return false;
         if (!query) return true;
-        return `${color.code} ${color.color} ${color.colorName}`.toLowerCase().includes(query);
+        return `${color.color} ${color.colorName} ${color.colorSystem}`.toLowerCase().includes(query);
       });
     }
 
@@ -5987,6 +6504,7 @@
           state.products = Array.isArray(products) ? products : [];
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
+          if (currentPublicPageKey === 'ai') refreshCurrentPublicActions();
         });
     }
 
@@ -5999,11 +6517,13 @@
           state.colorChartStyles = Array.isArray(posts) ? posts : [];
           state.colorChartStylesLoaded = true;
           refreshColorChartContent();
+          if (currentPublicPageKey === 'ai') refreshCurrentPublicActions();
         })
         .catch(() => {
           state.colorChartStyles = [];
           state.colorChartStylesLoaded = false;
           refreshColorChartContent();
+          if (currentPublicPageKey === 'ai') refreshCurrentPublicActions();
         });
     }
 
@@ -6270,6 +6790,386 @@
     function colorIncludedInStyle(post, color) {
       const postKeys = new Set(extractPostColorKeys(post));
       return colorAliasKeys(color).some((key) => postKeys.has(key));
+    }
+
+    function getStyleDiagnosisStoredResult() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STYLE_DIAGNOSIS_STORAGE_KEY) || 'null');
+        return saved && saved.resultId && saved.answers ? saved : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function hydrateStyleDiagnosisState() {
+      if (state.styleDiagnosis.result) return;
+      const saved = getStyleDiagnosisStoredResult();
+      if (!saved) return;
+      const result = STYLE_DIAGNOSIS_TYPES[saved.resultId];
+      if (!result) return;
+      state.styleDiagnosis.mode = 'result';
+      state.styleDiagnosis.answers = saved.answers || {};
+      state.styleDiagnosis.result = { ...result, savedAt: saved.savedAt || '' };
+      state.styleDiagnosis.currentIndex = STYLE_DIAGNOSIS_QUESTIONS.length - 1;
+    }
+
+    function startStyleDiagnosis() {
+      state.styleDiagnosis.mode = 'question';
+      state.styleDiagnosis.currentIndex = 0;
+      state.styleDiagnosis.answers = {};
+      state.styleDiagnosis.result = null;
+      state.styleDiagnosis.analyzing = false;
+      localStorage.removeItem(STYLE_DIAGNOSIS_STORAGE_KEY);
+      refreshCurrentPublicActions();
+    }
+
+    function resetStyleDiagnosis() {
+      startStyleDiagnosis();
+    }
+
+    function previousStyleDiagnosisQuestion() {
+      if (state.styleDiagnosis.mode === 'result') {
+        state.styleDiagnosis.mode = 'question';
+        state.styleDiagnosis.result = null;
+      }
+      state.styleDiagnosis.currentIndex = Math.max(0, Number(state.styleDiagnosis.currentIndex || 0) - 1);
+      refreshCurrentPublicActions();
+    }
+
+    function selectStyleDiagnosisAnswer(questionId, optionId) {
+      const questionIndex = STYLE_DIAGNOSIS_QUESTIONS.findIndex((question) => question.id === questionId);
+      if (questionIndex < 0) return;
+      const question = STYLE_DIAGNOSIS_QUESTIONS[questionIndex];
+      const option = question.options.find((item) => item.id === optionId);
+      if (!option) return;
+      state.styleDiagnosis.answers = {
+        ...state.styleDiagnosis.answers,
+        [questionId]: optionId,
+      };
+      state.styleDiagnosis.currentIndex = questionIndex;
+      refreshCurrentPublicActions();
+      window.setTimeout(() => {
+        if (questionIndex >= STYLE_DIAGNOSIS_QUESTIONS.length - 1) {
+          completeStyleDiagnosis();
+          return;
+        }
+        state.styleDiagnosis.currentIndex = questionIndex + 1;
+        refreshCurrentPublicActions();
+      }, 180);
+    }
+
+    function styleDiagnosisSelectedOption(questionId) {
+      return state.styleDiagnosis.answers?.[questionId] || '';
+    }
+
+    function styleDiagnosisAnswerLabel(questionId) {
+      const selected = styleDiagnosisSelectedOption(questionId);
+      const question = STYLE_DIAGNOSIS_QUESTIONS.find((item) => item.id === questionId);
+      return question?.options.find((option) => option.id === selected)?.label || '';
+    }
+
+    function completeStyleDiagnosis() {
+      if (state.styleDiagnosis.analyzing) return;
+      state.styleDiagnosis.mode = 'analyzing';
+      state.styleDiagnosis.analyzing = true;
+      refreshCurrentPublicActions();
+      window.setTimeout(() => {
+        const result = calculateStyleDiagnosisResult(state.styleDiagnosis.answers || {});
+        state.styleDiagnosis.mode = 'result';
+        state.styleDiagnosis.result = result;
+        state.styleDiagnosis.analyzing = false;
+        localStorage.setItem(STYLE_DIAGNOSIS_STORAGE_KEY, JSON.stringify({
+          resultId: result.id,
+          answers: state.styleDiagnosis.answers,
+          savedAt: new Date().toISOString(),
+        }));
+        refreshCurrentPublicActions();
+      }, 2000);
+    }
+
+    function calculateStyleDiagnosisResult(answers) {
+      const scores = Object.fromEntries(Object.keys(STYLE_DIAGNOSIS_TYPES).map((key) => [key, 0]));
+      let uncertainCount = 0;
+      STYLE_DIAGNOSIS_QUESTIONS.forEach((question) => {
+        const option = question.options.find((item) => item.id === answers[question.id]);
+        if (!option) return;
+        if (option.uncertain) uncertainCount += 1;
+        Object.entries(option.scores || {}).forEach(([type, score]) => {
+          scores[type] = Number(scores[type] || 0) + Number(score || 0);
+        });
+      });
+
+      if (answers.restriction === 'strict') {
+        scores.accent -= 5;
+        scores.highlight -= 4;
+        scores.natural += 2;
+      }
+      if (answers.length === 'short') {
+        scores.volume -= 5;
+        scores.natural += 2;
+        scores.face += 2;
+        scores.highlight += 1;
+      }
+      if (answers.length === 'bob') {
+        scores.natural += 2;
+        scores.face += 2;
+        scores.inner += 2;
+        scores.volume -= 2;
+      }
+      if (answers.length === 'medium' || answers.length === 'long') {
+        scores.inner += 1;
+        scores.highlight += 1;
+        scores.volume += 1;
+      }
+      if (answers.budget === 'four') {
+        scores.natural += 3;
+        scores.face += 2;
+        scores.highlight -= 2;
+        scores.volume -= 3;
+      }
+      if (answers.budget === 'tenTwenty') {
+        scores.highlight += 3;
+        scores.inner += 2;
+        scores.natural -= 1;
+      }
+      if (uncertainCount >= 3) {
+        scores.natural += 2;
+        scores.face += 1;
+      }
+
+      const priority = ['natural', 'face', 'inner', 'highlight', 'accent', 'volume'];
+      const resultId = priority
+        .map((id) => ({ id, score: scores[id] }))
+        .sort((a, b) => b.score - a.score || priority.indexOf(a.id) - priority.indexOf(b.id))[0]?.id || 'natural';
+      return {
+        ...STYLE_DIAGNOSIS_TYPES[resultId],
+        score: scores[resultId],
+        scores,
+      };
+    }
+
+    function normalizeDiagnosisText(value) {
+      return String(value || '').normalize('NFKC').trim().toLowerCase();
+    }
+
+    function styleDiagnosisPostText(post) {
+      return [
+        post.title,
+        post.styleTitle,
+        post.styleName,
+        post.styleType,
+        post.category,
+        post.description,
+        post.comment,
+        post.caption,
+        post.finish,
+        post.salonName,
+        post.shopName,
+        post.staffName,
+        post.authorName,
+        post.extensionColors,
+        post.colorCodes,
+        post.colors,
+        post.colorLabels,
+      ].map((value) => {
+        if (Array.isArray(value)) return value.map((item) => (typeof item === 'object' ? Object.values(item).join(' ') : item)).join(' ');
+        if (value && typeof value === 'object') return Object.values(value).join(' ');
+        return value;
+      }).join(' ');
+    }
+
+    function stylePostImageUrl(post) {
+      return String(post.imageUrl || post.photoUrl || post.image || post.mainImageUrl || post.thumbnailUrl || '').trim();
+    }
+
+    function stylePostDisplayId(post) {
+      return String(post.id || post.styleId || post.postId || '').trim();
+    }
+
+    function diagnosisRelatedStyles(result) {
+      const keywords = (result?.styleKeywords || []).map(normalizeDiagnosisText).filter(Boolean);
+      const colors = getActiveColorChartProducts().filter((color) => {
+        const haystack = normalizeDiagnosisText([
+          color.category,
+          color.color,
+          color.colorName,
+          color.colorSystem,
+          color.code,
+        ].join(' '));
+        return (result?.colorKeywords || []).some((keyword) => haystack.includes(normalizeDiagnosisText(keyword)));
+      });
+      const colorKeys = new Set(colors.flatMap(colorAliasKeys));
+      return (state.colorChartStyles || [])
+        .filter((post) => isPublishedStylePost(post) && stylePostImageUrl(post) && stylePostDisplayId(post))
+        .map((post) => {
+          const text = normalizeDiagnosisText(styleDiagnosisPostText(post));
+          const postColorKeys = extractPostColorKeys(post);
+          const textScore = keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 2 : 0), 0);
+          const colorScore = postColorKeys.reduce((score, key) => score + (colorKeys.has(key) ? 3 : 0), 0);
+          const saveScore = Number(post.saveCount || post.savedCount || post.likes || 0) / 100;
+          return { post, score: textScore + colorScore + saveScore };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6)
+        .map((item) => item.post);
+    }
+
+    function renderDiagnosisRelatedStyles(result) {
+      const stylesLoaded = state.colorChartStylesLoaded;
+      if (!stylesLoaded && STYLEBOOK_API_URL) {
+        return '<p class="color-chart-empty">関連スタイルを読み込んでいます。</p>';
+      }
+      const posts = diagnosisRelatedStyles(result);
+      if (!posts.length) {
+        return '<p class="color-chart-empty">現在、近いスタイルを準備中です</p>';
+      }
+      return `
+        <div class="diagnosis-related-grid">
+          ${posts.map((post) => `
+            <button type="button" class="diagnosis-related-card" onclick="openColorStyleDetail('${escapeHtml(stylePostDisplayId(post))}')">
+              <img src="${escapeHtml(stylePostImageUrl(post))}" alt="${escapeHtml(post.title || post.styleTitle || 'スタイル写真')}" loading="lazy">
+              <strong>${escapeHtml(post.title || post.styleTitle || post.styleName || 'スタイル')}</strong>
+              <span>${escapeHtml(post.salonName || post.shopName || '')} ${escapeHtml(post.staffName || post.authorName || '')}</span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function openDiagnosisColorChart() {
+      const result = state.styleDiagnosis.result || STYLE_DIAGNOSIS_TYPES[getStyleDiagnosisStoredResult()?.resultId] || STYLE_DIAGNOSIS_TYPES.natural;
+      state.colorChartDetailCode = '';
+      state.colorChartFilter = result.colorChartCategory || 'すべて';
+      state.colorChartSearch = '';
+      openPublicPage('colorChart');
+    }
+
+    function scrollToDiagnosisRelatedStyles() {
+      const target = document.getElementById('diagnosisRelatedStyles');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function diagnosisLineMessage() {
+      const result = state.styleDiagnosis.result || STYLE_DIAGNOSIS_TYPES[getStyleDiagnosisStoredResult()?.resultId] || STYLE_DIAGNOSIS_TYPES.natural;
+      return [
+        'AI診断結果：',
+        `タイプ：${result.title}`,
+        `おすすめスタイル：${result.style}`,
+        `おすすめカラー：${result.colorTone}`,
+        `おすすめ本数：${result.amount}`,
+        `現在の髪色：${styleDiagnosisAnswerLabel('hairColor')}`,
+        `現在の髪の長さ：${styleDiagnosisAnswerLabel('length')}`,
+        `希望する雰囲気：${styleDiagnosisAnswerLabel('mood')}`,
+      ].join('\n');
+    }
+
+    function openDiagnosisLineConsultation() {
+      const message = diagnosisLineMessage();
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(message).catch(() => {});
+      }
+      const separator = NPO_LINE_URL.includes('?') ? '&' : '?';
+      window.open(`${NPO_LINE_URL}${separator}text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+    }
+
+    function renderStyleDiagnosisStart() {
+      return `
+        <section class="diagnosis-hero">
+          <p class="diagnosis-kicker">Kimikea Concierge</p>
+          <h3>あなたのピッタリを探す</h3>
+          <p>いくつかの質問に答えるだけで、あなたにおすすめのエクステスタイル・カラー・本数をご提案します。</p>
+          <button type="button" class="diagnosis-primary-button" onclick="startStyleDiagnosis()">診断をはじめる</button>
+        </section>
+      `;
+    }
+
+    function renderStyleDiagnosisQuestion() {
+      const index = Number(state.styleDiagnosis.currentIndex || 0);
+      const question = STYLE_DIAGNOSIS_QUESTIONS[index] || STYLE_DIAGNOSIS_QUESTIONS[0];
+      const progress = Math.round(((index + 1) / STYLE_DIAGNOSIS_QUESTIONS.length) * 100);
+      const selected = styleDiagnosisSelectedOption(question.id);
+      return `
+        <section class="diagnosis-panel">
+          <div class="diagnosis-progress">
+            <div class="diagnosis-progress-row">
+              <span>${index + 1} / ${STYLE_DIAGNOSIS_QUESTIONS.length}</span>
+              <span>Style Diagnosis</span>
+            </div>
+            <div class="diagnosis-progress-track"><span style="width:${progress}%"></span></div>
+          </div>
+          <h3 class="diagnosis-question">${escapeHtml(question.title)}</h3>
+          <div class="diagnosis-options">
+            ${question.options.map((option) => `
+              <button type="button" class="diagnosis-option${selected === option.id ? ' is-selected' : ''}" onclick="selectStyleDiagnosisAnswer('${question.id}', '${option.id}')">
+                <span>${escapeHtml(option.label)}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div class="diagnosis-panel-footer">
+            <button type="button" class="diagnosis-back-button" onclick="${index === 0 ? 'startStyleDiagnosis()' : 'previousStyleDiagnosisQuestion()'}">${index === 0 ? '最初から' : '戻る'}</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderStyleDiagnosisAnalyzing() {
+      return `
+        <section class="diagnosis-panel diagnosis-analyzing" aria-live="polite">
+          <span class="diagnosis-orb" aria-hidden="true"></span>
+          <div>
+            <p class="diagnosis-kicker">Kimikea Concierge</p>
+            <h3 class="diagnosis-question">あなたに似合うスタイルを診断しています…</h3>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderStyleDiagnosisResult() {
+      const result = state.styleDiagnosis.result || STYLE_DIAGNOSIS_TYPES[getStyleDiagnosisStoredResult()?.resultId] || STYLE_DIAGNOSIS_TYPES.natural;
+      return `
+        <section class="diagnosis-result-card">
+          <p class="diagnosis-result-type">あなたにおすすめなのは</p>
+          <h3 class="diagnosis-result-title">${escapeHtml(result.title)}</h3>
+          <p class="diagnosis-result-lead">${escapeHtml(result.catchcopy)}</p>
+          <div class="diagnosis-result-grid">
+            <div class="diagnosis-result-item"><b>おすすめスタイル</b><span>${escapeHtml(result.style)}</span></div>
+            <div class="diagnosis-result-item"><b>おすすめカラー系統</b><span>${escapeHtml(result.colorTone)}</span></div>
+            <div class="diagnosis-result-item"><b>おすすめ本数</b><span>${escapeHtml(result.amount)}</span></div>
+            <div class="diagnosis-result-item"><b>おすすめの装着位置</b><span>${escapeHtml(result.position)}</span></div>
+            <div class="diagnosis-result-item"><b>仕上がりイメージ</b><p>${escapeHtml(result.finish)}</p></div>
+            <div class="diagnosis-result-item"><b>おすすめ理由</b><p>${escapeHtml(result.reason)}</p></div>
+          </div>
+          <div class="diagnosis-actions">
+            <button type="button" class="diagnosis-primary-button" onclick="openDiagnosisColorChart()">おすすめカラーを見る</button>
+            <button type="button" class="diagnosis-secondary-button" onclick="scrollToDiagnosisRelatedStyles()">関連スタイルを見る</button>
+            <button type="button" class="diagnosis-secondary-button" onclick="resetStyleDiagnosis()">もう一度診断する</button>
+            <button type="button" class="diagnosis-line-button" onclick="openDiagnosisLineConsultation()">LINEで相談する</button>
+          </div>
+        </section>
+        <section id="diagnosisRelatedStyles" class="diagnosis-related-section">
+          <h3 class="diagnosis-section-title">あなたに近いスタイル</h3>
+          ${renderDiagnosisRelatedStyles(result)}
+        </section>
+      `;
+    }
+
+    function renderStyleDiagnosisPage() {
+      hydrateStyleDiagnosisState();
+      window.setTimeout(loadPublicProductsForColorChart, 0);
+      window.setTimeout(loadStylebookPostsForColorChart, 0);
+      const mode = state.styleDiagnosis.mode || 'start';
+      return `
+        <article class="diagnosis-shell">
+          ${mode === 'question'
+            ? renderStyleDiagnosisQuestion()
+            : mode === 'analyzing'
+              ? renderStyleDiagnosisAnalyzing()
+              : mode === 'result'
+                ? renderStyleDiagnosisResult()
+                : renderStyleDiagnosisStart()}
+        </article>
+      `;
     }
 
     function openColorDetail(code) {
@@ -7821,8 +8721,9 @@
       },
       ai: {
         title: 'あなたのピッタリを探す',
-        lead: '似合うエクステカラーやスタイルを提案する機能です。現在は準備中です。',
-        items: ['肌なじみ診断：準備中', '職場OKカラー提案：準備中', '推し色スタイル提案：準備中']
+        lead: '質問に答えるだけで、おすすめのエクステスタイル・カラー・本数を提案します。',
+        items: [],
+        renderActions: renderStyleDiagnosisPage
       },
       notice: {
         title: 'お知らせ',
