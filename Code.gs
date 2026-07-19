@@ -215,6 +215,21 @@ const KCO_MAP_HEADERS = [
 const KCO_MAP_TYPES = ['加盟店', 'コーディネーター'];
 const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
 const KCO_FRANCHISE_HEADER_ALIASES = {
+  memberId: ['memberId', '加盟店ID', '会員ID'],
+  userId: ['userId', 'ユーザーID'],
+  shopId: ['shopId', '店舗ID'],
+  salonName: ['salonName', '加盟店名', 'サロン名', '店舗名'],
+  staffId: ['staffId', '担当者ID', 'スタッフID'],
+  displayName: ['displayName', '表示名', '担当者名'],
+  role: ['role', '権限'],
+  email: ['email', 'メールアドレス'],
+  loginId: ['loginId', 'ログインID'],
+  phone: ['phone', '電話', '電話番号'],
+  initialPassword: ['initialPassword', 'パスワード', 'password', '初期パスワード'],
+  passwordHash: ['passwordHash', 'パスワードハッシュ'],
+  postalCode: ['postalCode', '郵便番号'],
+  address: ['address', '住所'],
+  contactName: ['contactName', '担当者', '担当者名'],
   description: ['description', '紹介文', '店舗紹介', '説明'],
   googleMapUrl: ['googleMapURL', 'googleMapUrl', 'GoogleマップURL', 'Googleマップ', 'googleMapsUrl'],
   googlePlaceId: ['googlePlaceId', 'Google Place ID', 'GooglePlaceID', 'placeId', 'Place ID', 'プレイスID'],
@@ -223,6 +238,10 @@ const KCO_FRANCHISE_HEADER_ALIASES = {
   lineUrl: ['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE'],
   hotPepperUrl: ['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'],
   reservationUrl: ['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト'],
+  membershipStatus: ['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス', '表示'],
+  passwordChangedAt: ['passwordChangedAt', 'パスワード変更日'],
+  createdAt: ['createdAt', '作成日', '登録日'],
+  updatedAt: ['updatedAt', '更新日'],
   sortOrder: ['sortOrder', '表示順'],
 };
 
@@ -358,7 +377,6 @@ function setupKimikeaConnectOrder() {
     triggerSummary,
     durationMs: Date.now() - startedAt,
     nextSteps: [
-      'syncFranchiseUsers',
       'syncMembersToMap',
       'geocodeMissingAddresses',
     ],
@@ -368,7 +386,6 @@ function setupKimikeaConnectOrder() {
     masterSummary,
     triggerSummary,
     nextSteps: [
-      'syncFranchiseUsers',
       'syncMembersToMap',
       'geocodeMissingAddresses',
     ],
@@ -398,6 +415,7 @@ function setupMasterColumns() {
     summary.franchiseMaster = runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
     runSetupStep_('franchise identity backfill', () => backfillFranchiseIdentityColumns_(ss));
     runSetupStep_('user master', () => setupUserMaster_(ss));
+    summary.userSync = runSetupStep_('sync franchise users to user master', () => syncFranchiseUsersToUserMaster_(ss));
     runSetupStep_('orders', () => setupOrders_(ss));
     runSetupStep_('order details', () => setupOrderDetails_(ss));
     runSetupStep_('notices', () => setupNotices_(ss));
@@ -2225,6 +2243,9 @@ function backfillFranchiseIdentityColumns_(ss) {
   const shopIdIndex = getIndex(['shopId', '店舗ID']);
   const emailIndex = getIndex(['email', 'メールアドレス']);
   const loginIdIndex = getIndex(['loginId', 'ログインID']);
+  const roleIndex = getIndex(['role', '権限']);
+  const initialPasswordIndex = getIndex(['initialPassword', 'パスワード', 'password', '初期パスワード']);
+  const passwordHashIndex = getIndex(['passwordHash', 'パスワードハッシュ']);
   const createdAtIndex = getIndex(['createdAt', '作成日', '登録日']);
   const updatedAtIndex = getIndex(['updatedAt', '更新日']);
   let updatedRowCount = 0;
@@ -2254,6 +2275,18 @@ function backfillFranchiseIdentityColumns_(ss) {
       }
       if (loginIdIndex !== -1 && !String(row[loginIdIndex] || '').trim()) {
         row[loginIdIndex] = emailIndex === -1 ? '' : String(row[emailIndex] || '').trim();
+        changed = true;
+      }
+      if (roleIndex !== -1 && !String(row[roleIndex] || '').trim()) {
+        row[roleIndex] = 'member';
+        changed = true;
+      }
+      if (
+        initialPasswordIndex !== -1
+        && !String(row[initialPasswordIndex] || '').trim()
+        && (passwordHashIndex === -1 || !String(row[passwordHashIndex] || '').trim())
+      ) {
+        row[initialPasswordIndex] = KCO_DEFAULT_INITIAL_PASSWORD;
         changed = true;
       }
       if (createdAtIndex !== -1 && !row[createdAtIndex]) {
@@ -2287,6 +2320,7 @@ function backfillFranchiseIdentityColumns_(ss) {
 }
 
 function syncFranchiseUsersToUserMaster_(ss) {
+  const identitySummary = backfillFranchiseIdentityColumns_(ss);
   const userSheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
   ensureUserMasterColumns_(userSheet);
   const startedAt = Date.now();
@@ -2345,7 +2379,7 @@ function syncFranchiseUsersToUserMaster_(ss) {
       const desired = {
         userId,
         shopId,
-        staffName: franchise.contactName || franchise.displayName || '',
+        staffName: franchise.contactName || franchise.displayName || franchise.franchiseName || '',
         role: franchise.role || 'member',
         passwordHash: franchise.passwordHash || '',
         lastLogin: '',
@@ -2372,9 +2406,11 @@ function syncFranchiseUsersToUserMaster_(ss) {
         if (index === -1) return;
         if (key === 'lastLogin') return;
         const currentValue = String(row[index] || '').trim();
-        if (currentValue) return;
         const nextValue = desired[key];
-        if (nextValue === undefined || nextValue === null || nextValue === '') return;
+        if (nextValue === undefined || nextValue === null) return;
+        if (key === 'createdAt' && currentValue) return;
+        if (key !== 'passwordHash' && nextValue === '') return;
+        if (String(currentValue) === String(nextValue)) return;
         row[index] = nextValue;
         changed = true;
       });
@@ -2406,6 +2442,7 @@ function syncFranchiseUsersToUserMaster_(ss) {
     createdUserCount,
     updatedUserCount,
     skippedUserCount,
+    identitySummary,
     durationMs: Date.now() - startedAt,
   };
 }
@@ -3434,14 +3471,19 @@ function handleOrderStatusEdit(event) {
   const sheet = event.range.getSheet();
   if (sheet.getName() === KCO_CONFIG.FRANCHISE_MASTER && event.range.getRow() > 1) {
     try {
-      logSetupStep_('franchise edit map sync start', {
+      logSetupStep_('franchise edit master sync start', {
         row: event.range.getRow(),
         column: event.range.getColumn(),
       });
-      const result = syncFranchiseMapEntries_(SpreadsheetApp.getActiveSpreadsheet());
-      logSetupStep_('franchise edit map sync completed', result);
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const userResult = syncFranchiseUsersToUserMaster_(ss);
+      const mapResult = syncFranchiseMapEntries_(ss);
+      logSetupStep_('franchise edit master sync completed', {
+        userResult,
+        mapResult,
+      });
     } catch (error) {
-      logSetupStep_('franchise edit map sync failed', {
+      logSetupStep_('franchise edit master sync failed', {
         message: error && error.message ? error.message : String(error),
         stack: error && error.stack ? error.stack : '',
       });
