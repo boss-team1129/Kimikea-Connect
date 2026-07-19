@@ -6539,6 +6539,7 @@
     let kimikeaMarkers = [];
     const kimikeaMarkerById = new Map();
     const kimikeaMapStylePromises = new Map();
+    let kimikeaMapStyleLoadQueue = Promise.resolve();
 
     function loadKimikeaMapEntries(force = false) {
       const map = state.kimikeaMap;
@@ -6596,7 +6597,10 @@
           };
           ensureKimikeaMapSelection();
           refreshCurrentPublicActions();
-          window.requestAnimationFrame(initializeNetworkMap);
+          window.requestAnimationFrame(() => {
+            initializeNetworkMap();
+            queueKimikeaMapStyleLoads(visibleKimikeaMapEntries());
+          });
           return state.kimikeaMap;
         })
         .catch((error) => {
@@ -6878,6 +6882,7 @@
         region.innerHTML = entries.length
           ? renderKimikeaMapCarousel(entries)
           : '<div class="kimikea-map-empty">この条件に一致する公開データはありません。</div>';
+        queueKimikeaMapStyleLoads(entries);
       }
     }
 
@@ -7096,9 +7101,6 @@
       const addressLines = isCoordinator ? [mapEntryAreaText(entry)].filter(Boolean) : formatKimikeaMapAddress(entry.address || mapEntryAreaText(entry));
       const phoneUrl = phoneHref(entry.phone);
       const phoneLabel = formatKimikeaPhone(entry.phone);
-      if (!isCoordinator && normalizedShopId && !state.kimikeaMap.stylesLoadedByShopId[normalizedShopId] && !state.kimikeaMap.stylesLoading[normalizedShopId]) {
-        window.setTimeout(() => loadKimikeaMapStyles(entry), 0);
-      }
       return `
         <article id="kimikeaMapCard-${escapeHtml(entry.mapId)}" class="kimikea-map-card${isSelected ? ' is-selected' : ''}${isCoordinator ? ' is-coordinator' : ''}" data-map-id="${escapeHtml(entry.mapId)}" onclick="selectKimikeaMapEntry(${escapeHtml(JSON.stringify(String(entry.mapId || '')))}, true)">
           <div class="kimikea-map-card-image">
@@ -7221,12 +7223,28 @@
       return promise;
     }
 
+    function queueKimikeaMapStyleLoads(entries = visibleKimikeaMapEntries()) {
+      const selectedId = String(state.kimikeaMap.selectedMapId || '');
+      [...(entries || [])]
+        .sort((a, b) => (String(b.mapId || '') === selectedId) - (String(a.mapId || '') === selectedId))
+        .filter((entry) => entry && entry.type !== 'コーディネーター' && String(entry.shopId || '').trim())
+        .forEach((entry) => {
+          const shopId = String(entry.shopId || '').trim();
+          if (state.kimikeaMap.stylesLoadedByShopId[shopId] || state.kimikeaMap.stylesLoading[shopId]) return;
+          kimikeaMapStyleLoadQueue = kimikeaMapStyleLoadQueue
+            .catch(() => [])
+            .then(() => loadKimikeaMapStyles(entry));
+        });
+      return kimikeaMapStyleLoadQueue;
+    }
+
     function selectKimikeaMapEntry(mapId, skipScroll = false) {
       const entry = getKimikeaMapEntry(mapId);
       if (!entry) return;
       state.kimikeaMap.selectedMapId = entry.mapId;
       updateKimikeaMapCardSelection(skipScroll);
       updateKimikeaLeafletMarkerSelection();
+      if (entry.type !== 'コーディネーター') queueKimikeaMapStyleLoads([entry]);
       if (kimikeaMap && kimikeaMapHasCoordinates(entry)) {
         kimikeaMap.flyTo([Number(entry.latitude), Number(entry.longitude)], Math.max(kimikeaMap.getZoom(), 13), {
           duration: 0.45,
@@ -7684,7 +7702,10 @@
         : '';
       if (pageKey === 'map') {
         if (!state.kimikeaMap.loading) loadKimikeaMapEntries(true);
-        window.requestAnimationFrame(initializeNetworkMap);
+        window.requestAnimationFrame(() => {
+          initializeNetworkMap();
+          queueKimikeaMapStyleLoads(visibleKimikeaMapEntries());
+        });
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
