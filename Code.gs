@@ -190,6 +190,7 @@ const KCO_MAP_HEADERS = [
   'address',
   'latitude',
   'longitude',
+  'geocodedAddress',
   'phone',
   'imageUrl',
   'description',
@@ -319,6 +320,11 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Kimikea Connect')
     .addItem('初期設定・管理シート作成', 'setupKimikeaConnectOrder')
+    .addItem('1. マスタ列を整備', 'setupMasterColumns')
+    .addItem('2. トリガーを整備', 'setupTriggers')
+    .addItem('3. 加盟店ユーザーを同期', 'syncFranchiseUsers')
+    .addItem('4. 加盟店MAPを同期', 'syncMembersToMap')
+    .addItem('5. MAP住所を緯度経度へ変換', 'geocodeMissingAddresses')
     .addItem('請求書PDFの権限を取得', 'authorizeDocumentApp')
     .addItem('Grow通知テストメール送信', 'testSendGrowMail')
     .addItem('表示商品を再取得テスト', 'showProductCount_')
@@ -332,15 +338,37 @@ function authorizeDocumentApp() {
 
 function setupKimikeaConnectOrder() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const summary = {
-    createdUserCount: 0,
-    updatedUserCount: 0,
-    skippedUserCount: 0,
+  const masterSummary = setupMasterColumns();
+  const triggerSummary = setupTriggers();
+  logSetupStep_('setup completed', {
+    masterSummary,
+    triggerSummary,
+    durationMs: Date.now() - startedAt,
+    nextSteps: [
+      'syncFranchiseUsers',
+      'syncMembersToMap',
+      'geocodeMissingAddresses',
+    ],
+  });
+  return {
+    ok: true,
+    masterSummary,
+    triggerSummary,
+    nextSteps: [
+      'syncFranchiseUsers',
+      'syncMembersToMap',
+      'geocodeMissingAddresses',
+    ],
   };
+}
+
+function setupMasterColumns() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const summary = {};
 
   try {
-    logSetupStep_('setup started', {
+    logSetupStep_('setup master columns started', {
       spreadsheetId: ss.getId(),
       spreadsheetName: ss.getName(),
     });
@@ -356,34 +384,91 @@ function setupKimikeaConnectOrder() {
     runSetupStep_('franchise master', () => setupFranchiseMaster_(ss));
     runSetupStep_('franchise identity backfill', () => backfillFranchiseIdentityColumns_(ss));
     runSetupStep_('user master', () => setupUserMaster_(ss));
-    const userSyncSummary = runSetupStep_('sync franchise users to user master', () => syncFranchiseUsersToUserMaster_(ss)) || {};
-    summary.createdUserCount = Number(userSyncSummary.createdUserCount || 0);
-    summary.updatedUserCount = Number(userSyncSummary.updatedUserCount || 0);
-    summary.skippedUserCount = Number(userSyncSummary.skippedUserCount || 0);
     runSetupStep_('orders', () => setupOrders_(ss));
     runSetupStep_('order details', () => setupOrderDetails_(ss));
     runSetupStep_('notices', () => setupNotices_(ss));
     runSetupStep_('map entries', () => setupMapEntries_(ss));
-    runSetupStep_('sync franchise map entries', () => syncFranchiseMapEntries_(ss));
     runSetupStep_('settings', () => setupSettings_(ss));
-    runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
 
-    logSetupStep_('setup completed', {
-      createdUserCount: summary.createdUserCount,
-      updatedUserCount: summary.updatedUserCount,
-      skippedUserCount: summary.skippedUserCount,
-      durationMs: Date.now() - startedAt,
+    summary.durationMs = Date.now() - startedAt;
+    logSetupStep_('setup master columns completed', {
+      ...summary,
+      nextSteps: [
+        'setupTriggers',
+        'syncFranchiseUsers',
+        'syncMembersToMap',
+        'geocodeMissingAddresses',
+      ],
     });
-
-    SpreadsheetApp.getUi().alert('Kimikea Connect Order 管理表の土台を作成しました。');
+    return summary;
   } catch (error) {
-    logSetupStep_('setup failed', {
+    logSetupStep_('setup master columns failed', {
       message: error && error.message ? error.message : String(error),
       stack: error && error.stack ? error.stack : '',
       durationMs: Date.now() - startedAt,
     });
     throw error;
   }
+}
+
+function setupTriggers() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    const result = runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
+    logSetupStep_('setup triggers completed', {
+      result,
+      durationMs: Date.now() - startedAt,
+    });
+    return result;
+  } catch (error) {
+    logSetupStep_('setup triggers failed', {
+      message: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? error.stack : '',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+function syncFranchiseUsers() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const result = runSetupStep_('sync franchise users to user master', () => syncFranchiseUsersToUserMaster_(ss));
+  logSetupStep_('sync franchise users completed', {
+    ...result,
+    durationMs: Date.now() - startedAt,
+  });
+  return result;
+}
+
+function syncMembersToMap() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  setupMapEntries_(ss);
+  const result = runSetupStep_('sync franchise map entries without geocode', () => syncFranchiseMapEntries_(ss, {
+    geocode: false,
+  }));
+  logSetupStep_('sync members to map completed', {
+    ...result,
+    durationMs: Date.now() - startedAt,
+  });
+  return result;
+}
+
+function geocodeMissingAddresses() {
+  const startedAt = Date.now();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  setupMapEntries_(ss);
+  const result = runSetupStep_('geocode missing map addresses', () => syncFranchiseMapEntries_(ss, {
+    geocode: true,
+    geocodeLimit: 10,
+  }));
+  logSetupStep_('geocode missing addresses completed', {
+    ...result,
+    durationMs: Date.now() - startedAt,
+  });
+  return result;
 }
 
 function runSetupStep_(label, callback) {
@@ -1738,7 +1823,10 @@ function setupMapEntries_(ss) {
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
-function syncFranchiseMapEntries_(ss) {
+function syncFranchiseMapEntries_(ss, options) {
+  const syncOptions = options || {};
+  const shouldGeocode = syncOptions.geocode === true;
+  const geocodeLimit = Math.max(0, Number(syncOptions.geocodeLimit || 0));
   const startedAt = Date.now();
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.MAP_ENTRIES);
   if (sheet.getLastRow() === 0) {
@@ -1771,6 +1859,9 @@ function syncFranchiseMapEntries_(ss) {
   let skippedCount = 0;
   let geocodedCount = 0;
   let geocodeFailedCount = 0;
+  let geocodeSkippedCount = 0;
+  let geocodeLimitReachedCount = 0;
+  const rowResults = [];
   const now = new Date();
 
   franchises.forEach((franchise) => {
@@ -1822,21 +1913,71 @@ function syncFranchiseMapEntries_(ss) {
 
     const latitudeCol = index.latitude;
     const longitudeCol = index.longitude;
+    const geocodedAddressCol = index.geocodedAddress;
     const hasLatitude = latitudeCol !== undefined && String(row[latitudeCol] || '').trim();
     const hasLongitude = longitudeCol !== undefined && String(row[longitudeCol] || '').trim();
     const address = String(franchise.address || franchise.fullAddress || '').trim();
-    if (address && (!hasLatitude || !hasLongitude)) {
+    const geocodedAddress = geocodedAddressCol === undefined ? '' : String(row[geocodedAddressCol] || '').trim();
+    const addressChanged = Boolean(address && geocodedAddress && geocodedAddress !== address);
+    const needsGeocode = Boolean(address && (!hasLatitude || !hasLongitude || addressChanged));
+    if (address && hasLatitude && hasLongitude && !geocodedAddress) {
+      setBasicValue('geocodedAddress', address, { onlyIfBlank: true });
+      geocodeSkippedCount += 1;
+      rowResults.push({
+        shopId,
+        status: 'skipped',
+        reason: 'coordinates_already_exist',
+      });
+    } else if (!needsGeocode) {
+      geocodeSkippedCount += 1;
+      rowResults.push({
+        shopId,
+        status: 'skipped',
+        reason: address ? 'address_unchanged_or_coordinates_exist' : 'address_empty',
+      });
+    } else if (!shouldGeocode) {
+      geocodeSkippedCount += 1;
+      rowResults.push({
+        shopId,
+        status: 'skipped',
+        reason: 'geocode_disabled',
+      });
+    } else if (geocodeLimit && geocodedCount + geocodeFailedCount >= geocodeLimit) {
+      geocodeLimitReachedCount += 1;
+      rowResults.push({
+        shopId,
+        status: 'skipped',
+        reason: 'geocode_limit_reached',
+      });
+    } else if (address) {
       try {
         const location = geocodeAddressForMap_(address);
         if (location) {
-          setBasicValue('latitude', location.latitude, { onlyIfBlank: true });
-          setBasicValue('longitude', location.longitude, { onlyIfBlank: true });
+          setBasicValue('latitude', location.latitude);
+          setBasicValue('longitude', location.longitude);
+          setBasicValue('geocodedAddress', address);
           geocodedCount += 1;
+          rowResults.push({
+            shopId,
+            status: 'geocoded',
+            latitude: location.latitude,
+            longitude: location.longitude,
+          });
         } else {
           geocodeFailedCount += 1;
+          rowResults.push({
+            shopId,
+            status: 'failed',
+            reason: 'no_geocode_result',
+          });
         }
       } catch (error) {
         geocodeFailedCount += 1;
+        rowResults.push({
+          shopId,
+          status: 'failed',
+          reason: error && error.message ? error.message : String(error),
+        });
         logSetupStep_('map geocode failed', {
           shopId,
           address,
@@ -1870,6 +2011,9 @@ function syncFranchiseMapEntries_(ss) {
     skippedCount,
     geocodedCount,
     geocodeFailedCount,
+    geocodeSkippedCount,
+    geocodeLimitReachedCount,
+    rowResults,
     durationMs: Date.now() - startedAt,
   };
 }
