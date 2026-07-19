@@ -1948,7 +1948,8 @@
     }
     .kimikea-map-card-image {
       width: 100%;
-      height: 188px;
+      aspect-ratio: 16 / 9;
+      max-height: 182px;
       overflow: hidden;
       border-radius: 26px;
       background:
@@ -1957,10 +1958,12 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 16px 34px rgba(93, 70, 31, .12);
     }
     .kimikea-map-card.is-coordinator .kimikea-map-card-image {
-      border-radius: 999px;
-      width: 144px;
-      height: 144px;
-      margin: 0 auto;
+      border-radius: 26px;
+      width: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(255,255,255,.88), transparent 30%),
+        linear-gradient(135deg, #eef8ff, #b9d8ef 56%, #fbfdff);
     }
     .kimikea-map-card-image img {
       display: block;
@@ -6386,6 +6389,9 @@
         <text x="58" y="96" fill="#7b5a1d" font-family="Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="4">KIMIKEA</text>
       </svg>
     `)}`;
+    const KIMIKEA_MAP_SHOP_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
+      ? '/Kimikea-Connect/images/shops/'
+      : './images/shops/';
     let kimikeaMap = null;
     let kimikeaTileLayer = null;
     let kimikeaMarkerLayer = null;
@@ -6477,6 +6483,18 @@
       return String(value || '').normalize('NFKC').replace(/\u3000/g, ' ').trim();
     }
 
+    function kimikeaMapImageUrl(value) {
+      const raw = normalizeKimikeaMapText(value);
+      if (!raw) return '';
+      if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+      const clean = raw.replace(/^\/+/, '').replace(/^\.\//, '');
+      if (clean.startsWith('Kimikea-Connect/')) return `/${clean}`;
+      if (clean.startsWith('images/shops/')) {
+        return `${KIMIKEA_MAP_SHOP_IMAGE_BASE_PATH}${clean.replace(/^images\/shops\//, '')}`;
+      }
+      return clean;
+    }
+
     function getKimikeaMapValue(row, keys) {
       if (!row || typeof row !== 'object') return '';
       for (const key of keys) {
@@ -6558,7 +6576,7 @@
           coordinateStatus: coordinates.status,
           coordinateWarning: coordinates.warning,
           phone: normalizeKimikeaMapText(getKimikeaMapValue(row, ['phone', '電話番号', '電話'])),
-          imageUrl: normalizeKimikeaMapText(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])),
+          imageUrl: kimikeaMapImageUrl(getKimikeaMapValue(row, ['imageUrl', 'image_url', '画像URL'])),
           description: normalizeKimikeaMapText(getKimikeaMapValue(row, ['description', '紹介文', '説明'])),
           linkLabel1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkLabel1', 'link_label_1', 'ボタン名1', 'リンク名1'])),
           linkUrl1: normalizeKimikeaMapText(getKimikeaMapValue(row, ['linkUrl1', 'link_url_1', 'URL1', 'リンクURL1'])),
