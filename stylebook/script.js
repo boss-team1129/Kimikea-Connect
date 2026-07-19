@@ -202,6 +202,41 @@ function displayStaffName(post) {
   return post.staffName || getById('staff', post.staffId)?.name || '';
 }
 
+function normalizeStylebookFilterText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeStylebookFilterKey(value) {
+  return normalizeStylebookFilterText(value).toLocaleLowerCase('ja-JP');
+}
+
+function stylePostSalonNameForFilter(post) {
+  return normalizeStylebookFilterText(post?.salonName || post?.shopName || post?.storeName || '');
+}
+
+function stylePostStaffNameForFilter(post) {
+  return normalizeStylebookFilterText(post?.staffName || post?.stylistName || post?.personInCharge || '');
+}
+
+function stylebookNameFilterOptionKey(name) {
+  const key = normalizeStylebookFilterKey(name);
+  return key ? `name::${key}` : '';
+}
+
+function stylebookShopIdFilterOptionKey(shopId) {
+  const key = String(shopId || '').trim();
+  return key ? `shopid::${key}` : '';
+}
+
+function stylebookFilterLabelFromOptions(select, id) {
+  if (!select) return '';
+  const option = Array.from(select.options).find(item => item.value === id);
+  return option ? option.textContent.trim() : '';
+}
+
 function colorSwatchStyle(color) {
   const value = colorImageUrl(color) || color.imageUrl || '#efe9df';
   if (/^#|rgb|hsl|linear-gradient/.test(value)) return `background:${escapeHtml(value)}`;
@@ -524,7 +559,7 @@ function syncCurrentUserFromConnectSession() {
 function applyExternalShopScope() {
   const shopId = String(state.externalShopId || '').trim();
   if (!shopId || state.externalShopScopeApplied) return;
-  state.selectedShopIds = new Set([shopId]);
+  state.selectedShopIds = new Set([stylebookShopIdFilterOptionKey(shopId)]);
   state.visibleCount = PAGE_SIZE;
   state.currentView = 'gallery';
   state.externalShopScopeApplied = true;
@@ -909,8 +944,8 @@ function filteredPosts() {
     if (state.savedOnly && !savedIds.has(post.id)) return false;
     if (state.selectedColorIds.size && !(post.extensionColorIds || []).some(id => state.selectedColorIds.has(id))) return false;
     if (state.selectedStyleTypeIds.size && !(post.styleTypeIds || []).some(id => state.selectedStyleTypeIds.has(id))) return false;
-    if (state.selectedShopIds.size && !state.selectedShopIds.has(post.shopId)) return false;
-    if (state.selectedStaffIds.size && !state.selectedStaffIds.has(post.staffId)) return false;
+    if (state.selectedShopIds.size && !postMatchesShopFilter(post)) return false;
+    if (state.selectedStaffIds.size && !postMatchesStaffFilter(post)) return false;
     return true;
   });
 
@@ -924,6 +959,45 @@ function filteredPosts() {
     return compareNewest(a, b);
   });
   return posts;
+}
+
+function postMatchesShopFilter(post) {
+  const postShopIdKey = stylebookShopIdFilterOptionKey(post?.shopId);
+  const postSalonNameKey = stylebookNameFilterOptionKey(stylePostSalonNameForFilter(post));
+  return Array.from(state.selectedShopIds).some(id => id === postShopIdKey || id === postSalonNameKey);
+}
+
+function postMatchesStaffFilter(post) {
+  const postStaffNameKey = stylebookNameFilterOptionKey(stylePostStaffNameForFilter(post));
+  const postStaffId = String(post?.staffId || '').trim();
+  return Array.from(state.selectedStaffIds).some(id => id === postStaffNameKey || (postStaffId && id === `staffid::${postStaffId}`));
+}
+
+function publicStylebookFilterCandidates(kind) {
+  const counts = new Map();
+  activePosts().forEach((post) => {
+    const label = kind === 'shop' ? stylePostSalonNameForFilter(post) : stylePostStaffNameForFilter(post);
+    const key = stylebookNameFilterOptionKey(label);
+    if (!key) return;
+    if (!counts.has(key)) {
+      counts.set(key, { id: key, label, count: 0 });
+    }
+    const item = counts.get(key);
+    item.count += 1;
+    if (label.length < item.label.length) item.label = label;
+  });
+  return Array.from(counts.values()).sort((a, b) => {
+    const countDiff = b.count - a.count;
+    if (countDiff) return countDiff;
+    return a.label.localeCompare(b.label, 'ja', { numeric: true, sensitivity: 'base' });
+  });
+}
+
+function pruneUnavailableStylebookFilters() {
+  const shopIds = new Set(publicStylebookFilterCandidates('shop').map(item => item.id));
+  const staffIds = new Set(publicStylebookFilterCandidates('staff').map(item => item.id));
+  state.selectedShopIds = new Set(Array.from(state.selectedShopIds).filter(id => shopIds.has(id) || String(id || '').startsWith('shopid::')));
+  state.selectedStaffIds = new Set(Array.from(state.selectedStaffIds).filter(id => staffIds.has(id)));
 }
 
 function renderUserSelect() {
@@ -946,6 +1020,7 @@ function updateRoleVisibility() {
 
 function renderFilterControls() {
   const activeColorList = activeColors();
+  pruneUnavailableStylebookFilters();
   debugStylebook('renderFilterControls color counts', {
     apiColors: state.db.extensionColors?.length || 0,
     activeColors: activeColorList.length,
@@ -965,14 +1040,54 @@ function renderFilterControls() {
     .map(type => `<button type="button" class="chip ${state.selectedStyleTypeIds.has(type.id) ? 'active' : ''}" data-filter-style="${type.id}">${escapeHtml(type.name)}</button>`)
     .join('');
 
-  el.shopFilter.innerHTML = state.db.shops
-    .filter(shop => shop.isActive)
-    .map(shop => `<option value="${shop.id}">${escapeHtml(shop.name)}</option>`)
-    .join('');
-  el.staffFilter.innerHTML = state.db.staff
-    .filter(person => person.isActive && (!state.selectedShopIds.size || state.selectedShopIds.has(person.shopId)))
-    .map(person => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
-    .join('');
+  const shopOptions = publicStylebookFilterCandidates('shop');
+  const staffOptions = publicStylebookFilterCandidates('staff');
+  el.shopFilter.innerHTML = renderStylebookFilterSelectOptions(shopOptions, state.selectedShopIds, 'すべての店舗');
+  appendMissingSelectedStylebookFilterOptions(el.shopFilter, state.selectedShopIds, currentExternalShopName());
+  el.staffFilter.innerHTML = renderStylebookFilterSelectOptions(staffOptions, state.selectedStaffIds, 'すべての担当者');
+  updateStylebookFilterSelectLabels();
+}
+
+function renderStylebookFilterSelectOptions(options, selectedIds, emptyLabel) {
+  const placeholderSelected = selectedIds.size === 0 ? ' selected' : '';
+  return [
+    `<option value="" disabled${placeholderSelected}>${escapeHtml(emptyLabel)}</option>`,
+    ...options.map(option => (
+      `<option value="${escapeHtml(option.id)}" ${selectedIds.has(option.id) ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
+    )),
+  ].join('');
+}
+
+function appendMissingSelectedStylebookFilterOptions(select, selectedIds, fallbackLabel = '') {
+  if (!select || !selectedIds.size) return;
+  const existingValues = new Set(Array.from(select.options).map(option => option.value));
+  selectedIds.forEach((id) => {
+    if (!id || existingValues.has(id)) return;
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = fallbackLabel || id.replace(/^(shopid|staffid|name)::/, '');
+    option.selected = true;
+    select.appendChild(option);
+  });
+}
+
+function stylebookFilterSummary(select, selectedIds, emptyLabel, singleSuffix, multiSuffix) {
+  if (!selectedIds.size) return emptyLabel;
+  if (selectedIds.size === 1) {
+    return stylebookFilterLabelFromOptions(select, Array.from(selectedIds)[0]) || emptyLabel;
+  }
+  return `${selectedIds.size}${multiSuffix}`;
+}
+
+function updateStylebookFilterSelectLabels() {
+  if (el.shopFilter) {
+    el.shopFilter.setAttribute('aria-label', stylebookFilterSummary(el.shopFilter, state.selectedShopIds, 'すべての店舗', '店舗', '店舗'));
+    el.shopFilter.title = stylebookFilterSummary(el.shopFilter, state.selectedShopIds, 'すべての店舗', '店舗', '店舗');
+  }
+  if (el.staffFilter) {
+    el.staffFilter.setAttribute('aria-label', stylebookFilterSummary(el.staffFilter, state.selectedStaffIds, 'すべての担当者', '名', '名'));
+    el.staffFilter.title = stylebookFilterSummary(el.staffFilter, state.selectedStaffIds, 'すべての担当者', '名', '名');
+  }
 }
 
 function renderSelectOptions() {
@@ -1162,12 +1277,12 @@ function renderActiveChips() {
     if (type) chips.push({ label: type.name, type: 'style', id });
   });
   state.selectedShopIds.forEach(id => {
-    const shop = getById('shops', id);
-    if (shop) chips.push({ label: shop.name, type: 'shop', id });
+    const label = stylebookFilterLabelFromOptions(el.shopFilter, id);
+    if (label) chips.push({ label, type: 'shop', id });
   });
   state.selectedStaffIds.forEach(id => {
-    const person = getById('staff', id);
-    if (person) chips.push({ label: person.name, type: 'staff', id });
+    const label = stylebookFilterLabelFromOptions(el.staffFilter, id);
+    if (label) chips.push({ label, type: 'staff', id });
   });
   if (state.savedOnly) chips.push({ label: '保存済み', type: 'saved', id: 'saved' });
   el.activeChips.innerHTML = chips.map(chip => (
@@ -1562,7 +1677,7 @@ async function showMine(options = {}) {
 
 function selectedValues(select) {
   if (!select) return [];
-  return Array.from(select.selectedOptions).map(option => option.value);
+  return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
 }
 
 function resetGalleryViewState() {
@@ -1641,11 +1756,11 @@ function handleActionElement(action) {
     }
   }
   else if (actionName === 'filter-shop') {
-    state.selectedShopIds = new Set([id]);
+    state.selectedShopIds = new Set([stylebookShopIdFilterOptionKey(id) || stylebookNameFilterOptionKey(id)]);
     showView('gallery');
   }
   else if (actionName === 'filter-staff') {
-    state.selectedStaffIds = new Set([id]);
+    state.selectedStaffIds = new Set([stylebookNameFilterOptionKey(id) || `staffid::${String(id || '').trim()}`]);
     showView('gallery');
   }
   else if (actionName === 'filter-label') {
