@@ -6540,6 +6540,7 @@
     const kimikeaMarkerById = new Map();
     const kimikeaMapStylePromises = new Map();
     let kimikeaMapStyleLoadQueue = Promise.resolve();
+    let kimikeaMapStyleDatabasePromise = null;
 
     function loadKimikeaMapEntries(force = false) {
       const map = state.kimikeaMap;
@@ -6549,6 +6550,14 @@
       map.error = '';
       map.entries = [];
       map.prefectures = [];
+      if (force) {
+        kimikeaMapStyleDatabasePromise = null;
+        kimikeaMapStylePromises.clear();
+        map.stylesByShopId = {};
+        map.stylesLoading = {};
+        map.stylesLoadedByShopId = {};
+        map.stylesErrorByShopId = {};
+      }
       map.debug = {
         apiUrl: `${ORDER_API_URL}?api=getPublicMapEntries`,
         http: 'requesting',
@@ -7174,6 +7183,22 @@
       return String(b.id || b.postId || '').localeCompare(String(a.id || a.postId || ''), 'ja');
     }
 
+    function loadKimikeaMapStyleDatabase() {
+      if (!kimikeaMapStyleDatabasePromise) {
+        kimikeaMapStyleDatabasePromise = fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&t=${Date.now()}`)
+          .then((response) => response.json())
+          .then((data) => {
+            const posts = data?.database?.stylePosts || data?.stylePosts || [];
+            return (Array.isArray(posts) ? posts : []).filter((post) => isPublishedStylePost(post) && firstStyleImage(post));
+          })
+          .catch((error) => {
+            kimikeaMapStyleDatabasePromise = null;
+            throw error;
+          });
+      }
+      return kimikeaMapStyleDatabasePromise;
+    }
+
     function loadKimikeaMapStyles(entryOrShopId) {
       const entry = typeof entryOrShopId === 'object'
         ? entryOrShopId
@@ -7189,11 +7214,8 @@
       state.kimikeaMap.stylesLoading[normalizedShopId] = true;
       state.kimikeaMap.stylesErrorByShopId[normalizedShopId] = '';
       refreshKimikeaMapStyleStrip(normalizedShopId);
-      const promise = fetch(`${STYLEBOOK_API_URL}?action=database&userId=public-map&t=${Date.now()}`)
-        .then((response) => response.json())
-        .then((data) => {
-          const posts = data?.database?.stylePosts || data?.stylePosts || [];
-          const publicPosts = (Array.isArray(posts) ? posts : []).filter((post) => isPublishedStylePost(post) && firstStyleImage(post));
+      const promise = loadKimikeaMapStyleDatabase()
+        .then((publicPosts) => {
           const exactMatches = publicPosts
             .filter((post) => normalizeKimikeaMapMatchKey(post.shopId) === normalizeKimikeaMapMatchKey(normalizedShopId))
             .sort(compareKimikeaMapStyleNewest);
