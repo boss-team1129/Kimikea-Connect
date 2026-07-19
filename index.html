@@ -3252,6 +3252,45 @@
       border-radius: 18px;
       background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(250,246,236,.9));
     }
+    .diagnosis-color-filter-banner {
+      display: grid;
+      gap: 10px;
+      padding: 13px;
+      border: 1px solid rgba(189,147,64,.24);
+      border-radius: 18px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.92), rgba(255,244,214,.82)),
+        rgba(255,255,255,.7);
+      box-shadow: 0 12px 30px rgba(44,32,14,.08);
+    }
+    .diagnosis-color-filter-banner p {
+      margin: 0;
+      color: #3c2c16;
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.65;
+    }
+    .diagnosis-color-filter-banner strong {
+      color: #8a6422;
+      font-weight: 950;
+    }
+    .diagnosis-clear-color-button {
+      justify-self: start;
+      min-height: 38px;
+      border: 1px solid rgba(189,147,64,.3);
+      border-radius: 999px;
+      background: rgba(255,255,255,.86);
+      color: #3c2c16;
+      padding: 0 13px;
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(44,32,14,.08);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .diagnosis-clear-color-button:active {
+      transform: translateY(1px) scale(.98);
+    }
     .color-chart-search {
       width: 100%;
       min-height: 42px;
@@ -4980,6 +5019,7 @@
       orderSettings: { shippingFee: 1000, freeShippingBags: 5 },
       colorChartFilter: 'すべて',
       colorChartSearch: '',
+      diagnosisColorFilterKey: '',
       colorChartDetailCode: '',
       colorDetailReturnTarget: 'chart',
       colorChartStyles: [],
@@ -6173,9 +6213,43 @@
     }
 
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
+    const STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY = 'kimikeaDiagnosisColorFilter';
+    const STYLE_DIAGNOSIS_COLOR_FILTERS = {
+      'natural-earring': {
+        label: '地毛になじむ色、ブラウン、ベージュ、グレージュ系',
+        category: 'ダークカラー',
+        keywords: ['地毛', 'ナチュラル', 'ブラウン', '茶', 'ベージュ', 'グレージュ', 'グレー', 'ダーク', 'ブラック', '黒', 'NB', 'GB'],
+      },
+      'face-framing': {
+        label: 'ベージュ、ミルクティー、グレージュ、淡いピンク系',
+        category: 'ライトカラー',
+        keywords: ['ベージュ', 'ミルクティー', 'グレージュ', 'グレー', 'ピンク', '桃色', '淡い', '透明感', 'ライト'],
+      },
+      'adult-inner': {
+        label: 'グレージュ、シルバー、ピンク、パープル系',
+        category: 'ライトカラー',
+        keywords: ['グレージュ', 'グレー', 'シルバー', '銀', 'ピンク', '桃色', 'パープル', '紫', 'くすみ', 'ライト'],
+      },
+      highlight: {
+        label: 'ベージュ、ハイトーン、シルバー、ホワイト系',
+        category: 'ライトカラー',
+        keywords: ['ベージュ', 'ハイトーン', 'シルバー', '銀', 'ホワイト', '白', 'ミルクティー', 'ライト'],
+      },
+      accent: {
+        label: 'ピンク、ブルー、パープル、レッド、グリーンなどの原色系',
+        category: '原色',
+        keywords: ['ピンク', '桃色', 'ブルー', '青', 'パープル', '紫', 'レッド', '赤', 'グリーン', '緑', '原色', 'OR'],
+      },
+      'length-volume': {
+        label: '地毛に近い色、ブラウン、ブラック、ナチュラル系',
+        category: 'ダークカラー',
+        keywords: ['地毛', 'ナチュラル', 'ブラウン', '茶', 'ブラック', '黒', 'ダーク', 'NB', 'GB', 'DC'],
+      },
+    };
     const STYLE_DIAGNOSIS_TYPES = {
       natural: {
         id: 'natural',
+        colorFilterKey: 'natural-earring',
         title: 'ナチュラルイヤリングタイプ',
         catchcopy: 'さりげない変化で、いつもの髪に小さなきらめきを。',
         style: 'イヤリングカラー',
@@ -6190,6 +6264,7 @@
       },
       face: {
         id: 'face',
+        colorFilterKey: 'face-framing',
         title: '顔まわり透明感タイプ',
         catchcopy: '顔まわりを明るく、柔らかい透明感を足す提案です。',
         style: 'フェイスフレーミング、顔まわりポイント',
@@ -6204,6 +6279,7 @@
       },
       inner: {
         id: 'inner',
+        colorFilterKey: 'adult-inner',
         title: '大人インナーカラータイプ',
         catchcopy: '控えめな上質感と、動いた時に見える余韻を楽しむスタイル。',
         style: 'インナーカラー',
@@ -6218,6 +6294,7 @@
       },
       highlight: {
         id: 'highlight',
+        colorFilterKey: 'highlight',
         title: '華やかメッシュタイプ',
         catchcopy: '髪全体に立体感と動きを足し、華やかに印象を変える提案です。',
         style: 'ポイントメッシュ、全体メッシュ',
@@ -6232,6 +6309,7 @@
       },
       accent: {
         id: 'accent',
+        colorFilterKey: 'accent',
         title: '個性派アクセントタイプ',
         catchcopy: 'ファッションの一部として、色そのものを楽しむスタイル。',
         style: 'アクセントカラー、ポイントカラー、インナーカラー',
@@ -6246,6 +6324,7 @@
       },
       volume: {
         id: 'volume',
+        colorFilterKey: 'length-volume',
         title: '長さ・ボリュームアップタイプ',
         catchcopy: '自然な長さと厚みを足し、シルエットそのものを整える提案です。',
         style: '長さ出し、ボリュームアップ',
@@ -6431,17 +6510,125 @@
       }));
     }
 
+    function normalizeDiagnosisColorMatchText(value) {
+      return String(value || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/[‐‑‒–—―ーｰ\-_\s\u3000]+/g, '');
+    }
+
+    function diagnosisColorFilterConfig(key = state.diagnosisColorFilterKey) {
+      return STYLE_DIAGNOSIS_COLOR_FILTERS[resolveDiagnosisColorFilterKey(key)] || null;
+    }
+
+    function resolveDiagnosisColorFilterKey(value) {
+      const key = String(value || '').trim();
+      const aliases = {
+        natural: 'natural-earring',
+        earring: 'natural-earring',
+        'natural-earring': 'natural-earring',
+        face: 'face-framing',
+        'face-framing': 'face-framing',
+        inner: 'adult-inner',
+        'adult-inner': 'adult-inner',
+        highlight: 'highlight',
+        mesh: 'highlight',
+        accent: 'accent',
+        vivid: 'accent',
+        volume: 'length-volume',
+        length: 'length-volume',
+        'length-volume': 'length-volume',
+      };
+      return aliases[key] || key;
+    }
+
+    function readDiagnosisColorFilterRequest() {
+      if (state.diagnosisColorFilterKey) return;
+      let key = '';
+      try {
+        const params = new URLSearchParams(window.location.search);
+        key = params.get('diagnosisColor') || '';
+      } catch (error) {
+        key = '';
+      }
+      if (!key) {
+        try {
+          const stored = JSON.parse(sessionStorage.getItem(STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY) || 'null');
+          key = typeof stored === 'string' ? stored : stored?.key || '';
+        } catch (error) {
+          key = '';
+        }
+      }
+      const resolvedKey = resolveDiagnosisColorFilterKey(key);
+      if (STYLE_DIAGNOSIS_COLOR_FILTERS[resolvedKey]) {
+        state.diagnosisColorFilterKey = resolvedKey;
+        state.colorChartFilter = STYLE_DIAGNOSIS_COLOR_FILTERS[resolvedKey].category || 'すべて';
+      }
+    }
+
+    function clearDiagnosisColorFilter() {
+      state.diagnosisColorFilterKey = '';
+      try {
+        sessionStorage.removeItem(STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY);
+      } catch (error) {
+        // sessionStorage may be unavailable in some embedded browsers.
+      }
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('diagnosisColor')) {
+          url.searchParams.delete('diagnosisColor');
+          window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+        }
+      } catch (error) {
+        // Ignore URL cleanup failures.
+      }
+    }
+
+    function showAllColorChartProducts() {
+      clearDiagnosisColorFilter();
+      state.colorChartDetailCode = '';
+      state.colorChartFilter = 'すべて';
+      state.colorChartSearch = '';
+      updateColorChartTabs();
+      refreshColorChartContent();
+    }
+
+    function colorMatchesDiagnosisFilter(color, config) {
+      if (!config) return true;
+      const haystack = normalizeDiagnosisColorMatchText([
+        color.code,
+        color.category,
+        color.color,
+        color.colorName,
+        color.colorSystem,
+      ].join(' '));
+      const keywordMatch = (config.keywords || []).some((keyword) => {
+        const normalizedKeyword = normalizeDiagnosisColorMatchText(keyword);
+        return normalizedKeyword && haystack.includes(normalizedKeyword);
+      });
+      if (keywordMatch) return true;
+      const category = String(color.category || '').trim();
+      const colorSystem = normalizeDiagnosisColorMatchText(color.colorSystem);
+      return Boolean(
+        config.category && category === config.category && colorSystem
+          && (config.keywords || []).some((keyword) => colorSystem.includes(normalizeDiagnosisColorMatchText(keyword)))
+      );
+    }
+
     function getFilteredColorChartProducts() {
       const query = String(state.colorChartSearch || '').trim().toLowerCase();
+      const diagnosisConfig = diagnosisColorFilterConfig();
       return getActiveColorChartProducts().filter((color) => {
         const categoryMatch = state.colorChartFilter === 'すべて' || color.category === state.colorChartFilter;
         if (!categoryMatch) return false;
+        if (diagnosisConfig && !colorMatchesDiagnosisFilter(color, diagnosisConfig)) return false;
         if (!query) return true;
         return `${color.color} ${color.colorName} ${color.colorSystem}`.toLowerCase().includes(query);
       });
     }
 
     function setColorChartFilter(group) {
+      clearDiagnosisColorFilter();
       state.colorChartFilter = group || 'すべて';
       updateColorChartTabs();
       refreshColorChartContent();
@@ -7039,9 +7226,22 @@
 
     function openDiagnosisColorChart() {
       const result = state.styleDiagnosis.result || STYLE_DIAGNOSIS_TYPES[getStyleDiagnosisStoredResult()?.resultId] || STYLE_DIAGNOSIS_TYPES.natural;
+      const filterKey = result.colorFilterKey || 'natural-earring';
+      const config = diagnosisColorFilterConfig(filterKey);
       state.colorChartDetailCode = '';
-      state.colorChartFilter = result.colorChartCategory || 'すべて';
+      state.diagnosisColorFilterKey = filterKey;
+      state.colorChartFilter = config?.category || result.colorChartCategory || 'すべて';
       state.colorChartSearch = '';
+      try {
+        sessionStorage.setItem(STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY, JSON.stringify({
+          key: filterKey,
+          label: config?.label || result.colorTone,
+          keywords: config?.keywords || result.colorKeywords || [],
+          category: config?.category || result.colorChartCategory || 'すべて',
+        }));
+      } catch (error) {
+        // sessionStorage may be unavailable in some embedded browsers.
+      }
       openPublicPage('colorChart');
     }
 
@@ -7239,6 +7439,7 @@
     }
 
     function renderColorChartResults() {
+      readDiagnosisColorFilterRequest();
       const allColors = getActiveColorChartProducts();
       const detailColor = state.colorChartDetailCode
         ? allColors.find((color) => normalizeColorCode(color.code) === state.colorChartDetailCode)
@@ -7246,18 +7447,25 @@
       if (detailColor) return renderColorDetail(detailColor);
       const colors = getFilteredColorChartProducts();
       const query = String(state.colorChartSearch || '').trim();
-      const emptyText = state.colorChartFilter === 'すべて' && !query
-        ? '商品マスタに表示中のカラーがまだ読み込まれていません。'
-        : 'このカテゴリにはまだカラーが登録されていません';
+      const diagnosisConfig = diagnosisColorFilterConfig();
+      const diagnosisBanner = renderDiagnosisColorFilterBanner();
+      const emptyText = diagnosisConfig
+        ? '診断条件に近いカラーが見つかりませんでした'
+        : state.colorChartFilter === 'すべて' && !query
+          ? '商品マスタに表示中のカラーがまだ読み込まれていません。'
+          : 'このカテゴリにはまだカラーが登録されていません';
 
       if (!colors.length) {
         return `
+          ${diagnosisBanner}
           <p class="color-chart-meta">表示中 0件 / 登録カラー ${allColors.length}件</p>
           <div class="color-chart-empty">${escapeHtml(emptyText)}</div>
+          ${diagnosisConfig ? '<button type="button" class="diagnosis-clear-color-button" onclick="showAllColorChartProducts()">すべてのカラーを見る</button>' : ''}
         `;
       }
 
       return `
+        ${diagnosisBanner}
         <p class="color-chart-meta">表示中 ${colors.length}件 / 登録カラー ${allColors.length}件</p>
         <div class="color-chart-grid">
           ${colors.map((color) => `
@@ -7271,7 +7479,19 @@
       `;
     }
 
+    function renderDiagnosisColorFilterBanner() {
+      const config = diagnosisColorFilterConfig();
+      if (!config) return '';
+      return `
+        <div class="diagnosis-color-filter-banner">
+          <p><strong>AI診断から、あなたにおすすめのカラーを表示しています</strong><br>${escapeHtml(config.label)}</p>
+          <button type="button" class="diagnosis-clear-color-button" onclick="showAllColorChartProducts()">すべてのカラーを見る</button>
+        </div>
+      `;
+    }
+
     function renderColorChartContent() {
+      readDiagnosisColorFilterRequest();
       window.setTimeout(loadPublicProductsForColorChart, 0);
       return `
         <div class="color-chart-shell">
@@ -9479,6 +9699,8 @@
       initialRouteApplied = true;
       const params = new URLSearchParams(window.location.search);
       const view = params.get('view');
+      const page = params.get('page');
+      if (page === 'color-chart') openPublicPage('colorChart');
       if (view === 'search') openSearchPage();
       if (view === 'mypage') openMyPage();
       if (view && publicPages[view]) openPublicPage(view);
