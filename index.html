@@ -7199,6 +7199,16 @@
       return kimikeaMapStyleDatabasePromise;
     }
 
+    function resolveKimikeaMapStylesForEntry(entry, normalizedShopId, publicPosts) {
+      const exactMatches = publicPosts
+        .filter((post) => normalizeKimikeaMapMatchKey(post.shopId) === normalizeKimikeaMapMatchKey(normalizedShopId))
+        .sort(compareKimikeaMapStyleNewest);
+      const fallbackMatches = exactMatches.length || !entry ? [] : publicPosts
+        .filter((post) => kimikeaMapPostMatchesEntry(post, entry))
+        .sort(compareKimikeaMapStyleNewest);
+      return (exactMatches.length ? exactMatches : fallbackMatches).slice(0, 5);
+    }
+
     function loadKimikeaMapStyles(entryOrShopId) {
       const entry = typeof entryOrShopId === 'object'
         ? entryOrShopId
@@ -7216,13 +7226,7 @@
       refreshKimikeaMapStyleStrip(normalizedShopId);
       const promise = loadKimikeaMapStyleDatabase()
         .then((publicPosts) => {
-          const exactMatches = publicPosts
-            .filter((post) => normalizeKimikeaMapMatchKey(post.shopId) === normalizeKimikeaMapMatchKey(normalizedShopId))
-            .sort(compareKimikeaMapStyleNewest);
-          const fallbackMatches = exactMatches.length || !entry ? [] : publicPosts
-            .filter((post) => kimikeaMapPostMatchesEntry(post, entry))
-            .sort(compareKimikeaMapStyleNewest);
-          state.kimikeaMap.stylesByShopId[normalizedShopId] = (exactMatches.length ? exactMatches : fallbackMatches).slice(0, 5);
+          state.kimikeaMap.stylesByShopId[normalizedShopId] = resolveKimikeaMapStylesForEntry(entry, normalizedShopId, publicPosts);
           state.kimikeaMap.stylesLoadedByShopId[normalizedShopId] = true;
           return state.kimikeaMap.stylesByShopId[normalizedShopId];
         })
@@ -7247,15 +7251,40 @@
 
     function queueKimikeaMapStyleLoads(entries = visibleKimikeaMapEntries()) {
       const selectedId = String(state.kimikeaMap.selectedMapId || '');
-      [...(entries || [])]
+      const pendingEntries = [...(entries || [])]
         .sort((a, b) => (String(b.mapId || '') === selectedId) - (String(a.mapId || '') === selectedId))
         .filter((entry) => entry && entry.type !== 'コーディネーター' && String(entry.shopId || '').trim())
-        .forEach((entry) => {
+        .filter((entry) => {
           const shopId = String(entry.shopId || '').trim();
-          if (state.kimikeaMap.stylesLoadedByShopId[shopId] || state.kimikeaMap.stylesLoading[shopId]) return;
-          kimikeaMapStyleLoadQueue = kimikeaMapStyleLoadQueue
-            .catch(() => [])
-            .then(() => loadKimikeaMapStyles(entry));
+          return !state.kimikeaMap.stylesLoadedByShopId[shopId] && !state.kimikeaMap.stylesLoading[shopId];
+        });
+      if (!pendingEntries.length) return kimikeaMapStyleLoadQueue;
+      pendingEntries.forEach((entry) => {
+        const shopId = String(entry.shopId || '').trim();
+        state.kimikeaMap.stylesLoading[shopId] = true;
+        state.kimikeaMap.stylesErrorByShopId[shopId] = '';
+        refreshKimikeaMapStyleStrip(shopId);
+      });
+      kimikeaMapStyleLoadQueue = loadKimikeaMapStyleDatabase()
+        .then((publicPosts) => {
+          pendingEntries.forEach((entry) => {
+            const shopId = String(entry.shopId || '').trim();
+            state.kimikeaMap.stylesByShopId[shopId] = resolveKimikeaMapStylesForEntry(entry, shopId, publicPosts);
+            state.kimikeaMap.stylesLoadedByShopId[shopId] = true;
+            state.kimikeaMap.stylesLoading[shopId] = false;
+            refreshKimikeaMapStyleStrip(shopId);
+          });
+          return publicPosts;
+        })
+        .catch((error) => {
+          pendingEntries.forEach((entry) => {
+            const shopId = String(entry.shopId || '').trim();
+            state.kimikeaMap.stylesByShopId[shopId] = [];
+            state.kimikeaMap.stylesLoading[shopId] = false;
+            state.kimikeaMap.stylesErrorByShopId[shopId] = getErrorMessage(error) || 'load failed';
+            refreshKimikeaMapStyleStrip(shopId);
+          });
+          return [];
         });
       return kimikeaMapStyleLoadQueue;
     }
