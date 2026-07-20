@@ -34,6 +34,11 @@ const KCO_CONFIG = {
 const KCO_SETUP_VALIDATION_MIN_ROWS = 100;
 const KCO_SETUP_VALIDATION_BUFFER_ROWS = 200;
 const KCO_SETUP_VALIDATION_MAX_ROWS = 1000;
+const KCO_EXTENSION_SIMULATOR_DAILY_LIMIT = 3;
+const KCO_EXTENSION_SIMULATOR_MODEL = 'gpt-image-2';
+const KCO_EXTENSION_SIMULATOR_SIZE = '1024x1536';
+const KCO_EXTENSION_SIMULATOR_QUALITY = 'low';
+const KCO_EXTENSION_SIMULATOR_OUTPUT_FORMAT = 'png';
 
 const KCO_COST_PRICE_FRANCHISE_IDS = ['K-0', 'K-1'];
 
@@ -270,6 +275,38 @@ function doGet(event) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function doPost(event) {
+  let payload;
+  try {
+    const body = event && event.postData && event.postData.contents
+      ? event.postData.contents
+      : '{}';
+    const request = JSON.parse(body);
+    const apiName = String(request.api || '').trim();
+    if (apiName !== 'generateExtensionSimulationImage') {
+      throw new Error('利用できないAPIです。');
+    }
+    payload = {
+      ok: true,
+      data: generateExtensionSimulationImage(
+        request.sessionToken,
+        request.payload || {}
+      ),
+    };
+  } catch (error) {
+    logOrderDebug_('POST request failed', {
+      error: error && error.message ? error.message : String(error),
+    });
+    payload = {
+      ok: false,
+      error: error && error.message ? error.message : String(error),
+    };
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function handleJsonpApi_(event) {
   const callback = String(event.parameter.callback || '').trim();
   const apiName = String(event.parameter.api || '').trim();
@@ -292,6 +329,7 @@ function handleJsonpApi_(event) {
     getPublicColorRankings,
     getPublicNotices,
     getPublicMapEntries,
+    getExtensionSimulatorQuota,
     getPortalData,
     getMyPageStylebookData,
     updateMemberEmail,
@@ -568,6 +606,54 @@ function runOptionalSetupStep_(label, callback) {
 
 function logSetupStep_(label, data) {
   logOrderDebug_(`setup ${label}`, data || {});
+}
+
+function getExtensionSimulatorQuota(sessionToken) {
+  const franchise = getSessionFranchise_(sessionToken);
+  return getExtensionSimulatorQuotaForUser_(franchise.userId);
+}
+
+function generateExtensionSimulationImage(sessionToken, payload) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const quota = getExtensionSimulatorQuotaForUser_(franchise.userId);
+  if (quota.remaining <= 0) {
+    throw new Error('本日の生成回数に達しました。また明日お試しください。');
+  }
+
+  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEYが設定されていません。');
+  }
+
+  const personImage = parseImageDataUrl_(payload && payload.personImageDataUrl);
+  if (!personImage.bytes.length) {
+    throw new Error('人物写真が取得できませんでした。');
+  }
+
+  const swatchBlob = fetchExtensionSimulatorSwatchBlob_(payload && payload.color);
+  const prompt = buildExtensionSimulatorPrompt_(payload || {});
+  const openAiResult = callOpenAiImageEdit_(apiKey, prompt, personImage, swatchBlob);
+  const imageBase64 = String(openAiResult && openAiResult.imageBase64 || '').trim();
+  if (!imageBase64) {
+    throw new Error('AI画像を生成できませんでした。');
+  }
+
+  const updatedQuota = consumeExtensionSimulatorQuotaForUser_(franchise.userId);
+  logOrderDebug_('extension simulator generated', {
+    userId: franchise.userId,
+    shopId: franchise.shopId,
+    style: payload && payload.style,
+    colorCode: payload && payload.color && payload.color.colorCode,
+    remaining: updatedQuota.remaining,
+    requestId: openAiResult.requestId || '',
+  });
+
+  return {
+    imageDataUrl: `data:image/${KCO_EXTENSION_SIMULATOR_OUTPUT_FORMAT};base64,${imageBase64}`,
+    quota: updatedQuota,
+    model: KCO_EXTENSION_SIMULATOR_MODEL,
+    usage: openAiResult.usage || null,
+  };
 }
 
 function getPublicOrderSettings(sessionToken) {
@@ -3598,6 +3684,208 @@ function getProductMap_() {
     map[createProductKey_(product.category, product.color)] = product;
   });
   return map;
+}
+
+function getExtensionSimulatorTodayKey_() {
+  return Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+}
+
+function getExtensionSimulatorQuotaKey_(userId) {
+  return `KCO_EXTENSION_SIMULATOR_QUOTA_${getExtensionSimulatorTodayKey_()}_${String(userId || '').trim()}`;
+}
+
+function getExtensionSimulatorQuotaForUser_(userId) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('ログインが必要です。');
+  const props = PropertiesService.getScriptProperties();
+  const used = Math.min(
+    KCO_EXTENSION_SIMULATOR_DAILY_LIMIT,
+    Math.max(0, Number(props.getProperty(getExtensionSimulatorQuotaKey_(id)) || 0))
+  );
+  return {
+    userId: id,
+    dateKey: getExtensionSimulatorTodayKey_(),
+    limit: KCO_EXTENSION_SIMULATOR_DAILY_LIMIT,
+    used,
+    remaining: Math.max(0, KCO_EXTENSION_SIMULATOR_DAILY_LIMIT - used),
+  };
+}
+
+function consumeExtensionSimulatorQuotaForUser_(userId) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('ログインが必要です。');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const quota = getExtensionSimulatorQuotaForUser_(id);
+    if (quota.remaining <= 0) {
+      throw new Error('本日の生成回数に達しました。また明日お試しください。');
+    }
+    const props = PropertiesService.getScriptProperties();
+    const nextUsed = Math.min(KCO_EXTENSION_SIMULATOR_DAILY_LIMIT, quota.used + 1);
+    props.setProperty(getExtensionSimulatorQuotaKey_(id), String(nextUsed));
+    return {
+      userId: id,
+      dateKey: quota.dateKey,
+      limit: quota.limit,
+      used: nextUsed,
+      remaining: Math.max(0, quota.limit - nextUsed),
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function parseImageDataUrl_(dataUrl) {
+  const text = String(dataUrl || '').trim();
+  const match = text.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error('画像データの形式が正しくありません。');
+  }
+  const contentType = match[1] === 'image/jpg' ? 'image/jpeg' : match[1];
+  return {
+    contentType,
+    extension: contentType.split('/')[1] === 'jpeg' ? 'jpg' : contentType.split('/')[1],
+    bytes: Utilities.base64Decode(match[2]),
+  };
+}
+
+function fetchExtensionSimulatorSwatchBlob_(color) {
+  const imageUrl = String(color && color.imageUrl || '').trim();
+  const colorCode = String(color && color.colorCode || '').trim();
+  const urls = [];
+  if (imageUrl && /^https:\/\/boss-team1129\.github\.io\/Kimikea-Connect\/color-images\//.test(imageUrl)) {
+    urls.push(imageUrl);
+  }
+  if (colorCode) {
+    const encodedCode = encodeURIComponent(colorCode);
+    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.jpg`);
+    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.png`);
+  }
+  const uniqueUrls = Array.from(new Set(urls));
+  for (let i = 0; i < uniqueUrls.length; i += 1) {
+    try {
+      const response = UrlFetchApp.fetch(uniqueUrls[i], { muteHttpExceptions: true });
+      const status = response.getResponseCode();
+      if (status >= 200 && status < 300) {
+        const blob = response.getBlob();
+        blob.setName(`swatch-${colorCode || 'color'}.${blob.getContentType().includes('png') ? 'png' : 'jpg'}`);
+        return blob;
+      }
+    } catch (error) {
+      logOrderDebug_('extension simulator swatch fetch failed', {
+        colorCode,
+        url: uniqueUrls[i],
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  }
+  throw new Error('毛束画像を取得できませんでした。');
+}
+
+function buildExtensionSimulatorPrompt_(payload) {
+  const color = payload.color || {};
+  const style = String(payload.styleLabel || payload.style || '').trim();
+  const colorName = String(color.colorName || '').trim();
+  const colorCode = String(color.colorCode || '').trim();
+  const category = String(color.category || '').trim();
+  const amount = String(payload.amount || '').trim();
+  const length = String(payload.length || '').trim();
+  return [
+    '人物写真をもとに、エクステ装着後の自然な実写風イメージへ編集してください。',
+    `選択スタイル: ${style}`,
+    `選択カラー: ${colorName}${colorCode ? `（商品コード: ${colorCode}）` : ''}${category ? ` / ${category}` : ''}`,
+    `本数: ${amount}`,
+    `希望の長さ: ${length}`,
+    '固定条件:',
+    '顔を変えない。',
+    '表情を変えない。',
+    '服装を変えない。',
+    '背景を変えない。',
+    '人物の体型を変えない。',
+    '髪のみ編集する。',
+    '美容室で装着した自然な質感にする。',
+    '添付した毛束画像の色を最優先する。',
+    '毛束画像以外の色へ変更しない。',
+    'AIイラスト風ではなく実写風にする。',
+    '違和感のない仕上がりにする。',
+    '地毛となじむよう自然に装着する。',
+    'シールエクステ特有の自然な落ち感を再現する。',
+    '髪の流れ、毛先の動きを自然にする。',
+    '毛量は選択した本数相当で表現する。',
+    '美容室で仕上げたようなリアルな質感にする。',
+    '参照画像1は編集対象の人物写真です。参照画像2は色見本の毛束画像です。',
+  ].filter(Boolean).join('\n');
+}
+
+function callOpenAiImageEdit_(apiKey, prompt, personImage, swatchBlob) {
+  const boundary = `----KimikeaOpenAI${Utilities.getUuid().replace(/-/g, '')}`;
+  const body = buildMultipartPayload_(boundary, [
+    { name: 'model', value: KCO_EXTENSION_SIMULATOR_MODEL },
+    { name: 'prompt', value: prompt },
+    { name: 'size', value: KCO_EXTENSION_SIMULATOR_SIZE },
+    { name: 'quality', value: KCO_EXTENSION_SIMULATOR_QUALITY },
+    { name: 'output_format', value: KCO_EXTENSION_SIMULATOR_OUTPUT_FORMAT },
+    {
+      name: 'image[]',
+      filename: `person.${personImage.extension}`,
+      contentType: personImage.contentType,
+      bytes: personImage.bytes,
+    },
+    {
+      name: 'image[]',
+      filename: swatchBlob.getName() || 'swatch.jpg',
+      contentType: swatchBlob.getContentType() || 'image/jpeg',
+      bytes: swatchBlob.getBytes(),
+    },
+  ]);
+  const response = UrlFetchApp.fetch('https://api.openai.com/v1/images/edits', {
+    method: 'post',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    },
+    payload: body,
+    muteHttpExceptions: true,
+  });
+  const status = response.getResponseCode();
+  const text = response.getContentText();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`OpenAI画像生成の応答を読み取れませんでした。status=${status}`);
+  }
+  if (status < 200 || status >= 300) {
+    const message = json && json.error && json.error.message ? json.error.message : `status=${status}`;
+    throw new Error(`OpenAI画像生成に失敗しました: ${message}`);
+  }
+  return {
+    imageBase64: json && json.data && json.data[0] && json.data[0].b64_json,
+    usage: json && json.usage || null,
+    requestId: response.getHeaders()['x-request-id'] || response.getHeaders()['X-Request-Id'] || '',
+  };
+}
+
+function buildMultipartPayload_(boundary, parts) {
+  let bytes = [];
+  parts.forEach((part) => {
+    bytes = bytes.concat(Utilities.newBlob(`--${boundary}\r\n`).getBytes());
+    if (part.bytes) {
+      bytes = bytes.concat(Utilities.newBlob(
+        `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"\r\n`
+        + `Content-Type: ${part.contentType || 'application/octet-stream'}\r\n\r\n`
+      ).getBytes());
+      bytes = bytes.concat(part.bytes);
+      bytes = bytes.concat(Utilities.newBlob('\r\n').getBytes());
+    } else {
+      bytes = bytes.concat(Utilities.newBlob(
+        `Content-Disposition: form-data; name="${part.name}"\r\n\r\n${part.value}\r\n`
+      ).getBytes());
+    }
+  });
+  bytes = bytes.concat(Utilities.newBlob(`--${boundary}--\r\n`).getBytes());
+  return bytes;
 }
 
 function createSessionKey_(sessionToken) {

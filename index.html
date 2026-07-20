@@ -3430,6 +3430,27 @@
       height: 100%;
       border-radius: 14px;
     }
+    .simulator-generated-result {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(190, 147, 57, .26);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .68);
+      box-shadow: 0 16px 34px rgba(104, 73, 20, .11);
+    }
+    .simulator-generated-result img {
+      width: 100%;
+      border-radius: 18px;
+      display: block;
+      object-fit: contain;
+      background: rgba(255, 255, 255, .82);
+    }
+    .simulator-generated-result strong {
+      color: #2b2318;
+      font-size: 15px;
+      font-weight: 950;
+    }
     .simulator-summary-list {
       display: grid;
       gap: 8px;
@@ -5425,12 +5446,17 @@
         simulator: {
           step: 'photo',
           photoPreviewUrl: '',
+          photoFile: null,
           style: '',
           color: null,
           amount: '',
           length: '',
           colorSearch: '',
+          quota: null,
+          quotaLoading: false,
+          generating: false,
           generationMessage: '',
+          generatedImageUrl: '',
         },
       },
       noticeDetailId: '',
@@ -5684,6 +5710,26 @@
         script.src = url.toString();
         document.head.appendChild(script);
       });
+    }
+
+    function postOrderApi(api, payload) {
+      if (!isOfficialKimikeaContext()) {
+        return Promise.reject(new Error('画像生成は本番のKimikea Connect URLから利用してください。'));
+      }
+      return fetch(ORDER_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          api,
+          sessionToken: state.sessionToken,
+          payload,
+        }),
+      })
+        .then((response) => response.json())
+        .then((result) => {
+          if (result && result.ok) return result.data;
+          throw new Error((result && result.error) || '画像生成に失敗しました。');
+        });
     }
 
     function handleLogin(event) {
@@ -7820,6 +7866,19 @@
         || colorImageUrlFromCode(color?.colorCode || color?.code || color?.productCode, 'jpg');
     }
 
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) {
+          reject(new Error('写真が選択されていません。'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('写真を読み込めませんでした。'));
+        reader.readAsDataURL(file);
+      });
+    }
+
     function extensionSimulatorTodayKey() {
       const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Tokyo',
@@ -7860,6 +7919,20 @@
       if (!userId) {
         return { userId: '', dateKey, limit, used: 0, remaining: 0, isLoggedIn: false };
       }
+      const serverQuota = simulatorState().quota;
+      if (serverQuota && serverQuota.dateKey === dateKey) {
+        const serverLimit = Number(serverQuota.limit || limit);
+        const serverRemaining = Math.max(0, Number(serverQuota.remaining || 0));
+        const serverUsed = Math.max(0, Number(serverQuota.used || (serverLimit - serverRemaining)));
+        return {
+          userId,
+          dateKey,
+          limit: serverLimit,
+          used: serverUsed,
+          remaining: serverRemaining,
+          isLoggedIn: true,
+        };
+      }
       const store = readExtensionSimulatorQuotaStore();
       const record = store[userId] || {};
       const used = record.dateKey === dateKey
@@ -7884,12 +7957,21 @@
 
     function renderExtensionSimulatorQuota() {
       const quota = extensionSimulatorQuota();
+      const simulator = simulatorState();
       if (!quota.isLoggedIn) {
         return `
           <div class="simulator-quota is-empty" aria-live="polite">
             <span>本日の残り生成回数</span>
             <strong>0/${quota.limit}</strong>
             <small>生成機能はログイン後に利用できます。</small>
+          </div>
+        `;
+      }
+      if (simulator.quotaLoading && !simulator.quota) {
+        return `
+          <div class="simulator-quota" aria-live="polite">
+            <span>本日の残り生成回数</span>
+            <strong>確認中</strong>
           </div>
         `;
       }
@@ -7903,6 +7985,29 @@
           ${emptyMessage}
         </div>
       `;
+    }
+
+    function loadExtensionSimulatorQuota() {
+      const simulator = simulatorState();
+      if (!isAuthenticatedSessionActive() || simulator.quotaLoading) return Promise.resolve(null);
+      simulator.quotaLoading = true;
+      return callServer('getExtensionSimulatorQuota', state.sessionToken)
+        .then((quota) => {
+          simulator.quota = quota || null;
+          return quota;
+        })
+        .catch((error) => {
+          if (isSessionExpiredError(error)) {
+            handleSessionError(error);
+          }
+          return null;
+        })
+        .finally(() => {
+          simulator.quotaLoading = false;
+          if (currentPublicPageKey === 'ai' && state.styleDiagnosis.mode === 'simulator') {
+            refreshCurrentPublicActions();
+          }
+        });
     }
 
     function colorToSimulatorSelection(color) {
@@ -7949,6 +8054,8 @@
         URL.revokeObjectURL(simulator.photoPreviewUrl);
       }
       simulator.photoPreviewUrl = '';
+      simulator.photoFile = null;
+      simulator.generatedImageUrl = '';
     }
 
     function openStyleDiagnosisHub() {
@@ -7972,6 +8079,7 @@
       state.styleDiagnosis.simulator.step = 'photo';
       state.styleDiagnosis.simulator.generationMessage = '';
       window.setTimeout(loadPublicProductsForColorChart, 0);
+      window.setTimeout(loadExtensionSimulatorQuota, 0);
       refreshCurrentPublicActions();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -7985,6 +8093,7 @@
       const file = event.target.files?.[0];
       if (!file || !file.type.startsWith('image/')) return;
       clearExtensionSimulatorPhoto();
+      simulatorState().photoFile = file;
       simulatorState().photoPreviewUrl = URL.createObjectURL(file);
       simulatorState().generationMessage = '';
       event.target.value = '';
@@ -8027,6 +8136,7 @@
       simulator.style = styleKey;
       if (!extensionSimulatorAmountOptions(styleKey).includes(simulator.amount)) simulator.amount = '';
       simulator.generationMessage = '';
+      simulator.generatedImageUrl = '';
       persistExtensionSimulatorSelection();
       refreshCurrentPublicActions();
     }
@@ -8036,6 +8146,7 @@
       if (!color) return;
       simulatorState().color = colorToSimulatorSelection(color);
       simulatorState().generationMessage = '';
+      simulatorState().generatedImageUrl = '';
       persistExtensionSimulatorSelection();
       refreshCurrentPublicActions();
     }
@@ -8048,6 +8159,7 @@
     function selectExtensionSimulatorAmount(amount) {
       simulatorState().amount = amount;
       simulatorState().generationMessage = '';
+      simulatorState().generatedImageUrl = '';
       persistExtensionSimulatorSelection();
       refreshCurrentPublicActions();
     }
@@ -8055,25 +8167,67 @@
     function selectExtensionSimulatorLength(length) {
       simulatorState().length = length;
       simulatorState().generationMessage = '';
+      simulatorState().generatedImageUrl = '';
       persistExtensionSimulatorSelection();
       refreshCurrentPublicActions();
     }
 
     function createExtensionSimulatorImage() {
+      const simulator = simulatorState();
       const quota = extensionSimulatorQuota();
       if (!quota.isLoggedIn) {
-        simulatorState().generationMessage = '生成機能はログイン後に利用できます。';
+        simulator.generationMessage = '生成機能はログイン後に利用できます。';
         refreshCurrentPublicActions();
         return;
       }
       if (quota.remaining <= 0) {
-        simulatorState().generationMessage = '本日の生成回数に達しました。また明日お試しください。';
+        simulator.generationMessage = '本日の生成回数に達しました。また明日お試しください。';
         refreshCurrentPublicActions();
         return;
       }
-      const updatedQuota = markExtensionSimulatorGenerationUsed();
-      simulatorState().generationMessage = `AI画像生成機能は準備中です。本日の残り生成回数は${updatedQuota.remaining}/${updatedQuota.limit}です。`;
+      if (!simulator.photoFile) {
+        simulator.generationMessage = '写真を選択してください。';
+        refreshCurrentPublicActions();
+        return;
+      }
+      if (!simulator.color || !simulator.style || !simulator.amount || !simulator.length) {
+        simulator.generationMessage = 'スタイル、カラー、本数、長さを選択してください。';
+        refreshCurrentPublicActions();
+        return;
+      }
+      if (simulator.generating) return;
+      simulator.generating = true;
+      simulator.generationMessage = 'AIイメージを作成しています…';
+      simulator.generatedImageUrl = '';
       refreshCurrentPublicActions();
+      fileToDataUrl(simulator.photoFile)
+        .then((personImageDataUrl) => postOrderApi('generateExtensionSimulationImage', {
+          personImageDataUrl,
+          style: simulator.style,
+          styleLabel: extensionSimulatorStyleLabel(),
+          color: simulator.color,
+          amount: simulator.amount,
+          length: simulator.length,
+        }))
+        .then((result) => {
+          simulator.generatedImageUrl = result?.imageDataUrl || '';
+          simulator.quota = result?.quota || simulator.quota;
+          simulator.generationMessage = simulator.generatedImageUrl
+            ? 'AIイメージを作成しました。'
+            : 'AI画像を生成できませんでした。';
+          markExtensionSimulatorGenerationUsed();
+        })
+        .catch((error) => {
+          if (isSessionExpiredError(error)) {
+            handleSessionError(error);
+            return;
+          }
+          simulator.generationMessage = getErrorMessage(error) || '画像生成に失敗しました。時間をおいてもう一度お試しください。';
+        })
+        .finally(() => {
+          simulator.generating = false;
+          if (currentPublicPageKey === 'ai') refreshCurrentPublicActions();
+        });
     }
 
     function renderStyleDiagnosisHub() {
@@ -8263,14 +8417,20 @@
           </dl>
           <p class="simulator-note">選択された毛束画像の色を基準にAIイメージを作成します</p>
           <p class="simulator-note">AIによるイメージ画像です。実際の仕上がりや必要本数とは異なる場合があります。</p>
-          <p class="simulator-note">撮影した写真は、現在の試作版では外部送信・保存されません。</p>
+          <p class="simulator-note">生成時のみ写真と毛束画像をAI画像生成APIへ送信します。Kimikea Connect側では写真や生成画像を保存しません。</p>
           ${renderExtensionSimulatorQuota()}
           ${simulator.generationMessage ? `<p class="simulator-message">${escapeHtml(simulator.generationMessage)}</p>` : ''}
+          ${simulator.generatedImageUrl ? `
+            <div class="simulator-generated-result">
+              <strong>生成されたAIイメージ</strong>
+              <img src="${escapeHtml(simulator.generatedImageUrl)}" alt="生成されたエクステ装着イメージ">
+            </div>
+          ` : ''}
         </div>
       `, {
-        nextLabel: 'イメージを作成する',
+        nextLabel: simulator.generating ? '生成中…' : 'イメージを作成する',
         nextAction: 'createExtensionSimulatorImage()',
-        nextDisabled: !extensionSimulatorQuota().isLoggedIn || extensionSimulatorQuota().remaining <= 0,
+        nextDisabled: simulator.generating || !extensionSimulatorQuota().isLoggedIn || extensionSimulatorQuota().remaining <= 0,
       });
     }
 
