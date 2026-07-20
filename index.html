@@ -3453,6 +3453,39 @@
       font-weight: 950;
       text-align: right;
     }
+    .simulator-quota {
+      display: grid;
+      gap: 5px;
+      padding: 14px 16px;
+      border: 1px solid rgba(190, 147, 57, .28);
+      border-radius: 18px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, .86), rgba(255, 248, 234, .62)),
+        radial-gradient(circle at 12% 0%, rgba(236, 197, 103, .25), transparent 42%);
+      box-shadow: 0 14px 28px rgba(104, 73, 20, .09), inset 0 1px 0 rgba(255, 255, 255, .9);
+    }
+    .simulator-quota span {
+      color: #8a7a64;
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .08em;
+    }
+    .simulator-quota strong {
+      color: #2b2318;
+      font-size: 26px;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .simulator-quota small {
+      color: #8a4a32;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1.6;
+    }
+    .simulator-quota.is-empty {
+      border-color: rgba(154, 91, 64, .28);
+      background: rgba(255, 246, 242, .78);
+    }
     .simulator-message {
       padding: 12px 14px;
       border-radius: 16px;
@@ -6554,6 +6587,8 @@
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
     const STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY = 'kimikeaDiagnosisColorFilter';
     const EXTENSION_SIMULATOR_STORAGE_KEY = 'kimikea_extension_simulator_v1';
+    const EXTENSION_SIMULATOR_QUOTA_STORAGE_KEY = 'kimikea_extension_simulator_generation_quota_v1';
+    const EXTENSION_SIMULATOR_DAILY_LIMIT = 3;
     const EXTENSION_SIMULATOR_STEPS = [
       { key: 'photo', label: '写真' },
       { key: 'style', label: 'スタイル' },
@@ -7785,6 +7820,91 @@
         || colorImageUrlFromCode(color?.colorCode || color?.code || color?.productCode, 'jpg');
     }
 
+    function extensionSimulatorTodayKey() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(new Date());
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+
+    function extensionSimulatorQuotaUserId() {
+      return currentMemberUserId()
+        || String(state.franchise?.userId || state.franchise?.id || '').trim();
+    }
+
+    function readExtensionSimulatorQuotaStore() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(EXTENSION_SIMULATOR_QUOTA_STORAGE_KEY) || '{}');
+        return stored && typeof stored === 'object' ? stored : {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function writeExtensionSimulatorQuotaStore(store) {
+      try {
+        localStorage.setItem(EXTENSION_SIMULATOR_QUOTA_STORAGE_KEY, JSON.stringify(store || {}));
+      } catch (error) {
+        // Quota display still works in memory during this session if storage is blocked.
+      }
+    }
+
+    function extensionSimulatorQuota() {
+      const limit = EXTENSION_SIMULATOR_DAILY_LIMIT;
+      const userId = extensionSimulatorQuotaUserId();
+      const dateKey = extensionSimulatorTodayKey();
+      if (!userId) {
+        return { userId: '', dateKey, limit, used: 0, remaining: 0, isLoggedIn: false };
+      }
+      const store = readExtensionSimulatorQuotaStore();
+      const record = store[userId] || {};
+      const used = record.dateKey === dateKey
+        ? Math.min(limit, Math.max(0, Number(record.used || 0)))
+        : 0;
+      return { userId, dateKey, limit, used, remaining: Math.max(0, limit - used), isLoggedIn: true };
+    }
+
+    function markExtensionSimulatorGenerationUsed() {
+      const quota = extensionSimulatorQuota();
+      if (!quota.isLoggedIn || quota.remaining <= 0) return quota;
+      const store = readExtensionSimulatorQuotaStore();
+      const nextUsed = Math.min(quota.limit, quota.used + 1);
+      store[quota.userId] = {
+        dateKey: quota.dateKey,
+        used: nextUsed,
+        updatedAt: new Date().toISOString(),
+      };
+      writeExtensionSimulatorQuotaStore(store);
+      return { ...quota, used: nextUsed, remaining: Math.max(0, quota.limit - nextUsed) };
+    }
+
+    function renderExtensionSimulatorQuota() {
+      const quota = extensionSimulatorQuota();
+      if (!quota.isLoggedIn) {
+        return `
+          <div class="simulator-quota is-empty" aria-live="polite">
+            <span>本日の残り生成回数</span>
+            <strong>0/${quota.limit}</strong>
+            <small>生成機能はログイン後に利用できます。</small>
+          </div>
+        `;
+      }
+      const emptyMessage = quota.remaining <= 0
+        ? '<small>本日の生成回数に達しました。<br>また明日お試しください。</small>'
+        : '';
+      return `
+        <div class="simulator-quota${quota.remaining <= 0 ? ' is-empty' : ''}" aria-live="polite">
+          <span>本日の残り生成回数</span>
+          <strong>${quota.remaining}/${quota.limit}</strong>
+          ${emptyMessage}
+        </div>
+      `;
+    }
+
     function colorToSimulatorSelection(color) {
       const colorCode = normalizeColorCode(color?.code || color?.productCode || color?.['商品コード']);
       return {
@@ -7940,7 +8060,19 @@
     }
 
     function createExtensionSimulatorImage() {
-      simulatorState().generationMessage = 'AI画像生成機能は準備中です';
+      const quota = extensionSimulatorQuota();
+      if (!quota.isLoggedIn) {
+        simulatorState().generationMessage = '生成機能はログイン後に利用できます。';
+        refreshCurrentPublicActions();
+        return;
+      }
+      if (quota.remaining <= 0) {
+        simulatorState().generationMessage = '本日の生成回数に達しました。また明日お試しください。';
+        refreshCurrentPublicActions();
+        return;
+      }
+      const updatedQuota = markExtensionSimulatorGenerationUsed();
+      simulatorState().generationMessage = `AI画像生成機能は準備中です。本日の残り生成回数は${updatedQuota.remaining}/${updatedQuota.limit}です。`;
       refreshCurrentPublicActions();
     }
 
@@ -8132,11 +8264,13 @@
           <p class="simulator-note">選択された毛束画像の色を基準にAIイメージを作成します</p>
           <p class="simulator-note">AIによるイメージ画像です。実際の仕上がりや必要本数とは異なる場合があります。</p>
           <p class="simulator-note">撮影した写真は、現在の試作版では外部送信・保存されません。</p>
+          ${renderExtensionSimulatorQuota()}
           ${simulator.generationMessage ? `<p class="simulator-message">${escapeHtml(simulator.generationMessage)}</p>` : ''}
         </div>
       `, {
         nextLabel: 'イメージを作成する',
         nextAction: 'createExtensionSimulatorImage()',
+        nextDisabled: !extensionSimulatorQuota().isLoggedIn || extensionSimulatorQuota().remaining <= 0,
       });
     }
 
