@@ -3211,6 +3211,269 @@
       display: grid;
       gap: 10px;
     }
+    .diagnosis-entry-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .diagnosis-entry-card,
+    .simulator-card,
+    .simulator-choice,
+    .simulator-color-card {
+      border: 1px solid rgba(190, 147, 57, .24);
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, .9), rgba(255, 248, 234, .72)),
+        radial-gradient(circle at 18% 0%, rgba(232, 200, 126, .25), transparent 36%);
+      box-shadow: 0 18px 36px rgba(104, 73, 20, .1);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .diagnosis-entry-card {
+      width: 100%;
+      padding: 18px;
+      border-radius: 24px;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+    }
+    .diagnosis-entry-card:active,
+    .simulator-choice:active,
+    .simulator-color-card:active {
+      transform: translateY(2px) scale(.99);
+    }
+    .diagnosis-entry-card span {
+      display: block;
+      color: #9a7530;
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .diagnosis-entry-card strong {
+      display: block;
+      margin-top: 7px;
+      color: #2d2518;
+      font-size: 20px;
+      font-weight: 950;
+    }
+    .diagnosis-entry-card small {
+      display: block;
+      margin-top: 8px;
+      color: #756a59;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .simulator-card {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 26px;
+    }
+    .simulator-progress {
+      display: grid;
+      gap: 8px;
+    }
+    .simulator-progress-row {
+      display: flex;
+      justify-content: space-between;
+      color: #9a7530;
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .08em;
+    }
+    .simulator-progress-track {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(190, 147, 57, .16);
+    }
+    .simulator-progress-track span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #d7a63d, #f1d891, #e5b554);
+      transition: width .28s ease;
+    }
+    .simulator-title {
+      margin: 0;
+      color: #2b2318;
+      font-size: clamp(24px, 7vw, 38px);
+      line-height: 1.25;
+    }
+    .simulator-lead,
+    .simulator-note {
+      margin: 0;
+      color: #746a5d;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    .simulator-photo-actions,
+    .simulator-actions,
+    .simulator-link-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .simulator-photo-preview,
+    .simulator-summary-photo {
+      overflow: hidden;
+      border: 1px solid rgba(190, 147, 57, .24);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .58);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+      aspect-ratio: 4 / 5;
+    }
+    .simulator-photo-preview img,
+    .simulator-summary-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .simulator-placeholder {
+      display: grid;
+      min-height: 220px;
+      place-items: center;
+      padding: 22px;
+      color: #9a7530;
+      font-weight: 900;
+      text-align: center;
+      border: 1px dashed rgba(190, 147, 57, .34);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .48);
+    }
+    .simulator-choice-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .simulator-choice {
+      width: 100%;
+      min-height: 56px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      color: #302719;
+      font-size: 15px;
+      font-weight: 900;
+      text-align: left;
+      cursor: pointer;
+    }
+    .simulator-choice.is-selected,
+    .simulator-color-card.is-selected {
+      border-color: rgba(190, 147, 57, .65);
+      box-shadow: 0 18px 38px rgba(183, 129, 25, .18), inset 0 1px 0 rgba(255, 255, 255, .92);
+    }
+    .simulator-color-search {
+      width: 100%;
+      min-height: 52px;
+      padding: 0 16px;
+      border: 1px solid rgba(190, 147, 57, .26);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .72);
+      color: #2b2318;
+      font-size: 16px;
+    }
+    .simulator-color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      max-height: min(56vh, 520px);
+      overflow-y: auto;
+      padding: 2px 2px 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .simulator-color-card {
+      display: grid;
+      gap: 9px;
+      padding: 10px;
+      border-radius: 18px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .simulator-color-card .color-chart-swatch {
+      width: 100%;
+      min-height: 126px;
+      aspect-ratio: 3 / 4;
+      border-radius: 14px;
+    }
+    .simulator-color-card strong,
+    .simulator-summary-main strong {
+      color: #2b2318;
+      font-size: 17px;
+      font-weight: 950;
+    }
+    .simulator-color-card small,
+    .simulator-summary-main small {
+      color: #8a7a64;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .simulator-summary {
+      display: grid;
+      gap: 14px;
+    }
+    .simulator-summary-main {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .62);
+    }
+    .simulator-summary-color {
+      overflow: hidden;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .66);
+      aspect-ratio: 3 / 4;
+    }
+    .simulator-summary-color .color-chart-swatch {
+      width: 100%;
+      height: 100%;
+      border-radius: 14px;
+    }
+    .simulator-summary-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }
+    .simulator-summary-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(190, 147, 57, .15);
+    }
+    .simulator-summary-list dt {
+      color: #8a7a64;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .simulator-summary-list dd {
+      margin: 0;
+      color: #2b2318;
+      font-weight: 950;
+      text-align: right;
+    }
+    .simulator-message {
+      padding: 12px 14px;
+      border-radius: 16px;
+      color: #7a5a17;
+      font-size: 13px;
+      font-weight: 900;
+      background: rgba(245, 219, 148, .32);
+    }
+    @media (min-width: 680px) {
+      .diagnosis-entry-grid,
+      .simulator-choice-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .simulator-photo-actions,
+      .simulator-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .simulator-color-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
     .diagnosis-result-item {
       display: grid;
       gap: 4px;
@@ -5121,11 +5384,21 @@
         latest: null,
       },
       styleDiagnosis: {
-        mode: 'start',
+        mode: 'hub',
         currentIndex: 0,
         answers: {},
         result: null,
         analyzing: false,
+        simulator: {
+          step: 'photo',
+          photoPreviewUrl: '',
+          style: '',
+          color: null,
+          amount: '',
+          length: '',
+          colorSearch: '',
+          generationMessage: '',
+        },
       },
       noticeDetailId: '',
       kimikeaMap: {
@@ -6080,6 +6353,7 @@
     }
 
     function showHomePage() {
+      if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('home');
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
@@ -6097,6 +6371,7 @@
         setLoginActionMessage('注文機能を利用するにはログインしてください。', false);
         return;
       }
+      if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('order');
       document.getElementById('homeView').hidden = true;
       document.getElementById('publicPageView').hidden = true;
@@ -6278,6 +6553,30 @@
 
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
     const STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY = 'kimikeaDiagnosisColorFilter';
+    const EXTENSION_SIMULATOR_STORAGE_KEY = 'kimikea_extension_simulator_v1';
+    const EXTENSION_SIMULATOR_STEPS = [
+      { key: 'photo', label: '写真' },
+      { key: 'style', label: 'スタイル' },
+      { key: 'color', label: 'カラー' },
+      { key: 'amount', label: '本数' },
+      { key: 'length', label: '長さ' },
+      { key: 'confirm', label: '確認' },
+    ];
+    const EXTENSION_SIMULATOR_STYLES = [
+      { key: 'earring', label: 'イヤリングカラー', description: '耳まわりにさりげない色を足すスタイル。' },
+      { key: 'inner', label: 'インナーカラー', description: '髪の内側に色を仕込み、動いた時に見せるスタイル。' },
+      { key: 'mesh', label: 'メッシュ', description: '髪全体に立体感と動きを出すスタイル。' },
+      { key: 'length', label: '長さ出し', description: '自然に長さとボリュームを足すスタイル。' },
+      { key: 'gradient', label: 'デザイングラデーション', description: '毛先へ向かって色を楽しむデザインスタイル。' },
+    ];
+    const EXTENSION_SIMULATOR_AMOUNT_OPTIONS = {
+      earring: ['2本', '4本', '6本', '8本'],
+      inner: ['6本', '10本', '20本'],
+      mesh: ['10本', '20本', '30本'],
+      length: ['40本', '60本', '80本', '100本'],
+      gradient: ['40本', '60本', '80本'],
+    };
+    const EXTENSION_SIMULATOR_LENGTH_OPTIONS = ['肩', '鎖骨', '胸上', '胸下', '腰付近'];
     const STYLE_DIAGNOSIS_IMAGE_MAP = {
       'natural-earring': 'images/diagnosis/natural-earring.png',
       'face-transparent': 'images/diagnosis/face-transparent.png',
@@ -7465,6 +7764,392 @@
       window.open(`${NPO_LINE_URL}${separator}text=${encodeURIComponent(message)}`, '_blank', 'noopener');
     }
 
+    function simulatorState() {
+      return state.styleDiagnosis.simulator;
+    }
+
+    function extensionSimulatorStepIndex(step = simulatorState().step) {
+      return Math.max(0, EXTENSION_SIMULATOR_STEPS.findIndex((item) => item.key === step));
+    }
+
+    function extensionSimulatorStyleLabel(styleKey = simulatorState().style) {
+      return EXTENSION_SIMULATOR_STYLES.find((item) => item.key === styleKey)?.label || '';
+    }
+
+    function extensionSimulatorAmountOptions(styleKey = simulatorState().style) {
+      return EXTENSION_SIMULATOR_AMOUNT_OPTIONS[styleKey] || [];
+    }
+
+    function extensionSimulatorColorImageUrl(color) {
+      return String(color?.imageUrl || '').trim()
+        || colorImageUrlFromCode(color?.colorCode || color?.code || color?.productCode, 'jpg');
+    }
+
+    function colorToSimulatorSelection(color) {
+      const colorCode = normalizeColorCode(color?.code || color?.productCode || color?.['商品コード']);
+      return {
+        colorCode,
+        colorName: colorDisplayName(color),
+        category: String(color?.category || '').trim(),
+        imageUrl: colorImageUrlFromCode(colorCode, 'jpg'),
+      };
+    }
+
+    function persistExtensionSimulatorSelection() {
+      const simulator = simulatorState();
+      try {
+        sessionStorage.setItem(EXTENSION_SIMULATOR_STORAGE_KEY, JSON.stringify({
+          style: simulator.style || '',
+          color: simulator.color || null,
+          amount: simulator.amount || '',
+          length: simulator.length || '',
+        }));
+      } catch (error) {
+        // Some embedded browsers block sessionStorage. The simulator still works in memory.
+      }
+    }
+
+    function hydrateExtensionSimulatorSelection() {
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(EXTENSION_SIMULATOR_STORAGE_KEY) || 'null');
+        if (!stored || typeof stored !== 'object') return;
+        const simulator = simulatorState();
+        simulator.style = stored.style || simulator.style || '';
+        simulator.color = stored.color || simulator.color || null;
+        simulator.amount = stored.amount || simulator.amount || '';
+        simulator.length = stored.length || simulator.length || '';
+      } catch (error) {
+        // Ignore broken temporary state.
+      }
+    }
+
+    function clearExtensionSimulatorPhoto() {
+      const simulator = simulatorState();
+      if (simulator.photoPreviewUrl) {
+        URL.revokeObjectURL(simulator.photoPreviewUrl);
+      }
+      simulator.photoPreviewUrl = '';
+    }
+
+    function openStyleDiagnosisHub() {
+      clearExtensionSimulatorPhoto();
+      state.styleDiagnosis.mode = 'hub';
+      state.styleDiagnosis.simulator.generationMessage = '';
+      refreshCurrentPublicActions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openQuestionDiagnosisEntry() {
+      clearExtensionSimulatorPhoto();
+      state.styleDiagnosis.mode = 'start';
+      refreshCurrentPublicActions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openExtensionSimulator() {
+      hydrateExtensionSimulatorSelection();
+      state.styleDiagnosis.mode = 'simulator';
+      state.styleDiagnosis.simulator.step = 'photo';
+      state.styleDiagnosis.simulator.generationMessage = '';
+      window.setTimeout(loadPublicProductsForColorChart, 0);
+      refreshCurrentPublicActions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function triggerExtensionSimulatorPhotoInput(kind) {
+      const input = document.getElementById(kind === 'camera' ? 'simulatorCameraInput' : 'simulatorLibraryInput');
+      if (input) input.click();
+    }
+
+    function handleExtensionSimulatorPhotoChange(event) {
+      const file = event.target.files?.[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      clearExtensionSimulatorPhoto();
+      simulatorState().photoPreviewUrl = URL.createObjectURL(file);
+      simulatorState().generationMessage = '';
+      event.target.value = '';
+      refreshCurrentPublicActions();
+    }
+
+    function retakeExtensionSimulatorPhoto() {
+      clearExtensionSimulatorPhoto();
+      simulatorState().generationMessage = '';
+      refreshCurrentPublicActions();
+    }
+
+    function setExtensionSimulatorStep(step) {
+      const targetIndex = extensionSimulatorStepIndex(step);
+      if (targetIndex < 0) return;
+      simulatorState().step = step;
+      simulatorState().generationMessage = '';
+      refreshCurrentPublicActions();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function previousExtensionSimulatorStep() {
+      const currentIndex = extensionSimulatorStepIndex();
+      if (currentIndex <= 0) {
+        openStyleDiagnosisHub();
+        return;
+      }
+      setExtensionSimulatorStep(EXTENSION_SIMULATOR_STEPS[currentIndex - 1].key);
+    }
+
+    function nextExtensionSimulatorStep() {
+      const currentIndex = extensionSimulatorStepIndex();
+      const next = EXTENSION_SIMULATOR_STEPS[currentIndex + 1];
+      if (!next) return;
+      setExtensionSimulatorStep(next.key);
+    }
+
+    function selectExtensionSimulatorStyle(styleKey) {
+      const simulator = simulatorState();
+      simulator.style = styleKey;
+      if (!extensionSimulatorAmountOptions(styleKey).includes(simulator.amount)) simulator.amount = '';
+      simulator.generationMessage = '';
+      persistExtensionSimulatorSelection();
+      refreshCurrentPublicActions();
+    }
+
+    function selectExtensionSimulatorColor(code) {
+      const color = getActiveColorChartProducts().find((item) => normalizeColorCode(item.code) === normalizeColorCode(code));
+      if (!color) return;
+      simulatorState().color = colorToSimulatorSelection(color);
+      simulatorState().generationMessage = '';
+      persistExtensionSimulatorSelection();
+      refreshCurrentPublicActions();
+    }
+
+    function setExtensionSimulatorColorSearch(value) {
+      simulatorState().colorSearch = value || '';
+      refreshCurrentPublicActions();
+    }
+
+    function selectExtensionSimulatorAmount(amount) {
+      simulatorState().amount = amount;
+      simulatorState().generationMessage = '';
+      persistExtensionSimulatorSelection();
+      refreshCurrentPublicActions();
+    }
+
+    function selectExtensionSimulatorLength(length) {
+      simulatorState().length = length;
+      simulatorState().generationMessage = '';
+      persistExtensionSimulatorSelection();
+      refreshCurrentPublicActions();
+    }
+
+    function createExtensionSimulatorImage() {
+      simulatorState().generationMessage = 'AI画像生成機能は準備中です';
+      refreshCurrentPublicActions();
+    }
+
+    function renderStyleDiagnosisHub() {
+      return `
+        <section class="diagnosis-hero">
+          <p class="diagnosis-kicker">Kimikea Concierge</p>
+          <h3>AIで、似合うエクステを探す</h3>
+          <p>質問で似合う方向性を見つけるか、写真を使ってエクステのイメージ作成準備を進められます。</p>
+        </section>
+        <section class="diagnosis-entry-grid">
+          <button type="button" class="diagnosis-entry-card" onclick="openQuestionDiagnosisEntry()">
+            <span>Question</span>
+            <strong>質問でピッタリを探す</strong>
+            <small>既存の8問式AI診断で、スタイル・カラー・本数のおすすめを確認します。</small>
+          </button>
+          <button type="button" class="diagnosis-entry-card" onclick="openExtensionSimulator()">
+            <span>Photo Simulator</span>
+            <strong>写真でエクステを試す</strong>
+            <small>写真、スタイル、GROWカラー、本数、長さを選んでAIイメージ作成の準備をします。</small>
+          </button>
+        </section>
+      `;
+    }
+
+    function renderExtensionSimulatorProgress() {
+      const index = extensionSimulatorStepIndex();
+      const current = EXTENSION_SIMULATOR_STEPS[index] || EXTENSION_SIMULATOR_STEPS[0];
+      const progress = Math.round(((index + 1) / EXTENSION_SIMULATOR_STEPS.length) * 100);
+      return `
+        <div class="simulator-progress" aria-label="シミュレーター進捗">
+          <div class="simulator-progress-row">
+            <span>${index + 1} / ${EXTENSION_SIMULATOR_STEPS.length}</span>
+            <span>${escapeHtml(current.label)}</span>
+          </div>
+          <div class="simulator-progress-track"><span style="width:${progress}%"></span></div>
+        </div>
+      `;
+    }
+
+    function renderExtensionSimulatorShell(title, body, options = {}) {
+      const backAction = options.backAction || 'previousExtensionSimulatorStep()';
+      return `
+        <section class="simulator-card">
+          ${renderExtensionSimulatorProgress()}
+          <div>
+            <p class="diagnosis-kicker">AI Extension Simulator</p>
+            <h3 class="simulator-title">${escapeHtml(title)}</h3>
+            ${options.lead ? `<p class="simulator-lead">${escapeHtml(options.lead)}</p>` : ''}
+          </div>
+          ${body}
+          <div class="simulator-actions">
+            <button type="button" class="diagnosis-back-button" onclick="${backAction}">${options.backLabel || '戻る'}</button>
+            ${options.nextLabel ? `<button type="button" class="diagnosis-primary-button" onclick="${options.nextAction || 'nextExtensionSimulatorStep()'}" ${options.nextDisabled ? 'disabled' : ''}>${escapeHtml(options.nextLabel)}</button>` : ''}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderExtensionSimulatorPhotoStep() {
+      const simulator = simulatorState();
+      const preview = simulator.photoPreviewUrl
+        ? `<div class="simulator-photo-preview"><img src="${escapeHtml(simulator.photoPreviewUrl)}" alt="選択した写真"></div>`
+        : '<div class="simulator-placeholder">顔写真を撮影または選択してください</div>';
+      return renderExtensionSimulatorShell('顔写真を選択', `
+        ${preview}
+        <div class="simulator-photo-actions">
+          <button type="button" class="diagnosis-primary-button" onclick="triggerExtensionSimulatorPhotoInput('camera')">カメラで撮影</button>
+          <button type="button" class="diagnosis-secondary-button" onclick="triggerExtensionSimulatorPhotoInput('library')">写真ライブラリから選択</button>
+          ${simulator.photoPreviewUrl ? '<button type="button" class="diagnosis-secondary-button" onclick="retakeExtensionSimulatorPhoto()">撮り直す</button>' : ''}
+        </div>
+        <input id="simulatorCameraInput" type="file" accept="image/*" capture="environment" onchange="handleExtensionSimulatorPhotoChange(event)" hidden>
+        <input id="simulatorLibraryInput" type="file" accept="image/*" onchange="handleExtensionSimulatorPhotoChange(event)" hidden>
+        <p class="simulator-note">写真はこの段階では外部へ送信せず、ブラウザ内だけで一時保持します。</p>
+      `, {
+        backAction: 'openStyleDiagnosisHub()',
+        backLabel: '入口へ戻る',
+        nextLabel: 'スタイルを選ぶ',
+        nextDisabled: !simulator.photoPreviewUrl,
+      });
+    }
+
+    function renderExtensionSimulatorStyleStep() {
+      const selected = simulatorState().style;
+      return renderExtensionSimulatorShell('スタイルを選択', `
+        <div class="simulator-choice-grid">
+          ${EXTENSION_SIMULATOR_STYLES.map((item) => `
+            <button type="button" class="simulator-choice${selected === item.key ? ' is-selected' : ''}" onclick="selectExtensionSimulatorStyle('${item.key}')">
+              <strong>${escapeHtml(item.label)}</strong><br>
+              <small>${escapeHtml(item.description)}</small>
+            </button>
+          `).join('')}
+        </div>
+      `, {
+        nextLabel: 'カラーを選ぶ',
+        nextDisabled: !selected,
+      });
+    }
+
+    function renderExtensionSimulatorColorStep() {
+      const simulator = simulatorState();
+      const colors = getActiveColorChartProducts();
+      const query = String(simulator.colorSearch || '').trim().toLowerCase();
+      const filteredColors = colors.filter((color) => {
+        if (!query) return true;
+        return [
+          colorDisplayName(color),
+          color.color,
+          color.category,
+          color.colorSystem,
+          color.code,
+        ].join(' ').toLowerCase().includes(query);
+      });
+      const selectedCode = normalizeColorCode(simulator.color?.colorCode);
+      const content = colors.length
+        ? `
+          <input class="simulator-color-search" type="search" placeholder="カラー名で検索" value="${escapeHtml(simulator.colorSearch)}" oninput="setExtensionSimulatorColorSearch(this.value)">
+          <div class="simulator-color-grid">
+            ${filteredColors.map((color) => {
+              const code = normalizeColorCode(color.code);
+              return `
+                <button type="button" class="simulator-color-card${selectedCode === code ? ' is-selected' : ''}" onclick="selectExtensionSimulatorColor('${escapeHtml(code)}')">
+                  ${colorImageMarkup(color, 'color-chart-swatch')}
+                  <strong>${escapeHtml(colorDisplayName(color))}</strong>
+                  <small>${escapeHtml(color.category)}</small>
+                </button>
+              `;
+            }).join('') || '<p class="simulator-note">該当するカラーがありません。</p>'}
+          </div>
+        `
+        : '<p class="simulator-note">GROWカラーチャートを読み込み中です。</p>';
+      return renderExtensionSimulatorShell('GROWカラーを選択', content, {
+        nextLabel: '本数を選ぶ',
+        nextDisabled: !simulator.color,
+      });
+    }
+
+    function renderExtensionSimulatorAmountStep() {
+      const selected = simulatorState().amount;
+      const options = extensionSimulatorAmountOptions();
+      return renderExtensionSimulatorShell('本数を選択', `
+        <p class="simulator-note">${escapeHtml(extensionSimulatorStyleLabel() || '選択したスタイル')}に合わせた候補を表示しています。</p>
+        <div class="simulator-choice-grid">
+          ${options.map((amount) => `
+            <button type="button" class="simulator-choice${selected === amount ? ' is-selected' : ''}" onclick="selectExtensionSimulatorAmount('${escapeHtml(amount)}')">${escapeHtml(amount)}</button>
+          `).join('')}
+        </div>
+      `, {
+        nextLabel: '長さを選ぶ',
+        nextDisabled: !selected,
+      });
+    }
+
+    function renderExtensionSimulatorLengthStep() {
+      const selected = simulatorState().length;
+      return renderExtensionSimulatorShell('希望の長さを選択', `
+        <div class="simulator-choice-grid">
+          ${EXTENSION_SIMULATOR_LENGTH_OPTIONS.map((length) => `
+            <button type="button" class="simulator-choice${selected === length ? ' is-selected' : ''}" onclick="selectExtensionSimulatorLength('${escapeHtml(length)}')">${escapeHtml(length)}</button>
+          `).join('')}
+        </div>
+      `, {
+        nextLabel: '内容を確認する',
+        nextDisabled: !selected,
+      });
+    }
+
+    function renderExtensionSimulatorConfirmStep() {
+      const simulator = simulatorState();
+      const color = simulator.color || {};
+      return renderExtensionSimulatorShell('内容確認', `
+        <div class="simulator-summary">
+          ${simulator.photoPreviewUrl
+            ? `<div class="simulator-summary-photo"><img src="${escapeHtml(simulator.photoPreviewUrl)}" alt="選択した写真"></div>`
+            : '<div class="simulator-placeholder">写真が選択されていません</div>'}
+          <div class="simulator-summary-main">
+            <div class="simulator-summary-color">${color.colorCode ? colorImageMarkup({ code: color.colorCode, colorName: color.colorName }, 'color-chart-swatch') : ''}</div>
+            <div>
+              <strong>${escapeHtml(color.colorName || 'カラー未選択')}</strong><br>
+              <small>${escapeHtml(color.category || '')}</small>
+            </div>
+          </div>
+          <dl class="simulator-summary-list">
+            <div><dt>スタイル</dt><dd>${escapeHtml(extensionSimulatorStyleLabel() || '未選択')}</dd></div>
+            <div><dt>商品コード</dt><dd>${escapeHtml(color.colorCode || '未選択')}</dd></div>
+            <div><dt>本数</dt><dd>${escapeHtml(simulator.amount || '未選択')}</dd></div>
+            <div><dt>希望の長さ</dt><dd>${escapeHtml(simulator.length || '未選択')}</dd></div>
+          </dl>
+          <p class="simulator-note">選択された毛束画像の色を基準にAIイメージを作成します</p>
+          <p class="simulator-note">AIによるイメージ画像です。実際の仕上がりや必要本数とは異なる場合があります。</p>
+          <p class="simulator-note">撮影した写真は、現在の試作版では外部送信・保存されません。</p>
+          ${simulator.generationMessage ? `<p class="simulator-message">${escapeHtml(simulator.generationMessage)}</p>` : ''}
+        </div>
+      `, {
+        nextLabel: 'イメージを作成する',
+        nextAction: 'createExtensionSimulatorImage()',
+      });
+    }
+
+    function renderExtensionSimulatorPage() {
+      const step = simulatorState().step || 'photo';
+      if (step === 'style') return renderExtensionSimulatorStyleStep();
+      if (step === 'color') return renderExtensionSimulatorColorStep();
+      if (step === 'amount') return renderExtensionSimulatorAmountStep();
+      if (step === 'length') return renderExtensionSimulatorLengthStep();
+      if (step === 'confirm') return renderExtensionSimulatorConfirmStep();
+      return renderExtensionSimulatorPhotoStep();
+    }
+
     function renderStyleDiagnosisStart() {
       return `
         <section class="diagnosis-hero">
@@ -7549,13 +8234,17 @@
     }
 
     function renderStyleDiagnosisPage() {
-      hydrateStyleDiagnosisState();
       window.setTimeout(loadPublicProductsForColorChart, 0);
       window.setTimeout(loadStylebookPostsForColorChart, 0);
       const mode = state.styleDiagnosis.mode || 'start';
+      if (mode !== 'hub' && mode !== 'start' && mode !== 'simulator') hydrateStyleDiagnosisState();
       return `
         <article class="diagnosis-shell">
-          ${mode === 'question'
+          ${mode === 'hub'
+            ? renderStyleDiagnosisHub()
+            : mode === 'simulator'
+              ? renderExtensionSimulatorPage()
+              : mode === 'question'
             ? renderStyleDiagnosisQuestion()
             : mode === 'analyzing'
               ? renderStyleDiagnosisAnalyzing()
@@ -9135,7 +9824,7 @@
       },
       ai: {
         title: 'あなたのピッタリを探す',
-        lead: '質問に答えるだけで、おすすめのエクステスタイル・カラー・本数を提案します。',
+        lead: '質問診断と写真シミュレーターから、似合うエクステの方向性を探せます。',
         items: [],
         renderActions: renderStyleDiagnosisPage
       },
@@ -9154,6 +9843,10 @@
     };
 
     function openPublicPage(pageKey) {
+      const previousPublicPageKey = currentPublicPageKey;
+      if (previousPublicPageKey === 'ai' && pageKey !== 'ai') {
+        clearExtensionSimulatorPhoto();
+      }
       rememberKimikeaRoute('public', pageKey);
       currentPublicPageKey = pageKey;
       const page = publicPages[pageKey] || publicPages.notice;
@@ -9255,6 +9948,7 @@
     }
 
     function openSearchPage() {
+      if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('public', 'search');
       currentPublicPageKey = 'search';
       document.getElementById('homeView').hidden = true;
@@ -9709,6 +10403,7 @@
         setLoginActionMessage('マイページは加盟店・コーディネーター専用です。ログインしてください。', false);
         return;
       }
+      if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('public', 'mypage');
       currentPublicPageKey = 'mypage';
       const franchise = state.franchise || {};
