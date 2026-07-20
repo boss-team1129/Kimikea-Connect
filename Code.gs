@@ -608,18 +608,17 @@ function logSetupStep_(label, data) {
   logOrderDebug_(`setup ${label}`, data || {});
 }
 
-function getExtensionSimulatorQuota(sessionToken) {
-  const franchise = getSessionFranchise_(sessionToken);
-  return getExtensionSimulatorQuotaForUser_(franchise.userId);
+function getExtensionSimulatorQuota() {
+  return {
+    userId: 'browser',
+    dateKey: getExtensionSimulatorTodayKey_(),
+    limit: KCO_EXTENSION_SIMULATOR_DAILY_LIMIT,
+    used: 0,
+    remaining: KCO_EXTENSION_SIMULATOR_DAILY_LIMIT,
+  };
 }
 
 function generateExtensionSimulationImage(sessionToken, payload) {
-  const franchise = getSessionFranchise_(sessionToken);
-  const quota = getExtensionSimulatorQuotaForUser_(franchise.userId);
-  if (quota.remaining <= 0) {
-    throw new Error('本日の生成回数に達しました。また明日お試しください。');
-  }
-
   const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('OPENAI_API_KEYが設定されていません。');
@@ -638,19 +637,17 @@ function generateExtensionSimulationImage(sessionToken, payload) {
     throw new Error('AI画像を生成できませんでした。');
   }
 
-  const updatedQuota = consumeExtensionSimulatorQuotaForUser_(franchise.userId);
   logOrderDebug_('extension simulator generated', {
-    userId: franchise.userId,
-    shopId: franchise.shopId,
+    userId: 'browser',
+    shopId: '',
     style: payload && payload.style,
     colorCode: payload && payload.color && payload.color.colorCode,
-    remaining: updatedQuota.remaining,
     requestId: openAiResult.requestId || '',
   });
 
   return {
     imageDataUrl: `data:image/${KCO_EXTENSION_SIMULATOR_OUTPUT_FORMAT};base64,${imageBase64}`,
-    quota: updatedQuota,
+    quota: null,
     model: KCO_EXTENSION_SIMULATOR_MODEL,
     usage: openAiResult.usage || null,
   };

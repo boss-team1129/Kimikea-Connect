@@ -7891,8 +7891,7 @@
     }
 
     function extensionSimulatorQuotaUserId() {
-      return currentMemberUserId()
-        || String(state.franchise?.userId || state.franchise?.id || '').trim();
+      return 'browser';
     }
 
     function readExtensionSimulatorQuotaStore() {
@@ -7916,23 +7915,6 @@
       const limit = EXTENSION_SIMULATOR_DAILY_LIMIT;
       const userId = extensionSimulatorQuotaUserId();
       const dateKey = extensionSimulatorTodayKey();
-      if (!userId) {
-        return { userId: '', dateKey, limit, used: 0, remaining: 0, isLoggedIn: false };
-      }
-      const serverQuota = simulatorState().quota;
-      if (serverQuota && serverQuota.dateKey === dateKey) {
-        const serverLimit = Number(serverQuota.limit || limit);
-        const serverRemaining = Math.max(0, Number(serverQuota.remaining || 0));
-        const serverUsed = Math.max(0, Number(serverQuota.used || (serverLimit - serverRemaining)));
-        return {
-          userId,
-          dateKey,
-          limit: serverLimit,
-          used: serverUsed,
-          remaining: serverRemaining,
-          isLoggedIn: true,
-        };
-      }
       const store = readExtensionSimulatorQuotaStore();
       const record = store[userId] || {};
       const used = record.dateKey === dateKey
@@ -7943,7 +7925,7 @@
 
     function markExtensionSimulatorGenerationUsed() {
       const quota = extensionSimulatorQuota();
-      if (!quota.isLoggedIn || quota.remaining <= 0) return quota;
+      if (quota.remaining <= 0) return quota;
       const store = readExtensionSimulatorQuotaStore();
       const nextUsed = Math.min(quota.limit, quota.used + 1);
       store[quota.userId] = {
@@ -7958,15 +7940,6 @@
     function renderExtensionSimulatorQuota() {
       const quota = extensionSimulatorQuota();
       const simulator = simulatorState();
-      if (!quota.isLoggedIn) {
-        return `
-          <div class="simulator-quota is-empty" aria-live="polite">
-            <span>本日の残り生成回数</span>
-            <strong>0/${quota.limit}</strong>
-            <small>生成機能はログイン後に利用できます。</small>
-          </div>
-        `;
-      }
       if (simulator.quotaLoading && !simulator.quota) {
         return `
           <div class="simulator-quota" aria-live="polite">
@@ -7988,26 +7961,7 @@
     }
 
     function loadExtensionSimulatorQuota() {
-      const simulator = simulatorState();
-      if (!isAuthenticatedSessionActive() || simulator.quotaLoading) return Promise.resolve(null);
-      simulator.quotaLoading = true;
-      return callServer('getExtensionSimulatorQuota', state.sessionToken)
-        .then((quota) => {
-          simulator.quota = quota || null;
-          return quota;
-        })
-        .catch((error) => {
-          if (isSessionExpiredError(error)) {
-            handleSessionError(error);
-          }
-          return null;
-        })
-        .finally(() => {
-          simulator.quotaLoading = false;
-          if (currentPublicPageKey === 'ai' && state.styleDiagnosis.mode === 'simulator') {
-            refreshCurrentPublicActions();
-          }
-        });
+      return Promise.resolve(extensionSimulatorQuota());
     }
 
     function colorToSimulatorSelection(color) {
@@ -8175,11 +8129,6 @@
     function createExtensionSimulatorImage() {
       const simulator = simulatorState();
       const quota = extensionSimulatorQuota();
-      if (!quota.isLoggedIn) {
-        simulator.generationMessage = '生成機能はログイン後に利用できます。';
-        refreshCurrentPublicActions();
-        return;
-      }
       if (quota.remaining <= 0) {
         simulator.generationMessage = '本日の生成回数に達しました。また明日お試しください。';
         refreshCurrentPublicActions();
@@ -8211,17 +8160,14 @@
         }))
         .then((result) => {
           simulator.generatedImageUrl = result?.imageDataUrl || '';
-          simulator.quota = result?.quota || simulator.quota;
           simulator.generationMessage = simulator.generatedImageUrl
             ? 'AIイメージを作成しました。'
             : 'AI画像を生成できませんでした。';
-          markExtensionSimulatorGenerationUsed();
+          if (simulator.generatedImageUrl) {
+            markExtensionSimulatorGenerationUsed();
+          }
         })
         .catch((error) => {
-          if (isSessionExpiredError(error)) {
-            handleSessionError(error);
-            return;
-          }
           simulator.generationMessage = getErrorMessage(error) || '画像生成に失敗しました。時間をおいてもう一度お試しください。';
         })
         .finally(() => {
@@ -8430,7 +8376,7 @@
       `, {
         nextLabel: simulator.generating ? '生成中…' : 'イメージを作成する',
         nextAction: 'createExtensionSimulatorImage()',
-        nextDisabled: simulator.generating || !extensionSimulatorQuota().isLoggedIn || extensionSimulatorQuota().remaining <= 0,
+        nextDisabled: simulator.generating || extensionSimulatorQuota().remaining <= 0,
       });
     }
 
