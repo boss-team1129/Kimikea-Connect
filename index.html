@@ -3133,6 +3133,64 @@
       padding: 20px;
       border-radius: 28px;
     }
+    .diagnosis-character-stage {
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: min(82vw, 360px);
+      min-height: clamp(260px, 48vh, 430px);
+      margin: -4px auto 0;
+      padding-bottom: 22px;
+      animation: diagnosisCharacterRise .5s cubic-bezier(.2,.7,.2,1) both;
+    }
+    .diagnosis-character-stage[hidden] {
+      display: none;
+    }
+    .diagnosis-character-image {
+      position: relative;
+      z-index: 2;
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: clamp(250px, 48vh, 420px);
+      aspect-ratio: 3 / 5;
+      object-fit: contain;
+      filter: drop-shadow(0 18px 22px rgba(70, 45, 20, .13));
+    }
+    .diagnosis-glass-plate {
+      position: absolute;
+      z-index: 1;
+      left: 50%;
+      bottom: 12px;
+      width: 78%;
+      height: 38px;
+      border: 1px solid rgba(190, 147, 57, .35);
+      border-radius: 50%;
+      background:
+        radial-gradient(
+          ellipse at center,
+          rgba(255, 255, 255, .78) 0%,
+          rgba(255, 255, 255, .38) 48%,
+          rgba(225, 199, 135, .16) 72%,
+          rgba(255, 255, 255, .06) 100%
+        );
+      box-shadow:
+        0 14px 28px rgba(79, 55, 18, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .9);
+      transform: translateX(-50%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      animation: diagnosisPlateFade .36s ease both;
+    }
+    @keyframes diagnosisCharacterRise {
+      from { opacity: 0; transform: translateY(18px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes diagnosisPlateFade {
+      from { opacity: 0; transform: translateX(-50%) scale(.92); }
+      to { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
     .diagnosis-result-title {
       font-size: clamp(30px, 8vw, 56px);
     }
@@ -6214,6 +6272,15 @@
 
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
     const STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY = 'kimikeaDiagnosisColorFilter';
+    const STYLE_DIAGNOSIS_IMAGE_MAP = {
+      'natural-earring': 'images/diagnosis/natural-earring.png',
+      'face-transparent': 'images/diagnosis/face-transparent.png',
+      'adult-inner': 'images/diagnosis/adult-inner.png',
+      'gorgeous-mesh': 'images/diagnosis/gorgeous-mesh.png',
+      accent: 'images/diagnosis/accent.png',
+      'length-volume': 'images/diagnosis/length-volume.png',
+      'design-gradient': 'images/diagnosis/design-gradient.png',
+    };
     const STYLE_DIAGNOSIS_COLOR_FILTERS = {
       'natural-earring': {
         label: '地毛になじむ色、ブラウン、ベージュ、グレージュ系',
@@ -6255,6 +6322,7 @@
       natural: {
         id: 'natural',
         colorFilterKey: 'natural-earring',
+        imageKey: 'natural-earring',
         title: 'ナチュラルイヤリングタイプ',
         catchcopy: 'さりげない変化で、いつもの髪に小さなきらめきを。',
         style: 'イヤリングカラー',
@@ -6270,6 +6338,7 @@
       face: {
         id: 'face',
         colorFilterKey: 'face-framing',
+        imageKey: 'face-transparent',
         title: '顔まわり透明感タイプ',
         catchcopy: '顔まわりを明るく、柔らかい透明感を足す提案です。',
         style: 'フェイスフレーミング、顔まわりポイント',
@@ -6285,6 +6354,7 @@
       inner: {
         id: 'inner',
         colorFilterKey: 'adult-inner',
+        imageKey: 'adult-inner',
         title: '大人インナーカラータイプ',
         catchcopy: '控えめな上質感と、動いた時に見える余韻を楽しむスタイル。',
         style: 'インナーカラー',
@@ -6300,6 +6370,7 @@
       highlight: {
         id: 'highlight',
         colorFilterKey: 'highlight',
+        imageKey: 'gorgeous-mesh',
         title: '華やかメッシュタイプ',
         catchcopy: '髪全体に立体感と動きを足し、華やかに印象を変える提案です。',
         style: 'ポイントメッシュ、全体メッシュ',
@@ -6315,6 +6386,7 @@
       accent: {
         id: 'accent',
         colorFilterKey: 'accent',
+        imageKey: 'accent',
         title: '個性派アクセントタイプ',
         catchcopy: 'ファッションの一部として、色そのものを楽しむスタイル。',
         style: 'アクセントカラー、ポイントカラー、インナーカラー',
@@ -6330,6 +6402,7 @@
       gradient: {
         id: 'gradient',
         colorFilterKey: 'design-gradient',
+        imageKey: 'design-gradient',
         title: 'デザイングラデーションタイプ',
         catchcopy: '長さもカラーも、毛先まで自分らしく。',
         style: 'グラデーション、裾カラー、バレイヤージュ風、デザインロング',
@@ -6345,6 +6418,7 @@
       volume: {
         id: 'volume',
         colorFilterKey: 'length-volume',
+        imageKey: 'length-volume',
         title: '長さ・ボリュームアップタイプ',
         catchcopy: '自然な長さと厚みを足し、シルエットそのものを整える提案です。',
         style: '長さ出し、ボリュームアップ',
@@ -7024,6 +7098,7 @@
       state.styleDiagnosis.mode = 'result';
       state.styleDiagnosis.answers = saved.answers || {};
       state.styleDiagnosis.result = { ...result, savedAt: saved.savedAt || '' };
+      preloadDiagnosisCharacterImage(state.styleDiagnosis.result);
       state.styleDiagnosis.currentIndex = STYLE_DIAGNOSIS_QUESTIONS.length - 1;
     }
 
@@ -7089,6 +7164,7 @@
       refreshCurrentPublicActions();
       window.setTimeout(() => {
         const result = calculateStyleDiagnosisResult(state.styleDiagnosis.answers || {});
+        preloadDiagnosisCharacterImage(result);
         state.styleDiagnosis.mode = 'result';
         state.styleDiagnosis.result = result;
         state.styleDiagnosis.analyzing = false;
@@ -7099,6 +7175,48 @@
         }));
         refreshCurrentPublicActions();
       }, 2000);
+    }
+
+    function diagnosisCharacterImagePath(result) {
+      const key = result?.imageKey || result?.colorFilterKey || result?.id || '';
+      const src = STYLE_DIAGNOSIS_IMAGE_MAP[key] || '';
+      if (!src) return '';
+      return location.hostname.endsWith('github.io')
+        ? `/Kimikea-Connect/${src}`
+        : src;
+    }
+
+    function preloadDiagnosisCharacterImage(result) {
+      const src = diagnosisCharacterImagePath(result);
+      if (!src) return;
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = src;
+    }
+
+    function hideDiagnosisCharacterStage(image) {
+      const stage = image?.closest?.('.diagnosis-character-stage');
+      if (stage) stage.hidden = true;
+    }
+
+    function renderDiagnosisCharacterStage(result) {
+      const src = diagnosisCharacterImagePath(result);
+      if (!src) return '';
+      return `
+        <div class="diagnosis-character-stage" aria-label="${escapeHtml(result.title)}のキャラクター">
+          <span class="diagnosis-glass-plate" aria-hidden="true"></span>
+          <img
+            class="diagnosis-character-image"
+            src="${escapeHtml(src)}"
+            alt="${escapeHtml(result.title)}"
+            width="720"
+            height="1200"
+            loading="eager"
+            decoding="async"
+            onerror="hideDiagnosisCharacterStage(this)"
+          >
+        </div>
+      `;
     }
 
     function calculateStyleDiagnosisResult(answers) {
@@ -7375,6 +7493,8 @@
       const result = state.styleDiagnosis.result || STYLE_DIAGNOSIS_TYPES[getStyleDiagnosisStoredResult()?.resultId] || STYLE_DIAGNOSIS_TYPES.natural;
       return `
         <section class="diagnosis-result-card">
+          <p class="diagnosis-result-type">診断完了</p>
+          ${renderDiagnosisCharacterStage(result)}
           <p class="diagnosis-result-type">あなたにおすすめなのは</p>
           <h3 class="diagnosis-result-title">${escapeHtml(result.title)}</h3>
           <p class="diagnosis-result-lead">${escapeHtml(result.catchcopy)}</p>
