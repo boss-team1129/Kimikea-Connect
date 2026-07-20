@@ -7968,6 +7968,7 @@
       const colorCode = normalizeColorCode(color?.code || color?.productCode || color?.['商品コード']);
       return {
         colorCode,
+        productCode: colorCode,
         colorName: colorDisplayName(color),
         category: String(color?.category || '').trim(),
         imageUrl: colorImageUrlFromCode(colorCode, 'jpg'),

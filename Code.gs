@@ -619,6 +619,13 @@ function getExtensionSimulatorQuota() {
 }
 
 function generateExtensionSimulationImage(sessionToken, payload) {
+  const colorForLog = payload && payload.color || {};
+  logOrderDebug_('extension simulator request color', {
+    productCode: String(colorForLog.productCode || colorForLog.colorCode || '').trim(),
+    colorCode: String(colorForLog.colorCode || colorForLog.productCode || '').trim(),
+    imageUrl: String(colorForLog.imageUrl || '').trim(),
+    colorName: String(colorForLog.colorName || '').trim(),
+  });
   const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('OPENAI_API_KEYが設定されていません。');
@@ -3748,36 +3755,129 @@ function parseImageDataUrl_(dataUrl) {
 }
 
 function fetchExtensionSimulatorSwatchBlob_(color) {
-  const imageUrl = String(color && color.imageUrl || '').trim();
-  const colorCode = String(color && color.colorCode || '').trim();
-  const urls = [];
-  if (imageUrl && /^https:\/\/boss-team1129\.github\.io\/Kimikea-Connect\/color-images\//.test(imageUrl)) {
-    urls.push(imageUrl);
-  }
-  if (colorCode) {
-    const encodedCode = encodeURIComponent(colorCode);
-    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.jpg`);
-    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.png`);
-  }
-  const uniqueUrls = Array.from(new Set(urls));
+  const colorInfo = normalizeExtensionSimulatorColorInfo_(color);
+  const uniqueUrls = resolveExtensionSimulatorSwatchUrls_(colorInfo);
+  const attempts = [];
+  logOrderDebug_('extension simulator swatch urls', {
+    productCode: colorInfo.productCode,
+    colorCode: colorInfo.colorCode,
+    imageUrl: colorInfo.imageUrl,
+    urls: uniqueUrls,
+  });
   for (let i = 0; i < uniqueUrls.length; i += 1) {
+    const url = uniqueUrls[i];
     try {
-      const response = UrlFetchApp.fetch(uniqueUrls[i], { muteHttpExceptions: true });
+      const response = UrlFetchApp.fetch(url, {
+        followRedirects: true,
+        muteHttpExceptions: true,
+      });
       const status = response.getResponseCode();
-      if (status >= 200 && status < 300) {
+      const contentType = String(response.getHeaders()['Content-Type'] || response.getHeaders()['content-type'] || '');
+      attempts.push({ url, status, contentType });
+      if (status >= 200 && status < 300 && contentType.toLowerCase().indexOf('image/') !== -1) {
         const blob = response.getBlob();
-        blob.setName(`swatch-${colorCode || 'color'}.${blob.getContentType().includes('png') ? 'png' : 'jpg'}`);
+        blob.setName(`swatch-${colorInfo.productCode || colorInfo.colorCode || 'color'}.${contentType.toLowerCase().indexOf('png') !== -1 ? 'png' : 'jpg'}`);
+        logOrderDebug_('extension simulator swatch fetch success', {
+          productCode: colorInfo.productCode,
+          colorCode: colorInfo.colorCode,
+          url,
+          status,
+          contentType,
+        });
         return blob;
       }
     } catch (error) {
-      logOrderDebug_('extension simulator swatch fetch failed', {
-        colorCode,
-        url: uniqueUrls[i],
+      attempts.push({
+        url,
+        status: 'fetch_error',
         error: error && error.message ? error.message : String(error),
       });
     }
   }
-  throw new Error('毛束画像を取得できませんでした。');
+  logOrderDebug_('extension simulator swatch fetch failed all', {
+    productCode: colorInfo.productCode,
+    colorCode: colorInfo.colorCode,
+    attempts,
+  });
+  const detail = attempts.map((item) => {
+    const parts = [`URL=${item.url}`, `status=${item.status}`];
+    if (item.error) parts.push(`error=${item.error}`);
+    if (item.contentType) parts.push(`contentType=${item.contentType}`);
+    return parts.join(' / ');
+  }).join(' | ');
+  throw new Error(`毛束画像を取得できませんでした。${detail ? ` 取得結果: ${detail}` : ' 商品コードまたは画像URLを確認してください。'}`);
+}
+
+function normalizeExtensionSimulatorColorInfo_(color) {
+  const info = color || {};
+  const productCode = String(pickFirstDefined_(
+    info.productCode,
+    info.colorCode,
+    info.code,
+    info['商品コード']
+  ) || '').trim();
+  const colorCode = String(pickFirstDefined_(
+    info.colorCode,
+    info.productCode,
+    info.code,
+    info['商品コード']
+  ) || '').trim();
+  const colorName = String(pickFirstDefined_(
+    info.colorName,
+    info.name,
+    info.color,
+    info['カラー'],
+    info['カラー名']
+  ) || '').trim();
+  return {
+    productCode,
+    colorCode,
+    colorName,
+    imageUrl: normalizeExtensionSimulatorSwatchUrl_(info.imageUrl || info.swatchImageUrl || ''),
+  };
+}
+
+function resolveExtensionSimulatorSwatchUrls_(colorInfo) {
+  const urls = [];
+  if (colorInfo.imageUrl) urls.push(colorInfo.imageUrl);
+  const product = findExtensionSimulatorProduct_(colorInfo);
+  if (product && product.swatchImageUrl) {
+    urls.push(normalizeExtensionSimulatorSwatchUrl_(product.swatchImageUrl));
+  }
+  const productCode = product && product.productCode
+    ? product.productCode
+    : (colorInfo.productCode || colorInfo.colorCode);
+  if (productCode) {
+    const encodedCode = encodeURIComponent(String(productCode).trim());
+    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.jpg`);
+    urls.push(`https://boss-team1129.github.io/Kimikea-Connect/color-images/${encodedCode}.png`);
+  }
+  return Array.from(new Set(urls.map(normalizeExtensionSimulatorSwatchUrl_).filter(Boolean)));
+}
+
+function normalizeExtensionSimulatorSwatchUrl_(value) {
+  const raw = String(value || '').trim().replace(/&amp;/g, '&');
+  if (!raw) return '';
+  if (/^https:\/\/boss-team1129\.github\.io\/Kimikea-Connect\/color-images\//.test(raw)) {
+    return raw;
+  }
+  if (/^\/Kimikea-Connect\/color-images\//.test(raw)) {
+    return `https://boss-team1129.github.io${raw}`;
+  }
+  if (/^\.?\/?color-images\//.test(raw)) {
+    return `https://boss-team1129.github.io/Kimikea-Connect/${raw.replace(/^\.?\//, '')}`;
+  }
+  return '';
+}
+
+function findExtensionSimulatorProduct_(colorInfo) {
+  const productCodeKey = createProductCodeKey_(colorInfo.productCode || colorInfo.colorCode);
+  const colorNameKey = normalize_(colorInfo.colorName);
+  return getVisibleProducts_().find((product) => (
+    (productCodeKey && createProductCodeKey_(product.productCode) === productCodeKey)
+    || (colorNameKey && normalize_(product.color) === colorNameKey)
+    || (colorNameKey && normalize_(product.colorName) === colorNameKey)
+  )) || null;
 }
 
 function buildExtensionSimulatorPrompt_(payload) {
