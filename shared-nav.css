@@ -90,6 +90,12 @@ body.kc-has-bottom-nav .tabs {
   pointer-events: none;
 }
 
+.kc-bottom-nav.is-locked .kc-bottom-nav__button:disabled {
+  cursor: wait;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
 .kc-bottom-nav__button:hover,
 .kc-bottom-nav__button:focus-visible {
   background: rgba(255, 255, 255, 0.72);

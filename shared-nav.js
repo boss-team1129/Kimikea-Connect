@@ -59,14 +59,34 @@
   }
 
   function refreshBackState() {
+    const nav = document.querySelector('[data-kc-bottom-nav]');
+    const locked = Boolean(window.KimikeaConnectNav && typeof window.KimikeaConnectNav.isLocked === 'function' && window.KimikeaConnectNav.isLocked());
+    if (nav) nav.classList.toggle('is-locked', locked);
+    if (locked) {
+      document.querySelectorAll('.kc-bottom-nav__button').forEach((button) => {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+        button.classList.remove('is-disabled');
+      });
+      return;
+    }
     if (window.KimikeaConnectNav && typeof window.KimikeaConnectNav.canGoBack === 'function') {
       setBackEnabled(Boolean(window.KimikeaConnectNav.canGoBack()));
+      document.querySelectorAll('.kc-bottom-nav__button:not([data-kc-nav-action="back"])').forEach((button) => {
+        button.disabled = false;
+        button.setAttribute('aria-disabled', 'false');
+        button.classList.remove('is-disabled');
+      });
       return;
     }
     setBackEnabled(false);
   }
 
   function handleAction(action) {
+    if (window.KimikeaConnectNav && typeof window.KimikeaConnectNav.isLocked === 'function' && window.KimikeaConnectNav.isLocked()) {
+      refreshBackState();
+      return;
+    }
     if (isNavigating) return;
     isNavigating = true;
     safeVibrate();
