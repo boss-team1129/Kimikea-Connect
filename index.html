@@ -11177,6 +11177,10 @@
         openPublicPage('colorChart');
         return;
       }
+      if (view === 'stylebook') {
+        openStylebook();
+        return;
+      }
       if (view && publicPages[view]) openPublicPage(view);
     }
 

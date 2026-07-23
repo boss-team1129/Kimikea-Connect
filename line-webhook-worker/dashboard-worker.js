@@ -2,10 +2,11 @@ const LINE_REPLY_ENDPOINT = 'https://api.line.me/v2/bot/message/reply';
 const DEFAULT_KIMIKEA_CONNECT_URL = 'https://boss-team1129.github.io/Kimikea-Connect/index.html';
 const LINE_MENU_ITEMS = [
   { label: 'エクステを注文する', view: 'order' },
-  { label: 'AI診断をする', view: 'ai-diagnosis' },
+  { label: 'スタイル図鑑を見る', view: 'stylebook' },
   { label: 'カラーチャートを見る', view: 'color-chart' },
   { label: '講習を見る', view: 'academy' },
   { label: '加盟店マップ', view: 'map' },
+  { label: 'AI診断をする', view: 'ai-diagnosis' },
 ];
 
 export default {
@@ -123,6 +124,15 @@ function buildReplyMessageForText(messageText, connectUrl = DEFAULT_KIMIKEA_CONN
       '質問診断と写真シミュレーターから、似合うエクステを探せます。',
       'AI診断を開く',
       buildKimikeaUrl(connectUrl, 'ai-diagnosis')
+    );
+  }
+
+  if (containsAny(normalizedText, ['スタイル図鑑', '図鑑', 'スタイル', '作品', 'デザイン'])) {
+    return buildSingleFeatureMessage(
+      'スタイル図鑑',
+      '施術写真やデザイン、使用カラーを確認できます。',
+      'スタイル図鑑を見る',
+      buildKimikeaUrl(connectUrl, 'stylebook')
     );
   }
 

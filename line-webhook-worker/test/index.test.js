@@ -34,6 +34,13 @@ test('routes diagnosis keywords to AI diagnosis page', () => {
   assert.equal(message.contents.footer.contents[0].action.uri, `${baseUrl}?view=ai-diagnosis`);
 });
 
+test('routes stylebook keywords to stylebook page', () => {
+  const message = buildReplyMessageForText('スタイル図鑑で作品を見たい', baseUrl);
+  assert.equal(message.type, 'flex');
+  assert.equal(message.contents.body.contents[0].text, 'スタイル図鑑');
+  assert.equal(message.contents.footer.contents[0].action.uri, `${baseUrl}?view=stylebook`);
+});
+
 test('routes color keywords to color chart page', () => {
   const message = buildReplyMessageForText('カラー一覧を見たい', baseUrl);
   assert.equal(message.type, 'flex');
@@ -55,19 +62,31 @@ test('routes map keywords to map page', () => {
   assert.equal(message.contents.footer.contents[0].action.uri, `${baseUrl}?view=map`);
 });
 
-test('returns default 5 item guide for other messages', () => {
+test('returns default 6 item guide for other messages', () => {
   const message = buildReplyMessageForText('こんにちは', baseUrl);
   assert.equal(message.type, 'flex');
   assert.equal(message.contents.body.contents[0].text, 'Kimikea Connect');
-  assert.equal(message.contents.footer.contents.length, 5);
+  assert.equal(message.contents.footer.contents.length, 6);
+  assert.deepEqual(
+    message.contents.footer.contents.map((item) => item.action.label),
+    [
+      'エクステを注文する',
+      'スタイル図鑑を見る',
+      'カラーチャートを見る',
+      '講習を見る',
+      '加盟店マップ',
+      'AI診断をする',
+    ]
+  );
   assert.deepEqual(
     message.contents.footer.contents.map((item) => item.action.uri),
     [
       `${baseUrl}?view=order`,
-      `${baseUrl}?view=ai-diagnosis`,
+      `${baseUrl}?view=stylebook`,
       `${baseUrl}?view=color-chart`,
       `${baseUrl}?view=academy`,
       `${baseUrl}?view=map`,
+      `${baseUrl}?view=ai-diagnosis`,
     ]
   );
 });
