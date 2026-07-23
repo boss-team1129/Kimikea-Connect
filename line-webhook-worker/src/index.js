@@ -12,8 +12,16 @@ const LINE_MENU_ITEMS = [
 ];
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const requestUrl = new URL(request.url);
+    console.log('WORKER_FETCH_START', {
+      method: request.method,
+      url: requestUrl.toString(),
+      pathname: requestUrl.pathname,
+      userAgent: request.headers.get('user-agent') || '',
+      hasLineSignature: Boolean(request.headers.get('x-line-signature')),
+      contentLength: request.headers.get('content-length') || '',
+    });
     if (request.method === 'GET') {
       return jsonResponse({
         ok: true,
@@ -27,30 +35,76 @@ export default {
     }
 
     if (requestUrl.pathname === '/order-notification') {
+      console.log('WORKER_ROUTE_DEBUG', { route: 'order-notification' });
       return handleOrderNotificationRequest(request, env);
     }
 
-    const rawBody = await request.text();
-    const signature = request.headers.get('x-line-signature') || '';
+    let rawBody = '';
+    try {
+      console.log('LINE_WEBHOOK_STAGE', { stage: 'before_request_text' });
+      rawBody = await request.text();
+      console.log('LINE_WEBHOOK_STAGE', {
+        stage: 'after_request_text',
+        bodyLength: rawBody.length,
+        bodyPreview: rawBody.slice(0, 160),
+      });
+    } catch (error) {
+      console.error('LINE_WEBHOOK_ERROR', {
+        stage: 'request_text_failed',
+        error: error && error.message ? error.message : String(error),
+      });
+      return jsonResponse({ ok: false, error: 'Request body read failed.' }, 400);
+    }
 
     if (!env.LINE_CHANNEL_SECRET || !env.LINE_CHANNEL_ACCESS_TOKEN) {
+      console.error('LINE_WEBHOOK_ERROR', {
+        stage: 'missing_secrets',
+        hasSecret: Boolean(env.LINE_CHANNEL_SECRET),
+        hasAccessToken: Boolean(env.LINE_CHANNEL_ACCESS_TOKEN),
+      });
       return jsonResponse({ ok: false, error: 'LINE secrets are not configured.' }, 500);
     }
 
-    const isValidSignature = await verifyLineSignature(
-      rawBody,
-      signature,
-      env.LINE_CHANNEL_SECRET
-    );
+    const signature = request.headers.get('x-line-signature') || '';
+    let isValidSignature = false;
+    try {
+      console.log('LINE_WEBHOOK_STAGE', { stage: 'before_signature_verify' });
+      isValidSignature = await verifyLineSignature(
+        rawBody,
+        signature,
+        env.LINE_CHANNEL_SECRET
+      );
+      console.log('LINE_WEBHOOK_STAGE', {
+        stage: 'after_signature_verify',
+        isValidSignature,
+      });
+    } catch (error) {
+      console.error('LINE_WEBHOOK_ERROR', {
+        stage: 'signature_verify_failed',
+        error: error && error.message ? error.message : String(error),
+      });
+      return jsonResponse({ ok: false, error: 'Signature verification failed.' }, 401);
+    }
 
     if (!isValidSignature) {
+      console.error('LINE_WEBHOOK_ERROR', { stage: 'invalid_signature' });
       return jsonResponse({ ok: false, error: 'Invalid signature.' }, 401);
     }
 
     let payload;
     try {
+      console.log('LINE_WEBHOOK_STAGE', { stage: 'before_json_parse' });
       payload = JSON.parse(rawBody || '{}');
+      console.log('LINE_WEBHOOK_STAGE', {
+        stage: 'after_json_parse',
+        destination: payload.destination || '',
+        eventsCount: Array.isArray(payload.events) ? payload.events.length : -1,
+      });
     } catch (error) {
+      console.error('LINE_WEBHOOK_ERROR', {
+        stage: 'json_parse_failed',
+        error: error && error.message ? error.message : String(error),
+      });
       return jsonResponse({ ok: false, error: 'Invalid JSON payload.' }, 400);
     }
 
@@ -62,20 +116,73 @@ export default {
 
     const connectUrl = normalizeBaseUrl(env.KIMIKEA_CONNECT_URL || DEFAULT_KIMIKEA_CONNECT_URL);
     const orderApiUrl = normalizeBaseUrl(env.ORDER_API_URL || DEFAULT_ORDER_API_URL);
-    const replyResults = [];
+    const processingPromise = processLineEvents(events, env.LINE_CHANNEL_ACCESS_TOKEN, connectUrl, orderApiUrl)
+      .then((replyResults) => {
+        console.log('LINE_WEBHOOK_STAGE', {
+          stage: 'events_processed',
+          results: replyResults,
+        });
+        return replyResults;
+      })
+      .catch((error) => {
+        console.error('LINE_WEBHOOK_ERROR', {
+          stage: 'events_processing_failed',
+          error: error && error.message ? error.message : String(error),
+          stack: error && error.stack ? error.stack : '',
+        });
+      });
 
-    for (const event of events) {
-      const result = await handleLineEvent(event, env.LINE_CHANNEL_ACCESS_TOKEN, connectUrl, orderApiUrl);
-      replyResults.push(result);
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      console.log('LINE_WEBHOOK_STAGE', {
+        stage: 'wait_until_scheduled',
+        eventsCount: events.length,
+      });
+      ctx.waitUntil(processingPromise);
+      return jsonResponse({
+        ok: true,
+        accepted: events.length,
+      });
     }
 
+    console.log('LINE_WEBHOOK_STAGE', {
+      stage: 'no_execution_context_awaiting_events',
+      eventsCount: events.length,
+    });
+    const replyResults = await processingPromise;
     return jsonResponse({
       ok: true,
       handled: events.length,
-      replies: replyResults,
+      replies: replyResults || [],
     });
   },
 };
+
+async function processLineEvents(events, channelAccessToken, connectUrl, orderApiUrl) {
+  const replyResults = [];
+  for (const event of events) {
+    try {
+      console.log('LINE_EVENT_DEBUG', {
+        eventType: event && event.type ? event.type : '',
+        messageType: event && event.message && event.message.type ? event.message.type : '',
+        hasReplyToken: Boolean(event && event.replyToken),
+        sourceType: event && event.source && event.source.type ? event.source.type : '',
+        hasLineUserId: Boolean(event && event.source && event.source.userId),
+      });
+      const result = await handleLineEvent(event, channelAccessToken, connectUrl, orderApiUrl);
+      replyResults.push(result);
+    } catch (error) {
+      console.error('LINE_EVENT_ERROR', {
+        error: error && error.message ? error.message : String(error),
+        stack: error && error.stack ? error.stack : '',
+      });
+      replyResults.push({
+        replied: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+  }
+  return replyResults;
+}
 
 export async function handleLineEvent(event, channelAccessToken, connectUrl, orderApiUrl = DEFAULT_ORDER_API_URL) {
   if (!event || event.type !== 'message' || !event.replyToken) {
