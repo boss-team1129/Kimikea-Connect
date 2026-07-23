@@ -4,3 +4,4 @@ compatibility_date = "2026-07-23"
 
 [vars]
 KIMIKEA_CONNECT_URL = "https://boss-team1129.github.io/Kimikea-Connect/index.html"
+ORDER_API_URL = "https://script.google.com/macros/s/AKfycbyWxvyWZ7_qTkCgvkuim-h_AhDQEHag7xexg8iDqyHE-toaRA6ttQPpNjUaNfTyTYhA/exec"

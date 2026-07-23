@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildKimikeaUrl,
+  buildKimikeaUrlWithParams,
+  buildOrderAcceptedMessage,
   buildReplyMessageForText,
+  parseLineLinkToken,
   verifyLineSignature,
 } from '../src/index.js';
 import worker from '../src/index.js';
@@ -18,6 +21,32 @@ test('builds direct Kimikea Connect urls', () => {
     buildKimikeaUrl(`${baseUrl}?utm=line`, 'map'),
     'https://boss-team1129.github.io/Kimikea-Connect/index.html?utm=line&view=map'
   );
+  assert.equal(
+    buildKimikeaUrlWithParams(baseUrl, 'mypage', { tab: 'orders' }),
+    'https://boss-team1129.github.io/Kimikea-Connect/index.html?view=mypage&tab=orders'
+  );
+});
+
+test('parses one time LINE link tokens', () => {
+  assert.equal(parseLineLinkToken('連携 ABC123'), 'ABC123');
+  assert.equal(parseLineLinkToken('連携　abc123'), 'ABC123');
+  assert.equal(parseLineLinkToken('連携'), '');
+});
+
+test('builds order accepted LINE message', () => {
+  const message = buildOrderAcceptedMessage({
+    orderId: 'ORD-TEST-001',
+    orderedAt: '2026/07/23 12:00',
+    totalAmount: 12345,
+    items: [
+      { category: 'ダークカラー', colorName: 'NB', productCode: 'DC002', quantity: 2 },
+    ],
+  }, baseUrl);
+  assert.equal(message.type, 'flex');
+  assert.equal(message.contents.body.contents[0].text, '📦 ご注文ありがとうございます');
+  assert.match(message.contents.body.contents[3].text, /DC002 × 2/);
+  assert.equal(message.contents.footer.contents.length, 4);
+  assert.equal(message.contents.footer.contents[0].action.uri, `${baseUrl}?view=mypage&tab=orders`);
 });
 
 test('routes order keywords to order page', () => {

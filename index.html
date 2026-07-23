@@ -4554,6 +4554,19 @@
     }
     .mypage-list-card dt { color: var(--muted); font-size: 11px; font-weight: 800; }
     .mypage-list-card dd { margin: 2px 0 0; font-weight: 800; }
+    .line-link-code {
+      margin: 4px 0;
+      padding: 14px;
+      border: 1px solid rgba(189, 147, 64, .22);
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(250,244,232,.92));
+      color: var(--black);
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-align: center;
+      word-break: keep-all;
+    }
     .mypage-loading {
       display: grid;
       gap: 12px;
@@ -5530,6 +5543,7 @@
       orderProductSearch: '',
       myPageActiveTab: 'profile',
       myPageLoading: false,
+      lineLinkToken: null,
       myPageStylebook: {
         loaded: false,
         loading: false,
@@ -5757,6 +5771,16 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function escapeJs(value) {
+      return String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/</g, '\\x3C');
     }
 
     function canUseAppsScript() {
@@ -10813,6 +10837,10 @@
         `;
         return;
       }
+      if (tab === 'line') {
+        target.innerHTML = renderLineLinkPanel();
+        return;
+      }
       if (tab === 'posts') {
         const book = state.myPageStylebook;
         if (!book.loaded || book.loading) {
@@ -10953,7 +10981,100 @@
         });
     }
 
-    function openMyPage() {
+    function renderLineLinkPanel() {
+      const franchise = state.franchise || {};
+      const linked = Boolean(franchise.lineLinked || franchise.lineUserId);
+      const token = state.lineLinkToken || null;
+      if (linked) {
+        return `
+          <div class="mypage-section-grid">
+            <section class="mypage-card">
+              <span>LINE連携</span>
+              <strong>連携済み</strong>
+              <small>${escapeHtml(franchise.lineLinkedAt || '連携日時を確認中')}</small>
+            </section>
+            <section class="mypage-card">
+              <span>注文通知</span>
+              <strong>注文受付通知をLINEで受け取れます</strong>
+              <small>入金確認・発送通知は送信しません。</small>
+            </section>
+          </div>
+          <div class="mypage-list">
+            <p class="message">LINE公式アカウントと連携済みです。注文完了時に、注文者本人のLINEへ受付通知を送信します。</p>
+            <button type="button" class="button button-outline" onclick="handleLineUnlink()">LINE連携を解除する</button>
+          </div>
+        `;
+      }
+      return `
+        <div class="mypage-section-grid">
+          <section class="mypage-card">
+            <span>LINE連携</span>
+            <strong>未連携</strong>
+            <small>10分だけ有効な連携コードを発行します。</small>
+          </section>
+          <section class="mypage-card">
+            <span>通知内容</span>
+            <strong>注文受付通知</strong>
+            <small>請求書は従来どおりメールで送信します。</small>
+          </section>
+        </div>
+        <div class="mypage-list">
+          <p class="message">「LINEと連携する」を押して表示された文章を、きみけあLINE公式アカウントへ送信してください。</p>
+          <button type="button" class="button button-primary" onclick="handleCreateLineLinkToken()">LINEと連携する</button>
+          ${token ? `
+            <article class="mypage-list-card">
+              <header><strong>LINEへ送る文章</strong><span>有効期限 ${escapeHtml(token.expiresAt || '')}</span></header>
+              <p class="line-link-code">${escapeHtml(token.linkText || '')}</p>
+              <button type="button" class="button button-outline" onclick="copyLineLinkText('${escapeJs(token.linkText || '')}')">文章をコピーする</button>
+              <small>このコードは1回だけ使用できます。別の人へ共有しないでください。</small>
+            </article>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function handleCreateLineLinkToken() {
+      setMessage('mypageMessage', 'LINE連携コードを発行しています...', false);
+      callServer('createLineLinkToken', state.sessionToken)
+        .then((result) => {
+          state.lineLinkToken = result || null;
+          renderMyPageTab('line');
+          setMessage('mypageMessage', 'LINE連携コードを発行しました。LINE公式アカウントへ送信してください。', false);
+        })
+        .catch((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        });
+    }
+
+    function copyLineLinkText(text) {
+      const value = String(text || '');
+      if (!value) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value)
+          .then(() => setMessage('mypageMessage', 'コピーしました。LINE公式アカウントへ貼り付けて送信してください。', false))
+          .catch(() => setMessage('mypageMessage', value, false));
+        return;
+      }
+      setMessage('mypageMessage', value, false);
+    }
+
+    function handleLineUnlink() {
+      if (!confirm('LINE連携を解除しますか？注文受付通知はLINEへ届かなくなります。')) return;
+      setMessage('mypageMessage', 'LINE連携を解除しています...', false);
+      callServer('unlinkLineAccount', state.sessionToken)
+        .then((franchise) => {
+          state.franchise = franchise || state.franchise;
+          state.lineLinkToken = null;
+          if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
+          renderMyPageTab('line');
+          setMessage('mypageMessage', 'LINE連携を解除しました。', false);
+        })
+        .catch((error) => {
+          setMessage('mypageMessage', getErrorMessage(error), true);
+        });
+    }
+
+    function openMyPage(initialTab = 'profile') {
       if (blockExtensionSimulatorNavigation()) return;
       if (!isAuthenticatedSessionActive()) {
         showOrderLogin();
@@ -10980,6 +11101,7 @@
         </section>
         <div class="mypage-tabbar" role="tablist">
           <button type="button" data-tab="profile" class="is-active" onclick="renderMyPageTab('profile')">プロフィール</button>
+          <button type="button" data-tab="line" onclick="renderMyPageTab('line')">LINE連携</button>
           <button type="button" data-tab="posts" onclick="renderMyPageTab('posts')">投稿履歴</button>
           <button type="button" data-tab="saved" onclick="renderMyPageTab('saved')">保存したスタイル</button>
           <button type="button" data-tab="orders" onclick="renderMyPageTab('orders')">注文履歴</button>
@@ -11007,7 +11129,8 @@
           </div>
         </div>
       `;
-      state.myPageActiveTab = 'profile';
+      state.myPageActiveTab = initialTab || 'profile';
+      state.lineLinkToken = null;
       state.myPageStylebook = {
         loaded: false,
         loading: false,
@@ -11016,7 +11139,7 @@
         savedPosts: [],
         savedStyles: [],
       };
-      renderMyPageTab('profile');
+      renderMyPageTab(state.myPageActiveTab);
       refreshMyPageData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
@@ -11158,7 +11281,10 @@
       const page = params.get('page');
       if (page === 'color-chart') openPublicPage('colorChart');
       if (view === 'search') openSearchPage();
-      if (view === 'mypage') openMyPage();
+      if (view === 'mypage') {
+        openMyPage(params.get('tab') || 'profile');
+        return;
+      }
       if (view === 'order') {
         state.pendingOpenOrder = true;
         if (isAuthenticatedSessionActive() && !state.orderUnlocked) return;

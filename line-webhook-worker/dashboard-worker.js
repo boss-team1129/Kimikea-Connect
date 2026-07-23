@@ -1,5 +1,7 @@
 const LINE_REPLY_ENDPOINT = 'https://api.line.me/v2/bot/message/reply';
+const LINE_PUSH_ENDPOINT = 'https://api.line.me/v2/bot/message/push';
 const DEFAULT_KIMIKEA_CONNECT_URL = 'https://boss-team1129.github.io/Kimikea-Connect/index.html';
+const DEFAULT_ORDER_API_URL = 'https://script.google.com/macros/s/AKfycbyWxvyWZ7_qTkCgvkuim-h_AhDQEHag7xexg8iDqyHE-toaRA6ttQPpNjUaNfTyTYhA/exec';
 const LINE_MENU_ITEMS = [
   { label: 'エクステを注文する', view: 'order' },
   { label: 'スタイル図鑑を見る', view: 'stylebook' },
@@ -11,6 +13,7 @@ const LINE_MENU_ITEMS = [
 
 export default {
   async fetch(request, env) {
+    const requestUrl = new URL(request.url);
     if (request.method === 'GET') {
       return jsonResponse({
         ok: true,
@@ -21,6 +24,10 @@ export default {
 
     if (request.method !== 'POST') {
       return jsonResponse({ ok: false, error: 'Method Not Allowed' }, 405);
+    }
+
+    if (requestUrl.pathname === '/order-notification') {
+      return handleOrderNotificationRequest(request, env);
     }
 
     const rawBody = await request.text();
@@ -54,10 +61,11 @@ export default {
     }
 
     const connectUrl = normalizeBaseUrl(env.KIMIKEA_CONNECT_URL || DEFAULT_KIMIKEA_CONNECT_URL);
+    const orderApiUrl = normalizeBaseUrl(env.ORDER_API_URL || DEFAULT_ORDER_API_URL);
     const replyResults = [];
 
     for (const event of events) {
-      const result = await handleLineEvent(event, env.LINE_CHANNEL_ACCESS_TOKEN, connectUrl);
+      const result = await handleLineEvent(event, env.LINE_CHANNEL_ACCESS_TOKEN, connectUrl, orderApiUrl);
       replyResults.push(result);
     }
 
@@ -69,15 +77,23 @@ export default {
   },
 };
 
-async function handleLineEvent(event, channelAccessToken, connectUrl) {
+export async function handleLineEvent(event, channelAccessToken, connectUrl, orderApiUrl = DEFAULT_ORDER_API_URL) {
   if (!event || event.type !== 'message' || !event.replyToken) {
     return { skipped: true, reason: 'unsupported event' };
   }
 
   const message = event.message || {};
-  const replyMessage = message.type === 'text'
-    ? buildReplyMessageForText(message.text || '', connectUrl)
-    : buildDefaultGuideMessage(connectUrl);
+  let replyMessage;
+  if (message.type === 'text') {
+    const linkToken = parseLineLinkToken(message.text || '');
+    if (linkToken && event.source && event.source.userId) {
+      replyMessage = await buildLineLinkResultMessage(linkToken, event.source.userId, orderApiUrl);
+    } else {
+      replyMessage = buildReplyMessageForText(message.text || '', connectUrl);
+    }
+  } else {
+    replyMessage = buildDefaultGuideMessage(connectUrl);
+  }
 
   const response = await fetch(LINE_REPLY_ENDPOINT, {
     method: 'POST',
@@ -104,6 +120,246 @@ async function handleLineEvent(event, channelAccessToken, connectUrl) {
     replied: response.ok,
     status: response.status,
   };
+}
+
+async function handleOrderNotificationRequest(request, env) {
+  const providedSecret = request.headers.get('x-kimikea-notify-secret') || '';
+  const expectedSecret = env.LINE_ORDER_NOTIFY_SECRET || '';
+  if (!expectedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
+    return jsonResponse({ ok: false, error: 'Unauthorized.' }, 401);
+  }
+  if (!env.LINE_CHANNEL_ACCESS_TOKEN) {
+    return jsonResponse({ ok: false, error: 'LINE channel access token is not configured.' }, 500);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (error) {
+    return jsonResponse({ ok: false, error: 'Invalid JSON payload.' }, 400);
+  }
+
+  if (payload.type !== 'orderAccepted') {
+    return jsonResponse({ ok: false, error: 'Unsupported notification type.' }, 400);
+  }
+
+  const lineUserId = String(payload.lineUserId || '').trim();
+  if (!lineUserId) {
+    return jsonResponse({ ok: false, error: 'lineUserId is required.' }, 400);
+  }
+
+  const connectUrl = normalizeBaseUrl(env.KIMIKEA_CONNECT_URL || DEFAULT_KIMIKEA_CONNECT_URL);
+  const message = buildOrderAcceptedMessage(payload, connectUrl);
+  const response = await fetch(LINE_PUSH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      to: lineUserId,
+      messages: [message],
+    }),
+  });
+  const responseText = await response.text();
+  if (!response.ok) {
+    return jsonResponse({
+      ok: false,
+      status: response.status,
+      error: responseText,
+    }, 502);
+  }
+
+  return jsonResponse({
+    ok: true,
+    status: response.status,
+  });
+}
+
+function buildOrderAcceptedMessage(payload, connectUrl = DEFAULT_KIMIKEA_CONNECT_URL) {
+  const orderId = String(payload.orderId || '').trim();
+  const orderedAt = String(payload.orderedAt || '').trim();
+  const totalAmount = Number(payload.totalAmount || 0);
+  const invoiceUrl = sanitizeHttpsUrl(payload.invoiceUrl || '');
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const itemLines = items.length
+    ? items.slice(0, 12).map((item) => {
+      const category = String(item.category || '').trim();
+      const colorName = String(item.colorName || item.color || '').trim();
+      const productCode = String(item.productCode || '').trim();
+      const quantity = Number(item.quantity || 0);
+      return `${category || 'カラー'} / ${colorName || '名称未設定'} / ${productCode || '-'} × ${quantity}`;
+    }).join('\n')
+    : '明細を確認中です';
+  const invoiceNote = invoiceUrl
+    ? '請求書は、ご登録のメールアドレスへ送信します。'
+    : '請求書は、ご登録のメールアドレスへ送信します。\n請求書はメール送信後に確認できます。';
+
+  return {
+    type: 'flex',
+    altText: `注文受付通知 ${orderId || ''}`.trim(),
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '20px',
+        backgroundColor: '#FFFDF8',
+        contents: [
+          {
+            type: 'text',
+            text: '📦 ご注文ありがとうございます',
+            weight: 'bold',
+            size: 'lg',
+            color: '#2A2118',
+            wrap: true,
+          },
+          {
+            type: 'text',
+            text: 'ご注文を受け付けました。',
+            size: 'sm',
+            color: '#6D604F',
+            wrap: true,
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'xs',
+            margin: 'md',
+            contents: [
+              buildFlexText(`注文番号：${orderId || '-'}`, true),
+              buildFlexText(`注文日：${orderedAt || '-'}`, false),
+            ],
+          },
+          {
+            type: 'text',
+            text: `【注文内容】\n${itemLines}`,
+            size: 'sm',
+            color: '#2A2118',
+            wrap: true,
+            margin: 'md',
+          },
+          {
+            type: 'text',
+            text: `合計金額：${formatYen(totalAmount)}円`,
+            weight: 'bold',
+            size: 'md',
+            color: '#B17522',
+            wrap: true,
+          },
+          {
+            type: 'text',
+            text: invoiceNote,
+            size: 'xs',
+            color: '#7A6A55',
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '16px',
+        backgroundColor: '#FFFDF8',
+        contents: [
+          buildUriButton('注文履歴を見る', buildKimikeaUrlWithParams(connectUrl, 'mypage', { tab: 'orders' }), true),
+          buildUriButton('追加注文する', buildKimikeaUrl(connectUrl, 'order'), false),
+          invoiceUrl
+            ? buildUriButton('請求書を確認する', invoiceUrl, false)
+            : buildUriButton('請求書を確認する', buildKimikeaUrlWithParams(connectUrl, 'mypage', { tab: 'orders' }), false),
+          {
+            type: 'button',
+            style: 'secondary',
+            height: 'sm',
+            color: '#F2E8D4',
+            action: {
+              type: 'message',
+              label: '問い合わせる',
+              text: `注文番号：${orderId || ''}について問い合わせ`,
+            },
+          },
+        ],
+      },
+      styles: {
+        footer: {
+          separator: true,
+          separatorColor: '#E8D8B8',
+        },
+      },
+    },
+  };
+}
+
+function buildFlexText(text, bold) {
+  return {
+    type: 'text',
+    text,
+    size: 'sm',
+    weight: bold ? 'bold' : 'regular',
+    color: '#2A2118',
+    wrap: true,
+  };
+}
+
+function buildUriButton(label, uri, primary) {
+  return {
+    type: 'button',
+    style: primary ? 'primary' : 'secondary',
+    height: 'sm',
+    color: primary ? '#B78A35' : '#F2E8D4',
+    action: {
+      type: 'uri',
+      label,
+      uri,
+    },
+  };
+}
+
+async function buildLineLinkResultMessage(token, lineUserId, orderApiUrl) {
+  try {
+    const result = await callOrderApiJsonp(orderApiUrl, 'linkLineAccountByToken', [token, lineUserId]);
+    return {
+      type: 'text',
+      text: `LINE連携が完了しました。\n${result.salonName || 'Kimikea Connect'} の注文受付通知をLINEで受け取れます。`,
+    };
+  } catch (error) {
+    return {
+      type: 'text',
+      text: `LINE連携に失敗しました。\n${error && error.message ? error.message : String(error)}\n\nKimikea Connectのマイページから連携コードを再発行してください。`,
+    };
+  }
+}
+
+async function callOrderApiJsonp(orderApiUrl, api, args) {
+  const callbackName = '__kimikeaLineWebhook';
+  const url = new URL(orderApiUrl || DEFAULT_ORDER_API_URL);
+  url.searchParams.set('api', api);
+  url.searchParams.set('args', JSON.stringify(args || []));
+  url.searchParams.set('callback', callbackName);
+  url.searchParams.set('v', String(Date.now()));
+  const response = await fetch(url.toString(), { method: 'GET' });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Order API error: ${response.status}`);
+  }
+  const match = text.match(new RegExp(`^${callbackName}\\((.*)\\);?$`, 's'));
+  if (!match) {
+    throw new Error('Order APIの応答形式を確認できませんでした。');
+  }
+  const payload = JSON.parse(match[1]);
+  if (!payload || !payload.ok) {
+    throw new Error((payload && payload.error) || '連携処理に失敗しました。');
+  }
+  return payload.data || {};
+}
+
+function parseLineLinkToken(text) {
+  const normalized = String(text || '').normalize('NFKC').trim();
+  const match = normalized.match(/^連携[\s　]+([A-Z0-9]{6,16})$/i);
+  return match ? match[1].toUpperCase() : '';
 }
 
 function buildReplyMessageForText(messageText, connectUrl = DEFAULT_KIMIKEA_CONNECT_URL) {
@@ -303,7 +559,7 @@ function buildSingleButtonMessage(title, text, label, uri) {
   };
 }
 
-async function verifyLineSignature(rawBody, signature, channelSecret) {
+export async function verifyLineSignature(rawBody, signature, channelSecret) {
   if (!signature || !channelSecret) return false;
 
   const key = await crypto.subtle.importKey(
@@ -327,6 +583,32 @@ function buildKimikeaUrl(connectUrl, view) {
   const baseUrl = normalizeBaseUrl(connectUrl || DEFAULT_KIMIKEA_CONNECT_URL);
   const separator = baseUrl.includes('?') ? '&' : '?';
   return `${baseUrl}${separator}view=${encodeURIComponent(view)}`;
+}
+
+function buildKimikeaUrlWithParams(connectUrl, view, params = {}) {
+  const url = new URL(normalizeBaseUrl(connectUrl || DEFAULT_KIMIKEA_CONNECT_URL));
+  url.searchParams.set('view', view);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+function sanitizeHttpsUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return '';
+    return url.toString();
+  } catch (error) {
+    return '';
+  }
+}
+
+function formatYen(value) {
+  return Number(value || 0).toLocaleString('ja-JP');
 }
 
 function normalizeBaseUrl(value) {

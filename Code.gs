@@ -12,6 +12,7 @@
  */
 
 const KCO_CONFIG = {
+  SPREADSHEET_ID: '1Gyp5QVyiPmViJ9IpX-cWelSwxTWa6oddBsi8OHcQhts',
   SPREADSHEET_NAME: 'Kimikea Connect Order 管理表',
   PRODUCT_MASTER: '商品マスタ',
   ORDERS: '注文一覧',
@@ -30,6 +31,18 @@ const KCO_CONFIG = {
   SHIPPING_STATUS: ['発送準備', '発送済', 'キャンセル'],
   SESSION_SECONDS: 21600,
 };
+
+function getKcoSpreadsheet_() {
+  const spreadsheetId = String(KCO_CONFIG.SPREADSHEET_ID || '').trim();
+  if (!spreadsheetId) {
+    throw new Error('KCO_CONFIG.SPREADSHEET_ID が未設定です。本番のKimikea Connect Order 管理表IDを設定してください。');
+  }
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  if (!ss) {
+    throw new Error(`本番管理表を開けません。spreadsheetId=${spreadsheetId}`);
+  }
+  return ss;
+}
 
 const KCO_SETUP_VALIDATION_MIN_ROWS = 100;
 const KCO_SETUP_VALIDATION_BUFFER_ROWS = 200;
@@ -101,6 +114,10 @@ const KCO_ORDER_HEADERS = [
   'invoiceTotal',
   'shopId',
   'userId',
+  'lineOrderNotifyStatus',
+  'lineOrderNotifySentAt',
+  'lineOrderNotifyError',
+  'lineOrderNotifyTargetUserId',
 ];
 
 const KCO_SETTING_HEADERS = [
@@ -153,6 +170,11 @@ const KCO_FRANCHISE_HEADERS = [
   'reservationUrl',
   'sortOrder',
   'membershipStatus',
+  'lineUserId',
+  'lineLinkedAt',
+  'lineLinkStatus',
+  'lineLinkToken',
+  'lineLinkTokenExpiresAt',
   'passwordChangedAt',
   'createdAt',
   'updatedAt',
@@ -244,6 +266,11 @@ const KCO_FRANCHISE_HEADER_ALIASES = {
   hotPepperUrl: ['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL'],
   reservationUrl: ['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト'],
   membershipStatus: ['membershipStatus', '会員ステータス', '加盟店ステータス', 'ステータス', '表示'],
+  lineUserId: ['lineUserId', 'LINEユーザーID', 'LINE User ID'],
+  lineLinkedAt: ['lineLinkedAt', 'LINE連携日時'],
+  lineLinkStatus: ['lineLinkStatus', 'LINE連携状態'],
+  lineLinkToken: ['lineLinkToken', 'LINE連携トークン'],
+  lineLinkTokenExpiresAt: ['lineLinkTokenExpiresAt', 'LINE連携トークン期限'],
   passwordChangedAt: ['passwordChangedAt', 'パスワード変更日'],
   createdAt: ['createdAt', '作成日', '登録日'],
   updatedAt: ['updatedAt', '更新日'],
@@ -332,6 +359,9 @@ function handleJsonpApi_(event) {
     getExtensionSimulatorQuota,
     getPortalData,
     getMyPageStylebookData,
+    createLineLinkToken,
+    unlinkLineAccount,
+    linkLineAccountByToken,
     updateMemberEmail,
     changeMemberEmail,
     updateMyProfile,
@@ -375,7 +405,7 @@ function getAppAppearance() {
     iconContentType: 'image/png',
   };
   try {
-    const settings = getInvoiceSettings_(SpreadsheetApp.getActiveSpreadsheet());
+    const settings = getInvoiceSettings_(getKcoSpreadsheet_());
     if (!settings.logoFileId) return result;
     const blob = getInvoiceLogoBlob_(settings.logoFileId);
     result.iconContentType = blob.getContentType() || 'image/png';
@@ -395,6 +425,7 @@ function onOpen() {
     .addItem('3. 加盟店ユーザーを同期', 'syncFranchiseUsers')
     .addItem('4. 加盟店MAPを同期', 'syncMembersToMap')
     .addItem('5. MAP住所を緯度経度へ変換', 'geocodeMissingAddresses')
+    .addItem('MAP空欄座標を自動取得', 'updateMissingMapCoordinates')
     .addItem('請求書PDFの権限を取得', 'authorizeDocumentApp')
     .addItem('Grow通知テストメール送信', 'testSendGrowMail')
     .addItem('表示商品を再取得テスト', 'showProductCount_')
@@ -432,7 +463,7 @@ function setupKimikeaConnectOrder() {
 
 function setupMasterColumns() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const summary = {};
 
   try {
@@ -485,7 +516,7 @@ function setupMasterColumns() {
 
 function setupFranchiseMasterColumnsOnly() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const sheet = getSheetByNameCandidates_(ss, sheetNameCandidates_(KCO_CONFIG.FRANCHISE_MASTER));
   if (!sheet) {
     throw new Error(`対象シート「${KCO_CONFIG.FRANCHISE_MASTER}」が見つかりません。固定gidではなくシート名を確認してください。`);
@@ -500,7 +531,7 @@ function setupFranchiseMasterColumnsOnly() {
 
 function setupTriggers() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   try {
     const result = runSetupStep_('shipment trigger', () => ensureShipmentEditTrigger_(ss));
     logSetupStep_('setup triggers completed', {
@@ -520,7 +551,7 @@ function setupTriggers() {
 
 function syncFranchiseUsers() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const result = runSetupStep_('sync franchise users to user master', () => syncFranchiseUsersToUserMaster_(ss));
   logSetupStep_('sync franchise users completed', {
     ...result,
@@ -531,27 +562,46 @@ function syncFranchiseUsers() {
 
 function syncMembersToMap() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   setupMapEntries_(ss);
   const result = runSetupStep_('sync franchise map entries without geocode', () => syncFranchiseMapEntries_(ss, {
     geocode: false,
   }));
+  const coordinateResult = runSetupStep_('update missing map coordinates after sync', () => updateMissingMapCoordinatesInSheet_(ss, {
+    limit: 10,
+  }));
   logSetupStep_('sync members to map completed', {
     ...result,
+    coordinateResult,
     durationMs: Date.now() - startedAt,
   });
-  return result;
+  return {
+    ...result,
+    coordinateResult,
+  };
 }
 
 function geocodeMissingAddresses() {
   const startedAt = Date.now();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   setupMapEntries_(ss);
   const result = runSetupStep_('geocode missing map addresses', () => syncFranchiseMapEntries_(ss, {
     geocode: true,
     geocodeLimit: 10,
   }));
   logSetupStep_('geocode missing addresses completed', {
+    ...result,
+    durationMs: Date.now() - startedAt,
+  });
+  return result;
+}
+
+function updateMissingMapCoordinates() {
+  const startedAt = Date.now();
+  const ss = getKcoSpreadsheet_();
+  setupMapEntries_(ss);
+  const result = runSetupStep_('update missing map coordinates', () => updateMissingMapCoordinatesInSheet_(ss));
+  logSetupStep_('update missing map coordinates completed', {
     ...result,
     durationMs: Date.now() - startedAt,
   });
@@ -662,7 +712,7 @@ function generateExtensionSimulationImage(sessionToken, payload) {
 
 function getPublicOrderSettings(sessionToken) {
   getSessionFranchise_(sessionToken);
-  const rules = getOrderRules_(SpreadsheetApp.getActiveSpreadsheet());
+  const rules = getOrderRules_(getKcoSpreadsheet_());
   return {
     shippingFee: rules.shippingFee,
     freeShippingBags: rules.freeShippingBags,
@@ -905,7 +955,7 @@ function logoutFranchise(sessionToken) {
 
 function getPortalData(sessionToken) {
   const franchise = getSessionFranchise_(sessionToken);
-  const rules = getOrderRules_(SpreadsheetApp.getActiveSpreadsheet());
+  const rules = getOrderRules_(getKcoSpreadsheet_());
   const orders = getFranchiseOrders_(franchise.franchiseId);
   return {
     franchise: sanitizeFranchise_(franchise),
@@ -925,6 +975,116 @@ function getPortalData(sessionToken) {
   };
 }
 
+function createLineLinkToken(sessionToken) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const found = findFranchiseMasterRowByUserId_(franchise.userId);
+  if (!found) {
+    throw new Error('加盟店情報を確認できませんでした。');
+  }
+
+  const token = generateLineLinkToken_();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+  setFranchiseLineValues_(sheet, found.rowNumber, {
+    lineLinkToken: token,
+    lineLinkTokenExpiresAt: expiresAt,
+    lineLinkStatus: found.franchise && found.franchise.lineUserId ? 'linked_refresh_pending' : 'pending',
+  });
+
+  return {
+    token,
+    linkText: `連携 ${token}`,
+    expiresAt: formatDateTimeForClient_(expiresAt),
+    alreadyLinked: Boolean(found.franchise && found.franchise.lineUserId),
+  };
+}
+
+function unlinkLineAccount(sessionToken) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const found = findFranchiseMasterRowByUserId_(franchise.userId);
+  if (!found) {
+    throw new Error('加盟店情報を確認できませんでした。');
+  }
+
+  setFranchiseLineValues_(sheet, found.rowNumber, {
+    lineUserId: '',
+    lineLinkedAt: '',
+    lineLinkStatus: 'unlinked',
+    lineLinkToken: '',
+    lineLinkTokenExpiresAt: '',
+  });
+
+  return sanitizeFranchise_(Object.assign({}, found.franchise, {
+    lineUserId: '',
+    lineLinkedAt: '',
+    lineLinkStatus: 'unlinked',
+    lineLinkToken: '',
+    lineLinkTokenExpiresAt: '',
+  }));
+}
+
+function linkLineAccountByToken(token, lineUserId) {
+  const normalizedToken = String(token || '').normalize('NFKC').trim().toUpperCase();
+  const normalizedLineUserId = String(lineUserId || '').trim();
+  if (!normalizedToken || !normalizedLineUserId) {
+    throw new Error('連携コードまたはLINEユーザー情報が不足しています。');
+  }
+
+  const sheet = getSheet_(KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) {
+    throw new Error('加盟店情報が見つかりません。');
+  }
+
+  const headers = values[0].map(normalizeMasterHeader_);
+  const tokenIndex = findMasterHeaderIndex_(headers, ['lineLinkToken', 'LINE連携トークン']);
+  const expiresIndex = findMasterHeaderIndex_(headers, ['lineLinkTokenExpiresAt', 'LINE連携トークン期限']);
+  const userIdIndex = findMasterHeaderIndex_(headers, ['userId', 'ユーザーID']);
+  const nameIndex = findMasterHeaderIndex_(headers, ['salonName', '加盟店名', 'サロン名', '店舗名']);
+  if (tokenIndex === -1 || expiresIndex === -1) {
+    throw new Error('LINE連携用の列がありません。setupMasterColumnsを実行してください。');
+  }
+
+  const now = new Date();
+  for (let i = 1; i < values.length; i += 1) {
+    const row = values[i];
+    const rowToken = String(row[tokenIndex] || '').normalize('NFKC').trim().toUpperCase();
+    if (!rowToken || rowToken !== normalizedToken) continue;
+
+    const expiresAt = parseDateValue_(row[expiresIndex]);
+    if (!expiresAt || expiresAt.getTime() < now.getTime()) {
+      setFranchiseLineValues_(sheet, i + 1, {
+        lineLinkStatus: 'expired',
+        lineLinkToken: '',
+        lineLinkTokenExpiresAt: '',
+      });
+      throw new Error('連携コードの有効期限が切れています。Kimikea Connectから再発行してください。');
+    }
+
+    setFranchiseLineValues_(sheet, i + 1, {
+      lineUserId: normalizedLineUserId,
+      lineLinkedAt: now,
+      lineLinkStatus: 'linked',
+      lineLinkToken: '',
+      lineLinkTokenExpiresAt: '',
+    });
+
+    return {
+      ok: true,
+      userId: userIdIndex === -1 ? '' : String(row[userIdIndex] || '').trim(),
+      salonName: nameIndex === -1 ? '' : String(row[nameIndex] || '').trim(),
+      linkedAt: formatDateTimeForClient_(now),
+    };
+  }
+
+  throw new Error('連携コードが正しくありません。');
+}
+
 function getMyPageStylebookData(sessionToken) {
   const franchise = getSessionFranchise_(sessionToken);
   const userId = String(franchise.userId || '').trim();
@@ -932,7 +1092,7 @@ function getMyPageStylebookData(sessionToken) {
     throw new Error('ログインユーザーIDを確認できません。');
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const stylePosts = getMyPageStylebookPostsFromSheet_(ss);
   const savedStyles = getMyPageStylebookSavesFromSheet_(ss, userId);
   const ownPosts = stylePosts.filter((post) => sameIdString_(stylePostAuthorIdForMypage_(post), userId));
@@ -1065,7 +1225,7 @@ function getPublicProducts() {
 }
 
 function getPublicNotices() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const sheet = ss.getSheetByName(KCO_CONFIG.NOTICES);
   if (!sheet || sheet.getLastRow() <= 1) {
     return {
@@ -1208,7 +1368,7 @@ function normalizeFranchiseMapEntryForClient_(franchise, existingMapEntry) {
 }
 
 function getPublicMapEntries() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const mapSheet = ss.getSheetByName(KCO_CONFIG.MAP_ENTRIES);
   const mapValues = mapSheet && mapSheet.getLastRow() > 1 ? mapSheet.getDataRange().getValues() : [];
   const mapIndex = mapValues.length ? createIndex_(mapValues[0].map((header) => String(header || '').trim())) : {};
@@ -1244,6 +1404,7 @@ function getPublicMapEntries() {
     .filter((entry) => entry.status === '公開' && entry.prefecture && entry.type && (entry.salonName || entry.staffName || entry.shopId))
     .sort(comparePublicMapEntries_);
   logOrderDebug_('getPublicMapEntries result', {
+    spreadsheetId: ss.getId(),
     spreadsheetName: ss.getName(),
     source: 'franchise_master_with_map_coordinate_fallback',
     mapSheetName: mapSheet ? mapSheet.getName() : '',
@@ -1275,6 +1436,7 @@ function getPublicMapEntries() {
     prefectures,
     types: types.length ? types : KCO_MAP_TYPES,
     debug: {
+      spreadsheetId: ss.getId(),
       spreadsheetName: ss.getName(),
       source: 'franchise_master_with_map_coordinate_fallback',
       mapSheetName: mapSheet ? mapSheet.getName() : '',
@@ -1449,7 +1611,7 @@ function geocodeAddressForMap_(address) {
 }
 
 function getPublicColorRankings(year, month) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const period = getRankingPeriod_(year, month);
   const periodStart = period.start;
   const periodEnd = period.end;
@@ -1757,7 +1919,7 @@ function getProductCategories(sessionToken) {
 function submitCartOrder(order) {
   validateOrder_(order);
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
   ensureOrderHeaders_(ordersSheet);
@@ -1855,6 +2017,7 @@ function submitCartOrder(order) {
     franchise.shopId,
     franchise.userId,
   ]);
+  const orderRowNumber = ordersSheet.getLastRow();
 
   detailsSheet
     .getRange(detailsSheet.getLastRow() + 1, 1, detailRows.length, KCO_DETAIL_HEADERS.length)
@@ -1880,7 +2043,20 @@ function submitCartOrder(order) {
     productTotal,
     invoiceTotal,
     priceType,
+    lineUserId: franchise.lineUserId || '',
   }, invoiceSettings, orderRules);
+
+  notifyLineOrderAcceptedSafely_(ordersSheet, orderRowNumber, {
+    orderNo,
+    orderDate: now,
+    franchiseId: franchise.franchiseId,
+    franchiseName: franchise.franchiseName,
+    contactName: franchise.contactName,
+    lineUserId: franchise.lineUserId || '',
+    detailItems,
+    totalBags,
+    invoiceTotal,
+  });
 
   return {
     orderNo,
@@ -2053,6 +2229,219 @@ function setupMapEntries_(ss) {
   applyHeaderStyle_(sheet, KCO_MAP_HEADERS.length);
   safeSetupAutoResize_(sheet, KCO_MAP_HEADERS.length);
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+}
+
+function updateMissingMapCoordinatesInSheet_(ss, options) {
+  const updateOptions = options || {};
+  const limit = Math.max(0, Number(updateOptions.limit || 0));
+  const startedAt = Date.now();
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.MAP_ENTRIES);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, KCO_MAP_HEADERS.length).setValues([KCO_MAP_HEADERS]);
+  } else {
+    ensureMapEntryHeaders_(sheet);
+  }
+
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  if (values.length <= 1) {
+    return {
+      sheet: sheet.getName(),
+      processedCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [],
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  const headers = values[0].map((header) => String(header || '').trim());
+  const index = createIndex_(headers);
+  const findIndex = (candidates) => findHeaderIndexInHeaders_(headers, candidates);
+  const latitudeIndex = findIndex(['latitude', '緯度']);
+  const longitudeIndex = findIndex(['longitude', '経度']);
+  const geocodedAddressIndex = findIndex(['geocodedAddress', 'geocoded_address', '座標取得住所']);
+
+  if (latitudeIndex === -1 || longitudeIndex === -1) {
+    throw new Error('加盟店マップシートに latitude / longitude 列がありません。');
+  }
+
+  const postalCodeIndex = findIndex(['postalCode', 'postal_code', '郵便番号']);
+  const prefectureIndex = findIndex(['prefecture', '都道府県', '県']);
+  const cityIndex = findIndex(['city', '市区町村', '市町村', '活動エリア']);
+  const addressIndex = findIndex(['address', '住所']);
+  const shopIdIndex = findIndex(['shopId', '店舗ID', '加盟店ID']);
+  const salonNameIndex = findIndex(['salonName', '店舗名', 'サロン名', '加盟店名', 'shopName', 'name']);
+  const mapIdIndex = findIndex(['mapId', 'マップID']);
+
+  const rows = values.slice(1).map((row) => row.slice(0, headers.length));
+  let processedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+  let limitReachedCount = 0;
+  const rowResults = [];
+
+  rows.forEach((row, rowOffset) => {
+    const rowNumber = rowOffset + 2;
+    const mapId = mapIdIndex === -1 ? '' : String(row[mapIdIndex] || '').trim();
+    const shopId = shopIdIndex === -1 ? '' : String(row[shopIdIndex] || '').trim();
+    const salonName = salonNameIndex === -1 ? '' : String(row[salonNameIndex] || '').trim();
+    const latitudeText = String(row[latitudeIndex] || '').trim();
+    const longitudeText = String(row[longitudeIndex] || '').trim();
+
+    if (latitudeText && longitudeText) {
+      skippedCount += 1;
+      rowResults.push({
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        status: 'skipped',
+        reason: 'coordinates_already_exist',
+      });
+      return;
+    }
+
+    if (limit && processedCount >= limit) {
+      limitReachedCount += 1;
+      rowResults.push({
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        status: 'skipped',
+        reason: 'geocode_limit_reached',
+      });
+      return;
+    }
+
+    const address = buildMapGeocodeAddressFromRow_(row, {
+      postalCodeIndex,
+      prefectureIndex,
+      cityIndex,
+      addressIndex,
+    });
+
+    if (!address) {
+      skippedCount += 1;
+      rowResults.push({
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        status: 'skipped',
+        reason: 'address_empty',
+      });
+      return;
+    }
+
+    processedCount += 1;
+    try {
+      const location = geocodeAddressForMap_(address);
+      if (!location) {
+        failedCount += 1;
+        rowResults.push({
+          rowNumber,
+          mapId,
+          shopId,
+          salonName,
+          status: 'failed',
+          reason: '座標取得失敗',
+          address,
+        });
+        logSetupStep_('map coordinate geocode failed', {
+          rowNumber,
+          mapId,
+          shopId,
+          salonName,
+          address,
+          reason: '座標取得失敗',
+        });
+        return;
+      }
+
+      if (!latitudeText) row[latitudeIndex] = location.latitude;
+      if (!longitudeText) row[longitudeIndex] = location.longitude;
+      if (geocodedAddressIndex !== -1 && !String(row[geocodedAddressIndex] || '').trim()) {
+        row[geocodedAddressIndex] = address;
+      }
+      updatedCount += 1;
+      rowResults.push({
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        status: 'updated',
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address,
+      });
+    } catch (error) {
+      failedCount += 1;
+      const message = error && error.message ? error.message : String(error);
+      rowResults.push({
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        status: 'failed',
+        reason: '座標取得失敗',
+        message,
+        address,
+      });
+      logSetupStep_('map coordinate geocode failed', {
+        rowNumber,
+        mapId,
+        shopId,
+        salonName,
+        address,
+        message,
+      });
+    }
+  });
+
+  if (updatedCount > 0) {
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  }
+
+  return {
+    sheet: sheet.getName(),
+    processedCount,
+    updatedCount,
+    skippedCount,
+    failedCount,
+    limitReachedCount,
+    rowResults,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
+function buildMapGeocodeAddressFromRow_(row, index) {
+  const postalCode = index.postalCodeIndex === -1 ? '' : String(row[index.postalCodeIndex] || '').trim();
+  const prefecture = index.prefectureIndex === -1 ? '' : String(row[index.prefectureIndex] || '').trim();
+  const city = index.cityIndex === -1 ? '' : String(row[index.cityIndex] || '').trim();
+  const address = index.addressIndex === -1 ? '' : String(row[index.addressIndex] || '').trim();
+  const parsedAddress = parseJapaneseAddress_(address);
+  const parts = [
+    postalCode,
+    prefecture || parsedAddress.prefecture,
+    city || parsedAddress.city,
+    address,
+  ]
+    .map((value) => String(value || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).join(' ').trim();
+}
+
+function findHeaderIndexInHeaders_(headers, candidates) {
+  const normalizedHeaders = (headers || []).map(normalizeMasterHeader_);
+  const normalizedCandidates = (candidates || []).map(normalizeMasterHeader_);
+  for (let i = 0; i < normalizedHeaders.length; i += 1) {
+    if (normalizedCandidates.indexOf(normalizedHeaders[i]) !== -1) return i;
+  }
+  return -1;
 }
 
 function syncFranchiseMapEntries_(ss, options) {
@@ -2754,7 +3143,13 @@ function ensureOrderHeaders_(sheet) {
     sheet.getRange(1, insertAfter + 1).setValue('メールアドレス');
   }
 
-  sheet.getRange(1, 1, 1, KCO_ORDER_HEADERS.length).setValues([KCO_ORDER_HEADERS]);
+  headers = getHeaderValues_(sheet);
+  KCO_ORDER_HEADERS.forEach((header) => {
+    if (headers.indexOf(header) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    headers.push(header);
+  });
 }
 
 function ensureOrderDetailHeaders_(sheet) {
@@ -2900,6 +3295,114 @@ function sendOrderNotificationEmails_(ss, summary, invoiceSettings, orderRules) 
   }
 }
 
+function notifyLineOrderAcceptedSafely_(ordersSheet, orderRowNumber, summary) {
+  const lineUserId = String(summary.lineUserId || '').trim();
+  if (!lineUserId) {
+    updateOrderLineNotificationStatus_(ordersSheet, orderRowNumber, {
+      status: 'skipped_no_line_link',
+      targetUserId: '',
+      error: 'LINE未連携のため通知しませんでした。',
+    });
+    return;
+  }
+
+  const existingStatus = getOrderLineNotificationStatus_(ordersSheet, orderRowNumber);
+  if (['sent', 'sending'].indexOf(existingStatus) !== -1) {
+    return;
+  }
+
+  updateOrderLineNotificationStatus_(ordersSheet, orderRowNumber, {
+    status: 'sending',
+    targetUserId: lineUserId,
+    error: '',
+  });
+
+  try {
+    const result = pushLineOrderNotification_(summary);
+    updateOrderLineNotificationStatus_(ordersSheet, orderRowNumber, {
+      status: result && result.ok ? 'sent' : 'failed',
+      targetUserId: lineUserId,
+      sentAt: result && result.ok ? new Date() : '',
+      error: result && result.ok ? '' : JSON.stringify(result || {}),
+    });
+  } catch (error) {
+    updateOrderLineNotificationStatus_(ordersSheet, orderRowNumber, {
+      status: 'failed',
+      targetUserId: lineUserId,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+}
+
+function pushLineOrderNotification_(summary) {
+  const properties = PropertiesService.getScriptProperties();
+  const workerUrl = String(properties.getProperty('LINE_WORKER_NOTIFY_URL') || '').trim();
+  const notifySecret = String(properties.getProperty('LINE_ORDER_NOTIFY_SECRET') || '').trim();
+  if (!workerUrl || !notifySecret) {
+    throw new Error('LINE通知用のWorker URLまたはSecretが未設定です。');
+  }
+
+  const response = UrlFetchApp.fetch(workerUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'X-Kimikea-Notify-Secret': notifySecret,
+    },
+    payload: JSON.stringify({
+      type: 'orderAccepted',
+      lineUserId: summary.lineUserId,
+      orderId: summary.orderNo,
+      orderedAt: formatDateTimeForClient_(summary.orderDate),
+      totalAmount: Number(summary.invoiceTotal || 0),
+      invoiceUrl: '',
+      items: (summary.detailItems || []).map((item) => ({
+        category: item.category || '',
+        colorName: item.colorName || item.color || '',
+        productCode: item.productCode || '',
+        quantity: Number(item.quantity || 0),
+      })),
+    }),
+    muteHttpExceptions: true,
+  });
+
+  const status = response.getResponseCode();
+  const body = response.getContentText();
+  if (status < 200 || status >= 300) {
+    throw new Error(`LINE通知Workerエラー status=${status} body=${body}`);
+  }
+
+  try {
+    return JSON.parse(body || '{}');
+  } catch (error) {
+    return { ok: true, raw: body };
+  }
+}
+
+function getOrderLineNotificationStatus_(sheet, rowNumber) {
+  const headers = getHeaderValues_(sheet);
+  const index = createIndex_(headers);
+  const statusIndex = index.lineOrderNotifyStatus;
+  if (statusIndex === undefined || rowNumber <= 1) return '';
+  return String(sheet.getRange(rowNumber, statusIndex + 1).getValue() || '').trim();
+}
+
+function updateOrderLineNotificationStatus_(sheet, rowNumber, values) {
+  if (!sheet || rowNumber <= 1) return;
+  ensureOrderHeaders_(sheet);
+  const headers = getHeaderValues_(sheet);
+  const index = createIndex_(headers);
+  const updates = {
+    lineOrderNotifyStatus: values.status || '',
+    lineOrderNotifySentAt: values.sentAt || '',
+    lineOrderNotifyError: values.error || '',
+    lineOrderNotifyTargetUserId: values.targetUserId || '',
+  };
+  Object.keys(updates).forEach((header) => {
+    if (index[header] === undefined) return;
+    sheet.getRange(rowNumber, index[header] + 1).setValue(updates[header]);
+  });
+}
+
 function sendAdminOrderMail_(summary, settings, subject, body, invoicePdf) {
   sendMailList_(settings.adminEmails, subject, body, [invoicePdf], settings.senderName);
   logMailInfo_('管理者メール送信成功', summary.orderNo, settings.adminEmails);
@@ -2919,7 +3422,7 @@ function sendGrowOrderMail_(summary, settings) {
   }
   const subject = `【Kimikea Connect】新しい注文が入りました／注文番号：${summary.orderNo}`;
   const body = buildGrowOrderEmailBody_(summary);
-  const htmlBody = textToHtml_(body);
+  const htmlBody = buildGrowOrderEmailHtml_(summary);
   settings.growEmails.forEach((email) => {
     try {
       MailApp.sendEmail({
@@ -3002,11 +3505,34 @@ function buildGrowOrderEmailBody_(summary) {
     `発送先住所：${summary.franchiseAddress || ''}`,
     `電話番号：${summary.franchisePhone || ''}`,
     '',
+    '--------------------------------',
+    '【お願い】',
+    '納品書には金額を記載しないようお願いいたします。',
+    '',
     '【注文内容】',
+    '--------------------------------',
     buildGrowOrderItemsText_(summary),
     '',
     `合計袋数：${summary.totalBags}`,
   ].join('\n');
+}
+
+function buildGrowOrderEmailHtml_(summary) {
+  return [
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Hiragino Sans\',\'Yu Gothic\',sans-serif;font-size:15px;line-height:1.75;color:#222;">',
+    `<div>加盟店名：${escapeHtml_(summary.franchiseName)}</div>`,
+    `<div>担当者名：${escapeHtml_(summary.contactName)}</div>`,
+    `<div>発送先住所：${escapeHtml_(summary.franchiseAddress || '')}</div>`,
+    `<div>電話番号：${escapeHtml_(summary.franchisePhone || '')}</div>`,
+    '<div style="margin:18px 0 16px;padding:16px 18px;border:2px solid #b98a3c;border-radius:10px;background:#fffaf0;color:#221a12;">',
+    '<div style="font-size:18px;font-weight:800;margin-bottom:6px;">【お願い】</div>',
+    '<div style="font-size:17px;font-weight:800;">納品書には金額を記載しないようお願いいたします。</div>',
+    '</div>',
+    '<div style="font-size:18px;font-weight:800;margin:0 0 10px;">【注文内容】</div>',
+    `<div>${textToHtml_(buildGrowOrderItemsText_(summary))}</div>`,
+    `<div style="margin-top:16px;font-size:17px;font-weight:800;">合計袋数：${escapeHtml_(summary.totalBags)}</div>`,
+    '</div>',
+  ].join('');
 }
 
 function buildFranchiseEmailBody_(summary, invoiceSettings) {
@@ -3515,11 +4041,17 @@ function sendMailList_(emails, subject, body, attachments, senderName, htmlBody)
 }
 
 function textToHtml_(body) {
-  return String(body || '')
+  return escapeHtml_(body)
+    .replace(/\n/g, '<br>');
+}
+
+function escapeHtml_(value) {
+  return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function logMailInfo_(message, orderNo, emails) {
@@ -3537,7 +4069,7 @@ function logMailError_(message, orderNo, emails, error) {
 }
 
 function testSendGrowMail() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const settings = getNotificationSettings_(ss);
   if (!settings.growEmails.length) {
     throw new Error('grow通知メールが設定されていません');
@@ -3587,12 +4119,16 @@ function handleOrderStatusEdit(event) {
         row: event.range.getRow(),
         column: event.range.getColumn(),
       });
-      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const ss = getKcoSpreadsheet_();
       const userResult = syncFranchiseUsersToUserMaster_(ss);
       const mapResult = syncFranchiseMapEntries_(ss);
+      const coordinateResult = updateMissingMapCoordinatesInSheet_(ss, {
+        limit: 5,
+      });
       logSetupStep_('franchise edit master sync completed', {
         userResult,
         mapResult,
+        coordinateResult,
       });
     } catch (error) {
       logSetupStep_('franchise edit master sync failed', {
@@ -4027,7 +4563,7 @@ function getSessionFranchise_(sessionToken, options) {
 }
 
 function getFranchiseOrders_(franchiseId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
   if (!ordersSheet || ordersSheet.getLastRow() <= 1) return [];
@@ -4139,7 +4675,7 @@ function orderRowBelongsToFranchise_(row, orderIndex, franchise) {
 function getInvoicePdfData(sessionToken, orderNo) {
   const franchise = getSessionFranchise_(sessionToken);
   const targetOrderNo = String(orderNo || '').trim();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
   const orderValues = ordersSheet.getDataRange().getValues();
@@ -4240,6 +4776,11 @@ function getFranchiseMasterRecords_() {
   const homepageUrlIndex = findHeaderIndex(['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']);
   const instagramUrlIndex = findHeaderIndex(['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']);
   const lineUrlIndex = findHeaderIndex(['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']);
+  const lineUserIdIndex = findHeaderIndex(['lineUserId', 'LINEユーザーID', 'LINE User ID']);
+  const lineLinkedAtIndex = findHeaderIndex(['lineLinkedAt', 'LINE連携日時']);
+  const lineLinkStatusIndex = findHeaderIndex(['lineLinkStatus', 'LINE連携状態']);
+  const lineLinkTokenIndex = findHeaderIndex(['lineLinkToken', 'LINE連携トークン']);
+  const lineLinkTokenExpiresAtIndex = findHeaderIndex(['lineLinkTokenExpiresAt', 'LINE連携トークン期限']);
   const hotPepperUrlIndex = findHeaderIndex(['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']);
   const reservationUrlIndex = findHeaderIndex(['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト']);
   const sortOrderIndex = findHeaderIndex(['sortOrder', '表示順']);
@@ -4249,8 +4790,8 @@ function getFranchiseMasterRecords_() {
   const updatedAtIndex = findHeaderIndex(['updatedAt', '更新日']);
   const visibleIndex = findHeaderIndex(['表示']);
   logOrderDebug_('getFranchiseMasterRecords headers', {
-    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
-    spreadsheetName: SpreadsheetApp.getActiveSpreadsheet().getName(),
+    spreadsheetId: getKcoSpreadsheet_().getId(),
+    spreadsheetName: getKcoSpreadsheet_().getName(),
     sheetName: sheet.getName(),
     totalRowsIncludingHeader: values.length,
     rawHeaders: values[0].map(String),
@@ -4321,6 +4862,11 @@ function getFranchiseMasterRecords_() {
         homepageUrl: homepageUrlIndex === -1 ? '' : String(row[homepageUrlIndex] || '').trim(),
         instagramUrl: instagramUrlIndex === -1 ? '' : String(row[instagramUrlIndex] || '').trim(),
         lineUrl: lineUrlIndex === -1 ? '' : String(row[lineUrlIndex] || '').trim(),
+        lineUserId: lineUserIdIndex === -1 ? '' : String(row[lineUserIdIndex] || '').trim(),
+        lineLinkedAt: lineLinkedAtIndex === -1 ? '' : row[lineLinkedAtIndex],
+        lineLinkStatus: lineLinkStatusIndex === -1 ? '' : String(row[lineLinkStatusIndex] || '').trim(),
+        lineLinkToken: lineLinkTokenIndex === -1 ? '' : String(row[lineLinkTokenIndex] || '').trim(),
+        lineLinkTokenExpiresAt: lineLinkTokenExpiresAtIndex === -1 ? '' : row[lineLinkTokenExpiresAtIndex],
         hotPepperUrl: hotPepperUrlIndex === -1 ? '' : String(row[hotPepperUrlIndex] || '').trim(),
         reservationUrl: reservationUrlIndex === -1 ? '' : String(row[reservationUrlIndex] || '').trim(),
         sortOrder: sortOrderIndex === -1 ? '' : row[sortOrderIndex],
@@ -4389,7 +4935,7 @@ function getUserMasterColumnIndexes_(sheet) {
 }
 
 function findUserMasterRowByUserId_(userId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.USER_MASTER);
   ensureUserMasterColumns_(sheet);
   const values = sheet.getDataRange().getValues();
@@ -4399,6 +4945,55 @@ function findUserMasterRowByUserId_(userId) {
   const rowIndex = values.slice(1).findIndex(row => String(row[indexes.userId] || '').trim() === normalizedUserId);
   if (rowIndex < 0) return null;
   return { sheet, rowNumber: rowIndex + 2, indexes };
+}
+
+function findFranchiseMasterRowByUserId_(userId) {
+  const ss = getKcoSpreadsheet_();
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_MASTER);
+  ensureFranchiseMasterColumns_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return null;
+  const headers = values[0].map(normalizeMasterHeader_);
+  const userIdIndex = findMasterHeaderIndex_(headers, ['userId', 'ユーザーID']);
+  if (userIdIndex === -1) return null;
+  const normalizedUserId = String(userId || '').trim();
+  const rowIndex = values.slice(1).findIndex((row) => String(row[userIdIndex] || '').trim() === normalizedUserId);
+  if (rowIndex < 0) return null;
+  const franchise = getFranchiseMasterRecords_().find((item) => String(item.userId || '').trim() === normalizedUserId);
+  return {
+    sheet,
+    rowNumber: rowIndex + 2,
+    headers,
+    franchise,
+  };
+}
+
+function setFranchiseLineValues_(sheet, rowNumber, values) {
+  ensureFranchiseMasterColumns_(sheet);
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const fieldCandidates = {
+    lineUserId: ['lineUserId', 'LINEユーザーID', 'LINE User ID'],
+    lineLinkedAt: ['lineLinkedAt', 'LINE連携日時'],
+    lineLinkStatus: ['lineLinkStatus', 'LINE連携状態'],
+    lineLinkToken: ['lineLinkToken', 'LINE連携トークン'],
+    lineLinkTokenExpiresAt: ['lineLinkTokenExpiresAt', 'LINE連携トークン期限'],
+  };
+  Object.keys(values).forEach((field) => {
+    const index = findMasterHeaderIndex_(headers, fieldCandidates[field] || [field]);
+    if (index === -1) return;
+    sheet.getRange(rowNumber, index + 1).setValue(values[field]);
+  });
+}
+
+function generateLineLinkToken_() {
+  return Utilities.getUuid()
+    .replace(/-/g, '')
+    .toUpperCase()
+    .replace(/[O0IL]/g, '')
+    .slice(0, 8);
 }
 
 function updateUserMasterPasswordHash_(userId, passwordHash) {
@@ -4629,7 +5224,7 @@ function isHeadquartersAdmin_(franchise) {
   if (!franchise) return false;
   const status = String(franchise.membershipStatus || '').normalize('NFKC').trim().toLowerCase();
   if (['headquarters_admin', 'admin', '本部管理者', '管理者'].includes(status)) return true;
-  const settings = getNotificationSettings_(SpreadsheetApp.getActiveSpreadsheet());
+  const settings = getNotificationSettings_(getKcoSpreadsheet_());
   const adminEmails = settings.adminEmails.map(normalizeEmail_);
   return Boolean(franchise.email && adminEmails.includes(normalizeEmail_(franchise.email)));
 }
@@ -4661,6 +5256,9 @@ function sanitizeFranchise_(franchise) {
     address: franchise.address,
     fullAddress: franchise.fullAddress || [franchise.postalCode, franchise.address].filter(Boolean).join(' '),
     membershipStatus: franchise.membershipStatus || 'active',
+    lineLinked: Boolean(franchise.lineUserId),
+    lineLinkedAt: formatDateTimeForClient_(franchise.lineLinkedAt),
+    lineLinkStatus: franchise.lineLinkStatus || (franchise.lineUserId ? 'linked' : ''),
   };
 }
 
@@ -4689,7 +5287,7 @@ function createProductCodeKey_(productCode) {
 }
 
 function getSheet_(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getKcoSpreadsheet_();
   const sheet = getSheetByNameCandidates_(ss, sheetNameCandidates_(name));
   if (!sheet) throw new Error(`${name} シートが見つかりません。setupKimikeaConnectOrder を実行してください。`);
   return sheet;
