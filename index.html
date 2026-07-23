@@ -5960,6 +5960,7 @@
         .then((data) => {
           state.franchise = data.franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
+          state.orderUnlocked = true;
           state.products = data.products || [];
           state.orders = data.orders || [];
           state.myPage = data.myPage || null;
@@ -11158,6 +11159,16 @@
       if (page === 'color-chart') openPublicPage('colorChart');
       if (view === 'search') openSearchPage();
       if (view === 'mypage') openMyPage();
+      if (view === 'order') {
+        state.pendingOpenOrder = true;
+        if (isAuthenticatedSessionActive() && !state.orderUnlocked) return;
+        openOrderPage();
+        return;
+      }
+      if (view === 'academy') {
+        openPublicPage('coordinator');
+        return;
+      }
       if (view && publicPages[view]) openPublicPage(view);
     }
 
