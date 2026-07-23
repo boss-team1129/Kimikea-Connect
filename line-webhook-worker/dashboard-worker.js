@@ -87,21 +87,52 @@ async function handleLineEvent(event, channelAccessToken, connectUrl, orderApiUr
   if (message.type === 'text') {
     const text = message.text || '';
     const linkToken = parseLineLinkToken(text);
-    if (linkToken || isLineLinkCommandText(text)) {
+    const isLinkCommand = isLineLinkCommandText(text);
+    console.log('LINE_TEXT_DEBUG', {
+      rawText: text,
+      normalizedText: normalizeLineLinkText(text),
+      messageType: message.type,
+      sourceType: event.source && event.source.type ? event.source.type : '',
+      hasLineUserId: Boolean(event.source && event.source.userId),
+      parsedToken: maskDebugToken(linkToken),
+      isLinkCommand,
+    });
+    if (linkToken || isLinkCommand) {
       if (!linkToken) {
+        console.log('LINE_BRANCH_DEBUG', {
+          branch: 'line_link_format_error',
+          reason: 'link command detected but token was not parsed',
+        });
         replyMessage = buildLineLinkFormatErrorMessage();
       } else if (!event.source || !event.source.userId) {
+        console.log('LINE_BRANCH_DEBUG', {
+          branch: 'line_link_missing_user_id',
+          token: maskDebugToken(linkToken),
+        });
         replyMessage = {
           type: 'text',
           text: 'LINEユーザー情報を確認できませんでした。LINE公式アカウントとの1対1トークで、もう一度「連携 コード」を送信してください。',
         };
       } else {
+        console.log('LINE_BRANCH_DEBUG', {
+          branch: 'line_link_api_call',
+          token: maskDebugToken(linkToken),
+          orderApiUrl,
+        });
         replyMessage = await buildLineLinkResultMessage(linkToken, event.source.userId, orderApiUrl);
       }
     } else {
+      console.log('LINE_BRANCH_DEBUG', {
+        branch: 'normal_menu_or_keyword',
+        reason: 'not detected as line link command',
+      });
       replyMessage = buildReplyMessageForText(text, connectUrl);
     }
   } else {
+    console.log('LINE_BRANCH_DEBUG', {
+      branch: 'default_guide_non_text',
+      messageType: message.type || '',
+    });
     replyMessage = buildDefaultGuideMessage(connectUrl);
   }
 
@@ -367,13 +398,23 @@ async function callOrderApiJsonp(orderApiUrl, api, args) {
 }
 
 function parseLineLinkToken(text) {
-  const normalized = String(text || '').normalize('NFKC').trim();
+  const normalized = normalizeLineLinkText(text);
   const match = normalized.match(/^(?:LINE)?連携[\s:：　-]*([A-Z0-9]{6,16})$/i);
   return match ? match[1].toUpperCase() : '';
 }
 
 function isLineLinkCommandText(text) {
-  return /^(?:LINE)?連携(?:\s|$|[:：-])/i.test(String(text || '').normalize('NFKC').trim());
+  return /^(?:LINE)?連携(?:\s|$|[:：-])/i.test(normalizeLineLinkText(text));
+}
+
+function normalizeLineLinkText(text) {
+  return String(text || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+}
+
+function maskDebugToken(token) {
+  const value = String(token || '').trim();
+  if (!value) return '';
+  return `${value.slice(0, 3)}***(${value.length})`;
 }
 
 function buildLineLinkFormatErrorMessage() {

@@ -34,6 +34,7 @@ test('parses one time LINE link tokens', () => {
   assert.equal(parseLineLinkToken('連携 7DBEED3B'), '7DBEED3B');
   assert.equal(parseLineLinkToken('LINE連携:7DBEED3B'), '7DBEED3B');
   assert.equal(parseLineLinkToken('連携-7DBEED3B'), '7DBEED3B');
+  assert.equal(parseLineLinkToken('連携\n7DBEED3B'), '7DBEED3B');
   assert.equal(parseLineLinkToken('連携'), '');
   assert.equal(isLineLinkCommandText('連携 7DBEED3B'), true);
   assert.equal(isLineLinkCommandText('連携'), true);
