@@ -5,6 +5,7 @@ import {
   buildKimikeaUrlWithParams,
   buildOrderAcceptedMessage,
   buildReplyMessageForText,
+  isLineLinkCommandText,
   parseLineLinkToken,
   verifyLineSignature,
 } from '../src/index.js';
@@ -30,7 +31,13 @@ test('builds direct Kimikea Connect urls', () => {
 test('parses one time LINE link tokens', () => {
   assert.equal(parseLineLinkToken('連携 ABC123'), 'ABC123');
   assert.equal(parseLineLinkToken('連携　abc123'), 'ABC123');
+  assert.equal(parseLineLinkToken('連携 7DBEED3B'), '7DBEED3B');
+  assert.equal(parseLineLinkToken('LINE連携:7DBEED3B'), '7DBEED3B');
+  assert.equal(parseLineLinkToken('連携-7DBEED3B'), '7DBEED3B');
   assert.equal(parseLineLinkToken('連携'), '');
+  assert.equal(isLineLinkCommandText('連携 7DBEED3B'), true);
+  assert.equal(isLineLinkCommandText('連携'), true);
+  assert.equal(isLineLinkCommandText('こんにちは'), false);
 });
 
 test('builds order accepted LINE message', () => {

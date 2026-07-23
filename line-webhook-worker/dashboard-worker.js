@@ -77,7 +77,7 @@ export default {
   },
 };
 
-export async function handleLineEvent(event, channelAccessToken, connectUrl, orderApiUrl = DEFAULT_ORDER_API_URL) {
+async function handleLineEvent(event, channelAccessToken, connectUrl, orderApiUrl = DEFAULT_ORDER_API_URL) {
   if (!event || event.type !== 'message' || !event.replyToken) {
     return { skipped: true, reason: 'unsupported event' };
   }
@@ -85,11 +85,21 @@ export async function handleLineEvent(event, channelAccessToken, connectUrl, ord
   const message = event.message || {};
   let replyMessage;
   if (message.type === 'text') {
-    const linkToken = parseLineLinkToken(message.text || '');
-    if (linkToken && event.source && event.source.userId) {
-      replyMessage = await buildLineLinkResultMessage(linkToken, event.source.userId, orderApiUrl);
+    const text = message.text || '';
+    const linkToken = parseLineLinkToken(text);
+    if (linkToken || isLineLinkCommandText(text)) {
+      if (!linkToken) {
+        replyMessage = buildLineLinkFormatErrorMessage();
+      } else if (!event.source || !event.source.userId) {
+        replyMessage = {
+          type: 'text',
+          text: 'LINEユーザー情報を確認できませんでした。LINE公式アカウントとの1対1トークで、もう一度「連携 コード」を送信してください。',
+        };
+      } else {
+        replyMessage = await buildLineLinkResultMessage(linkToken, event.source.userId, orderApiUrl);
+      }
     } else {
-      replyMessage = buildReplyMessageForText(message.text || '', connectUrl);
+      replyMessage = buildReplyMessageForText(text, connectUrl);
     }
   } else {
     replyMessage = buildDefaultGuideMessage(connectUrl);
@@ -358,8 +368,19 @@ async function callOrderApiJsonp(orderApiUrl, api, args) {
 
 function parseLineLinkToken(text) {
   const normalized = String(text || '').normalize('NFKC').trim();
-  const match = normalized.match(/^連携[\s　]+([A-Z0-9]{6,16})$/i);
+  const match = normalized.match(/^(?:LINE)?連携[\s:：　-]*([A-Z0-9]{6,16})$/i);
   return match ? match[1].toUpperCase() : '';
+}
+
+function isLineLinkCommandText(text) {
+  return /^(?:LINE)?連携(?:\s|$|[:：-])/i.test(String(text || '').normalize('NFKC').trim());
+}
+
+function buildLineLinkFormatErrorMessage() {
+  return {
+    type: 'text',
+    text: 'LINE連携コードを確認できませんでした。\nKimikea Connectのマイページで発行した文章を、そのまま送信してください。\n\n例：連携 ABC123',
+  };
 }
 
 function buildReplyMessageForText(messageText, connectUrl = DEFAULT_KIMIKEA_CONNECT_URL) {
@@ -559,7 +580,7 @@ function buildSingleButtonMessage(title, text, label, uri) {
   };
 }
 
-export async function verifyLineSignature(rawBody, signature, channelSecret) {
+async function verifyLineSignature(rawBody, signature, channelSecret) {
   if (!signature || !channelSecret) return false;
 
   const key = await crypto.subtle.importKey(
