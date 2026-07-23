@@ -11169,6 +11169,14 @@
         openPublicPage('coordinator');
         return;
       }
+      if (view === 'ai-diagnosis') {
+        openPublicPage('ai');
+        return;
+      }
+      if (view === 'color-chart') {
+        openPublicPage('colorChart');
+        return;
+      }
       if (view && publicPages[view]) openPublicPage(view);
     }
 
