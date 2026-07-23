@@ -996,11 +996,27 @@ function createLineLinkToken(sessionToken) {
     token: maskLineDebugToken_(token),
     expiresAt: formatDateTimeForClient_(expiresAt),
   });
-  setFranchiseLineValues_(sheet, found.rowNumber, {
+  const savedLineValues = setFranchiseLineValues_(sheet, found.rowNumber, {
     lineLinkToken: token,
     lineLinkTokenExpiresAt: expiresAt,
     lineLinkStatus: found.franchise && found.franchise.lineUserId ? 'linked_refresh_pending' : 'pending',
   });
+  SpreadsheetApp.flush();
+  const savedToken = getFranchiseLineCellValue_(sheet, found.rowNumber, 'lineLinkToken');
+  const savedExpiresAt = getFranchiseLineCellValue_(sheet, found.rowNumber, 'lineLinkTokenExpiresAt');
+  logOrderDebug_('LINE link token saved readback', {
+    spreadsheetId: getKcoSpreadsheet_().getId(),
+    sheetName: sheet.getName(),
+    rowNumber: found.rowNumber,
+    token: maskLineDebugToken_(token),
+    savedToken: maskLineDebugToken_(savedToken),
+    savedExpiresAt,
+    savedLineValues,
+    tokenSaved: String(savedToken || '').normalize('NFKC').trim().toUpperCase() === token,
+  });
+  if (String(savedToken || '').normalize('NFKC').trim().toUpperCase() !== token) {
+    throw new Error('LINE連携コードを保存できませんでした。加盟店マスタのLINE連携列を確認してください。');
+  }
 
   return {
     token,
@@ -1051,8 +1067,8 @@ function linkLineAccountByToken(token, lineUserId) {
   }
 
   const headers = values[0].map(normalizeMasterHeader_);
-  const tokenIndex = findMasterHeaderIndex_(headers, ['lineLinkToken', 'LINE連携トークン']);
-  const expiresIndex = findMasterHeaderIndex_(headers, ['lineLinkTokenExpiresAt', 'LINE連携トークン期限']);
+  const tokenIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkToken');
+  const expiresIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkTokenExpiresAt');
   const userIdIndex = findMasterHeaderIndex_(headers, ['userId', 'ユーザーID']);
   const nameIndex = findMasterHeaderIndex_(headers, ['salonName', '加盟店名', 'サロン名', '店舗名']);
   logOrderDebug_('LINE link token verify start', {
@@ -4808,11 +4824,11 @@ function getFranchiseMasterRecords_() {
   const homepageUrlIndex = findHeaderIndex(['websiteURL', 'websiteUrl', 'homepage', 'homepageUrl', 'ホームページ', '公式サイト', '公式サイトURL']);
   const instagramUrlIndex = findHeaderIndex(['instagramURL', 'instagramUrl', 'Instagram', 'インスタグラム']);
   const lineUrlIndex = findHeaderIndex(['lineURL', 'lineUrl', 'LINE', 'LINE URL', '公式LINE']);
-  const lineUserIdIndex = findHeaderIndex(['lineUserId', 'LINEユーザーID', 'LINE User ID']);
-  const lineLinkedAtIndex = findHeaderIndex(['lineLinkedAt', 'LINE連携日時']);
-  const lineLinkStatusIndex = findHeaderIndex(['lineLinkStatus', 'LINE連携状態']);
-  const lineLinkTokenIndex = findHeaderIndex(['lineLinkToken', 'LINE連携トークン']);
-  const lineLinkTokenExpiresAtIndex = findHeaderIndex(['lineLinkTokenExpiresAt', 'LINE連携トークン期限']);
+  const lineUserIdIndex = findFranchiseLineHeaderIndex_(headers, 'lineUserId');
+  const lineLinkedAtIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkedAt');
+  const lineLinkStatusIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkStatus');
+  const lineLinkTokenIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkToken');
+  const lineLinkTokenExpiresAtIndex = findFranchiseLineHeaderIndex_(headers, 'lineLinkTokenExpiresAt');
   const hotPepperUrlIndex = findHeaderIndex(['hotPepperURL', 'hotpepperURL', 'hotPepperUrl', 'Hot Pepper', 'HotPepper', 'ホットペッパー', 'ホットペッパーURL']);
   const reservationUrlIndex = findHeaderIndex(['reservation', 'reservationUrl', '予約URL', '予約', '予約サイト']);
   const sortOrderIndex = findHeaderIndex(['sortOrder', '表示順']);
@@ -5006,18 +5022,30 @@ function setFranchiseLineValues_(sheet, rowNumber, values) {
     .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
     .getValues()[0]
     .map(normalizeMasterHeader_);
-  const fieldCandidates = {
-    lineUserId: ['lineUserId', 'LINEユーザーID', 'LINE User ID'],
-    lineLinkedAt: ['lineLinkedAt', 'LINE連携日時'],
-    lineLinkStatus: ['lineLinkStatus', 'LINE連携状態'],
-    lineLinkToken: ['lineLinkToken', 'LINE連携トークン'],
-    lineLinkTokenExpiresAt: ['lineLinkTokenExpiresAt', 'LINE連携トークン期限'],
-  };
+  const written = {};
   Object.keys(values).forEach((field) => {
-    const index = findMasterHeaderIndex_(headers, fieldCandidates[field] || [field]);
-    if (index === -1) return;
+    const index = findFranchiseLineHeaderIndex_(headers, field);
+    if (index === -1) {
+      throw new Error(`加盟店マスタにLINE連携列「${field}」が見つかりません。setupMasterColumnsを実行してください。`);
+    }
     sheet.getRange(rowNumber, index + 1).setValue(values[field]);
+    written[field] = {
+      column: index + 1,
+      header: sheet.getRange(1, index + 1).getValue(),
+    };
   });
+  return written;
+}
+
+function getFranchiseLineCellValue_(sheet, rowNumber, field) {
+  ensureFranchiseMasterColumns_(sheet);
+  const headers = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map(normalizeMasterHeader_);
+  const index = findFranchiseLineHeaderIndex_(headers, field);
+  if (index === -1) return '';
+  return sheet.getRange(rowNumber, index + 1).getValue();
 }
 
 function generateLineLinkToken_() {
@@ -5065,6 +5093,17 @@ function findMasterHeaderIndex_(headers, candidates) {
       || candidate.startsWith(header)
     ))
   ));
+}
+
+function findExactMasterHeaderIndex_(headers, candidates) {
+  const normalizedCandidates = candidates.map(normalizeMasterHeader_);
+  return headers.findIndex((header) => (
+    header && normalizedCandidates.indexOf(header) !== -1
+  ));
+}
+
+function findFranchiseLineHeaderIndex_(headers, field) {
+  return findExactMasterHeaderIndex_(headers, KCO_FRANCHISE_HEADER_ALIASES[field] || [field]);
 }
 
 function normalizeEmail_(value) {
