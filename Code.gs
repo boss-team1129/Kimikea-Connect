@@ -987,6 +987,15 @@ function createLineLinkToken(sessionToken) {
   const token = generateLineLinkToken_();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+  logOrderDebug_('LINE link token issued', {
+    spreadsheetId: getKcoSpreadsheet_().getId(),
+    sheetName: sheet.getName(),
+    rowNumber: found.rowNumber,
+    userId: franchise.userId,
+    shopId: franchise.shopId,
+    token: maskLineDebugToken_(token),
+    expiresAt: formatDateTimeForClient_(expiresAt),
+  });
   setFranchiseLineValues_(sheet, found.rowNumber, {
     lineLinkToken: token,
     lineLinkTokenExpiresAt: expiresAt,
@@ -1046,6 +1055,17 @@ function linkLineAccountByToken(token, lineUserId) {
   const expiresIndex = findMasterHeaderIndex_(headers, ['lineLinkTokenExpiresAt', 'LINE連携トークン期限']);
   const userIdIndex = findMasterHeaderIndex_(headers, ['userId', 'ユーザーID']);
   const nameIndex = findMasterHeaderIndex_(headers, ['salonName', '加盟店名', 'サロン名', '店舗名']);
+  logOrderDebug_('LINE link token verify start', {
+    spreadsheetId: getKcoSpreadsheet_().getId(),
+    sheetName: sheet.getName(),
+    rowCount: values.length - 1,
+    token: maskLineDebugToken_(normalizedToken),
+    hasLineUserId: Boolean(normalizedLineUserId),
+    tokenIndex,
+    expiresIndex,
+    userIdIndex,
+    nameIndex,
+  });
   if (tokenIndex === -1 || expiresIndex === -1) {
     throw new Error('LINE連携用の列がありません。setupMasterColumnsを実行してください。');
   }
@@ -1055,6 +1075,11 @@ function linkLineAccountByToken(token, lineUserId) {
     const row = values[i];
     const rowToken = String(row[tokenIndex] || '').normalize('NFKC').trim().toUpperCase();
     if (!rowToken || rowToken !== normalizedToken) continue;
+    logOrderDebug_('LINE link token matched', {
+      rowNumber: i + 1,
+      token: maskLineDebugToken_(rowToken),
+      expiresAtRaw: row[expiresIndex],
+    });
 
     const expiresAt = parseDateValue_(row[expiresIndex]);
     if (!expiresAt || expiresAt.getTime() < now.getTime()) {
@@ -1082,6 +1107,13 @@ function linkLineAccountByToken(token, lineUserId) {
     };
   }
 
+  logOrderDebug_('LINE link token not found', {
+    spreadsheetId: getKcoSpreadsheet_().getId(),
+    sheetName: sheet.getName(),
+    searchedRows: values.length - 1,
+    token: maskLineDebugToken_(normalizedToken),
+    nonEmptyTokenCount: values.slice(1).filter((row) => String(row[tokenIndex] || '').trim()).length,
+  });
   throw new Error('連携コードが正しくありません。');
 }
 
@@ -4994,6 +5026,12 @@ function generateLineLinkToken_() {
     .toUpperCase()
     .replace(/[O0IL]/g, '')
     .slice(0, 8);
+}
+
+function maskLineDebugToken_(token) {
+  const value = String(token || '').trim();
+  if (!value) return '';
+  return `${value.slice(0, 3)}***(${value.length})`;
 }
 
 function updateUserMasterPasswordHash_(userId, passwordHash) {

@@ -116,6 +116,13 @@ export default {
 
     const connectUrl = normalizeBaseUrl(env.KIMIKEA_CONNECT_URL || DEFAULT_KIMIKEA_CONNECT_URL);
     const orderApiUrl = normalizeBaseUrl(env.ORDER_API_URL || DEFAULT_ORDER_API_URL);
+    console.log('LINE_CONFIG_DEBUG', {
+      connectUrl,
+      orderApiUrl,
+      hasOrderApiEnv: Boolean(env.ORDER_API_URL),
+      defaultOrderApiUrl: DEFAULT_ORDER_API_URL,
+      orderApiMatchesDefault: orderApiUrl === DEFAULT_ORDER_API_URL,
+    });
     const processingPromise = processLineEvents(events, env.LINE_CHANNEL_ACCESS_TOKEN, connectUrl, orderApiUrl)
       .then((replyResults) => {
         console.log('LINE_WEBHOOK_STAGE', {
@@ -468,12 +475,33 @@ function buildUriButton(label, uri, primary) {
 
 async function buildLineLinkResultMessage(token, lineUserId, orderApiUrl) {
   try {
+    console.log('LINE_LINK_API_DEBUG', {
+      stage: 'before_call',
+      api: 'linkLineAccountByToken',
+      token: maskDebugToken(token),
+      hasLineUserId: Boolean(lineUserId),
+      orderApiUrl,
+    });
     const result = await callOrderApiJsonp(orderApiUrl, 'linkLineAccountByToken', [token, lineUserId]);
+    console.log('LINE_LINK_API_DEBUG', {
+      stage: 'success',
+      token: maskDebugToken(token),
+      salonName: result && result.salonName ? result.salonName : '',
+      linkedAt: result && result.linkedAt ? result.linkedAt : '',
+    });
     return {
       type: 'text',
       text: `LINE連携が完了しました。\n${result.salonName || 'Kimikea Connect'} の注文受付通知をLINEで受け取れます。`,
     };
   } catch (error) {
+    console.error('LINE_LINK_API_DEBUG', {
+      stage: 'failed',
+      token: maskDebugToken(token),
+      hasLineUserId: Boolean(lineUserId),
+      orderApiUrl,
+      error: error && error.message ? error.message : String(error),
+      stack: error && error.stack ? error.stack : '',
+    });
     return {
       type: 'text',
       text: `LINE連携に失敗しました。\n${error && error.message ? error.message : String(error)}\n\nKimikea Connectのマイページから連携コードを再発行してください。`,
@@ -488,8 +516,22 @@ async function callOrderApiJsonp(orderApiUrl, api, args) {
   url.searchParams.set('args', JSON.stringify(args || []));
   url.searchParams.set('callback', callbackName);
   url.searchParams.set('v', String(Date.now()));
+  console.log('ORDER_API_JSONP_DEBUG', {
+    stage: 'before_fetch',
+    api,
+    baseUrl: orderApiUrl || DEFAULT_ORDER_API_URL,
+    requestUrl: maskOrderApiRequestUrl(url.toString()),
+    args: maskOrderApiArgs(api, args),
+  });
   const response = await fetch(url.toString(), { method: 'GET' });
   const text = await response.text();
+  console.log('ORDER_API_JSONP_DEBUG', {
+    stage: 'after_fetch',
+    api,
+    httpStatus: response.status,
+    ok: response.ok,
+    bodyPreview: text.slice(0, 500),
+  });
   if (!response.ok) {
     throw new Error(`Order API error: ${response.status}`);
   }
@@ -498,6 +540,13 @@ async function callOrderApiJsonp(orderApiUrl, api, args) {
     throw new Error('Order APIの応答形式を確認できませんでした。');
   }
   const payload = JSON.parse(match[1]);
+  console.log('ORDER_API_JSONP_DEBUG', {
+    stage: 'parsed_payload',
+    api,
+    payloadOk: Boolean(payload && payload.ok),
+    payloadError: payload && payload.error ? payload.error : '',
+    dataKeys: payload && payload.data ? Object.keys(payload.data) : [],
+  });
   if (!payload || !payload.ok) {
     throw new Error((payload && payload.error) || '連携処理に失敗しました。');
   }
@@ -522,6 +571,36 @@ function maskDebugToken(token) {
   const value = String(token || '').trim();
   if (!value) return '';
   return `${value.slice(0, 3)}***(${value.length})`;
+}
+
+function maskDebugLineUserId(lineUserId) {
+  const value = String(lineUserId || '').trim();
+  if (!value) return '';
+  return `${value.slice(0, 4)}***(${value.length})`;
+}
+
+function maskOrderApiArgs(api, args) {
+  if (api === 'linkLineAccountByToken') {
+    return [
+      maskDebugToken(args && args[0]),
+      maskDebugLineUserId(args && args[1]),
+    ];
+  }
+  return Array.isArray(args) ? args.map((value) => String(value).slice(0, 80)) : [];
+}
+
+function maskOrderApiRequestUrl(urlText) {
+  try {
+    const url = new URL(urlText);
+    if (url.searchParams.has('args')) {
+      const args = JSON.parse(url.searchParams.get('args') || '[]');
+      url.searchParams.set('args_debug', JSON.stringify(maskOrderApiArgs(url.searchParams.get('api') || '', args)));
+      url.searchParams.delete('args');
+    }
+    return url.toString();
+  } catch (error) {
+    return String(urlText || '').slice(0, 300);
+  }
 }
 
 function buildLineLinkFormatErrorMessage() {
