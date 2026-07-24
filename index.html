@@ -330,6 +330,20 @@
       font-weight: 950;
       box-shadow: 0 12px 22px rgba(6, 199, 85, 0.18);
     }
+    .home-franchise-icon {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border: 1px solid rgba(189, 147, 64, .34);
+      border-radius: 17px;
+      background: linear-gradient(145deg, #17130d, #c6a15a);
+      color: #fff7dc;
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      box-shadow: 0 14px 24px rgba(141, 105, 34, .2);
+    }
     .home-line-panel .home-action-copy { gap: 7px; }
     .home-line-button {
       background: #06c755;
@@ -1135,6 +1149,777 @@
     .public-page.is-network-page .public-actions {
       display: block;
       margin: 0;
+    }
+    .public-page.is-franchise-page {
+      display: block;
+      padding: 0 0 110px;
+    }
+    .public-page.is-franchise-page .public-panel {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: visible;
+    }
+    .public-page.is-franchise-page #publicPageKicker,
+    .public-page.is-franchise-page #publicPageTitle,
+    .public-page.is-franchise-page #publicPageLead,
+    .public-page.is-franchise-page #publicPageList {
+      display: none;
+    }
+    .public-page.is-franchise-page .public-actions {
+      display: block;
+      margin: 0;
+    }
+    .franchise-lp {
+      --franchise-black: #090908;
+      --franchise-ink: #17130d;
+      --franchise-gold: #c6a15a;
+      --franchise-gold-deep: #8f6c29;
+      --franchise-cream: #fffaf0;
+      position: relative;
+      width: min(100%, 1180px);
+      margin: 0 auto;
+      color: var(--franchise-ink);
+      isolation: isolate;
+    }
+    .franchise-lp::before,
+    .franchise-lp::after {
+      position: fixed;
+      z-index: -1;
+      content: "";
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(46px);
+      opacity: .28;
+    }
+    .franchise-lp::before {
+      top: 8%;
+      left: -90px;
+      width: 250px;
+      height: 250px;
+      background: rgba(198, 161, 90, .42);
+    }
+    .franchise-lp::after {
+      right: -80px;
+      bottom: 12%;
+      width: 310px;
+      height: 310px;
+      background: rgba(255, 255, 255, .72);
+    }
+    .franchise-hero {
+      position: relative;
+      min-height: min(760px, calc(100svh - 34px));
+      overflow: hidden;
+      border-radius: 34px;
+      background:
+        linear-gradient(90deg, rgba(4, 4, 4, .84), rgba(10, 9, 8, .52) 48%, rgba(10, 9, 8, .12)),
+        url("./assets/home-gallery/stylebook-20260714.jpg?v=20260724-franchise-lp-1") center right / cover no-repeat;
+      box-shadow: 0 28px 70px rgba(17, 12, 5, .22);
+    }
+    .franchise-hero::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      background:
+        radial-gradient(circle at 18% 15%, rgba(255, 255, 255, .16), transparent 28%),
+        linear-gradient(0deg, rgba(7, 6, 5, .76), transparent 34%, rgba(255, 255, 255, .03));
+      pointer-events: none;
+    }
+    .franchise-hero-inner {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      min-height: inherit;
+      grid-template-columns: minmax(0, 1.05fr) minmax(260px, .7fr);
+      gap: 28px;
+      align-items: end;
+      padding: clamp(28px, 5vw, 68px);
+    }
+    .franchise-kicker {
+      width: fit-content;
+      margin: 0 0 14px;
+      padding: 7px 12px;
+      border: 1px solid rgba(225, 195, 126, .58);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .1);
+      color: #f6d98e;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .16em;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .franchise-hero h1 {
+      max-width: 9.6em;
+      margin: 0;
+      color: #fff;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(42px, 9vw, 88px);
+      line-height: .98;
+      letter-spacing: 0;
+      text-shadow: 0 18px 34px rgba(0, 0, 0, .32);
+    }
+    .franchise-hero-lead {
+      max-width: 23em;
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, .9);
+      font-size: clamp(17px, 3.5vw, 24px);
+      font-weight: 800;
+      line-height: 1.75;
+    }
+    .franchise-hero-brand {
+      margin: 18px 0 0;
+      color: #f6d98e;
+      font-size: clamp(14px, 3vw, 18px);
+      font-weight: 900;
+      line-height: 1.7;
+    }
+    .franchise-cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+    .franchise-cta,
+    .franchise-secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 54px;
+      padding: 0 22px;
+      border: 1px solid rgba(225, 195, 126, .58);
+      border-radius: 999px;
+      background: linear-gradient(135deg, #fff6d8, #c6a15a 54%, #f5e5b5);
+      color: #17130d;
+      font-size: 15px;
+      font-weight: 950;
+      text-decoration: none;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .72);
+      cursor: pointer;
+      transition: transform .22s ease, box-shadow .22s ease;
+    }
+    .franchise-secondary-button {
+      min-height: 48px;
+      background: rgba(255, 255, 255, .86);
+      color: var(--franchise-gold-deep);
+      box-shadow: 0 14px 26px rgba(85, 64, 24, .12);
+    }
+    .franchise-cta:hover,
+    .franchise-secondary-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 22px 42px rgba(0, 0, 0, .24);
+    }
+    .franchise-cta:active,
+    .franchise-secondary-button:active {
+      transform: translateY(1px) scale(.99);
+    }
+    .franchise-phone {
+      align-self: center;
+      justify-self: center;
+      width: min(78vw, 290px);
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, .36);
+      border-radius: 38px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, .78), rgba(255, 255, 255, .22));
+      box-shadow: 0 28px 62px rgba(0, 0, 0, .28);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .franchise-phone-screen {
+      min-height: 470px;
+      overflow: hidden;
+      border-radius: 30px;
+      background: linear-gradient(180deg, #11100f, #f9f3e7 42%, #fffaf1);
+      color: #fff;
+    }
+    .franchise-phone-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 18px 12px;
+      color: rgba(255, 255, 255, .78);
+      font-size: 12px;
+      font-weight: 850;
+    }
+    .franchise-phone-title {
+      padding: 0 18px 18px;
+    }
+    .franchise-phone-title strong {
+      display: block;
+      color: #f6d98e;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+    .franchise-phone-title span {
+      display: block;
+      margin-top: 7px;
+      color: rgba(255, 255, 255, .78);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .franchise-phone-card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 14px;
+      color: #17130d;
+    }
+    .franchise-phone-card {
+      min-height: 96px;
+      padding: 12px;
+      border: 1px solid rgba(198, 161, 90, .22);
+      border-radius: 19px;
+      background: rgba(255, 255, 255, .88);
+      box-shadow: 0 14px 26px rgba(36, 26, 9, .08);
+    }
+    .franchise-phone-card span {
+      display: block;
+      color: #9b782e;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .franchise-phone-card strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .franchise-scroll-cue {
+      position: absolute;
+      left: 50%;
+      bottom: 20px;
+      z-index: 3;
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+      color: rgba(255, 255, 255, .78);
+      font-size: 11px;
+      font-weight: 850;
+      transform: translateX(-50%);
+    }
+    .franchise-scroll-cue::after {
+      width: 1px;
+      height: 34px;
+      content: "";
+      border-radius: 999px;
+      background: linear-gradient(#f6d98e, transparent);
+      animation: franchiseScrollCue 1.45s ease-in-out infinite;
+    }
+    @keyframes franchiseScrollCue {
+      0%, 100% { transform: translateY(-4px); opacity: .45; }
+      50% { transform: translateY(6px); opacity: 1; }
+    }
+    .franchise-section {
+      padding: clamp(54px, 9vw, 100px) 0 0;
+    }
+    .franchise-section-head {
+      width: min(92vw, 760px);
+      margin: 0 auto 24px;
+      text-align: center;
+    }
+    .franchise-section-kicker {
+      display: inline-flex;
+      margin-bottom: 10px;
+      padding: 5px 10px;
+      border: 1px solid rgba(198, 161, 90, .28);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .72);
+      color: var(--franchise-gold-deep);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .14em;
+    }
+    .franchise-section h2 {
+      margin: 0;
+      color: var(--franchise-ink);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 7vw, 58px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+    .franchise-section-head p {
+      margin: 12px auto 0;
+      color: #6f6759;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.8;
+    }
+    .franchise-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      width: min(92vw, 1060px);
+      margin: 0 auto;
+    }
+    .franchise-glass-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(198, 161, 90, .24);
+      border-radius: 26px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, .92), rgba(255, 250, 239, .7)),
+        radial-gradient(circle at 84% 10%, rgba(198, 161, 90, .16), transparent 34%);
+      box-shadow: 0 20px 46px rgba(65, 49, 17, .1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform .28s ease, box-shadow .28s ease;
+    }
+    .franchise-glass-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 28px 58px rgba(65, 49, 17, .16);
+    }
+    .franchise-feature-card {
+      display: grid;
+      gap: 14px;
+      min-height: 190px;
+      padding: 22px;
+    }
+    .franchise-feature-icon {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #161311, #3a3020);
+      color: #f6d98e;
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 14px 24px rgba(0,0,0,.16);
+    }
+    .franchise-feature-card h3,
+    .franchise-benefit-card h3 {
+      margin: 0;
+      color: var(--franchise-ink);
+      font-size: 21px;
+      line-height: 1.28;
+    }
+    .franchise-feature-card p,
+    .franchise-benefit-card li,
+    .franchise-grow-card p,
+    .franchise-note-list li,
+    .franchise-flow-card p {
+      color: #6f6759;
+      font-size: 14px;
+      font-weight: 720;
+      line-height: 1.7;
+    }
+    .franchise-benefit-card {
+      padding: 26px;
+    }
+    .franchise-benefit-card ul,
+    .franchise-note-list,
+    .franchise-grow-card ul {
+      display: grid;
+      gap: 9px;
+      margin: 16px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .franchise-benefit-card li::before,
+    .franchise-note-list li::before,
+    .franchise-grow-card li::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin: 0 8px 2px 0;
+      border-radius: 50%;
+      background: var(--franchise-gold);
+    }
+    .franchise-timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      width: min(92vw, 1060px);
+      margin: 0 auto;
+    }
+    .franchise-flow-card {
+      padding: 24px;
+    }
+    .franchise-flow-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      margin-bottom: 14px;
+      border-radius: 50%;
+      background: #11100e;
+      color: #f6d98e;
+      font-weight: 950;
+    }
+    .franchise-price-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      width: min(92vw, 980px);
+      margin: 0 auto 22px;
+    }
+    .franchise-price-card {
+      padding: 24px;
+      text-align: center;
+    }
+    .franchise-price-card span {
+      display: block;
+      color: var(--franchise-gold-deep);
+      font-size: 13px;
+      font-weight: 950;
+    }
+    .franchise-price-card strong {
+      display: block;
+      margin-top: 8px;
+      color: var(--franchise-ink);
+      font-size: clamp(26px, 6vw, 38px);
+      line-height: 1.1;
+    }
+    .franchise-price-card small {
+      display: block;
+      margin-top: 6px;
+      color: #6f6759;
+      font-weight: 800;
+    }
+    .franchise-color-chart {
+      width: min(92vw, 1060px);
+      margin: 18px auto 0;
+      padding: 18px;
+      border: 1px solid rgba(198, 161, 90, .2);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, .72);
+      box-shadow: 0 20px 46px rgba(65, 49, 17, .08);
+    }
+    .franchise-color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+      gap: 12px;
+    }
+    .franchise-color-chip {
+      display: grid;
+      justify-items: center;
+      gap: 7px;
+      min-height: 118px;
+      padding: 10px 8px;
+      border: 1px solid rgba(28, 24, 18, .08);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .86);
+      color: #4c4334;
+      font-size: 11px;
+      font-weight: 850;
+      text-align: center;
+    }
+    .franchise-color-chip img {
+      width: 44px;
+      height: 72px;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 10px rgba(42, 31, 12, .12));
+    }
+    .franchise-color-chip span {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .franchise-grow-showcase {
+      display: grid;
+      grid-template-columns: minmax(0, .82fr) minmax(0, 1fr);
+      gap: 18px;
+      width: min(92vw, 1060px);
+      margin: 0 auto;
+      align-items: stretch;
+    }
+    .franchise-grow-logo-card,
+    .franchise-grow-card {
+      padding: 28px;
+    }
+    .franchise-grow-logo-card {
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      min-height: 260px;
+      background:
+        linear-gradient(145deg, rgba(17, 14, 12, .95), rgba(49, 39, 23, .86)),
+        radial-gradient(circle at 50% 18%, rgba(246, 217, 142, .24), transparent 42%);
+    }
+    .franchise-grow-logo-card img {
+      width: min(58vw, 260px);
+      max-height: 150px;
+      object-fit: contain;
+      filter: drop-shadow(0 18px 24px rgba(0,0,0,.24));
+    }
+    .franchise-grow-samples {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .franchise-grow-samples img {
+      width: 52px;
+      height: 92px;
+      object-fit: contain;
+      border-radius: 16px;
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 14px 28px rgba(0,0,0,.18);
+    }
+    .franchise-screen-rail {
+      display: flex;
+      gap: 16px;
+      width: min(100%, 1120px);
+      margin: 0 auto;
+      padding: 4px max(4vw, 18px) 20px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+    }
+    .franchise-screen-rail::-webkit-scrollbar { display: none; }
+    .franchise-screen-card {
+      flex: 0 0 min(70vw, 250px);
+      scroll-snap-align: center;
+      padding: 10px;
+      border: 0;
+      border-radius: 32px;
+      background: linear-gradient(145deg, #161311, #3b3326);
+      box-shadow: 0 22px 44px rgba(25, 18, 7, .2);
+      color: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .24s ease;
+    }
+    .franchise-screen-card:hover { transform: translateY(-4px); }
+    .franchise-screen-card img {
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      object-fit: cover;
+      border-radius: 24px;
+      background: #f5efe3;
+    }
+    .franchise-screen-card strong {
+      display: block;
+      padding: 12px 10px 4px;
+      color: #f6d98e;
+      font-size: 15px;
+    }
+    .franchise-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      width: min(92vw, 980px);
+      margin: 0 auto;
+    }
+    .franchise-stat-card {
+      padding: 24px 16px;
+      text-align: center;
+    }
+    .franchise-stat-card strong {
+      display: block;
+      color: var(--franchise-ink);
+      font-size: clamp(30px, 7vw, 48px);
+      line-height: 1;
+    }
+    .franchise-stat-card span {
+      display: block;
+      margin-top: 8px;
+      color: #786b58;
+      font-weight: 850;
+    }
+    .franchise-faq {
+      display: grid;
+      gap: 10px;
+      width: min(92vw, 780px);
+      margin: 0 auto;
+    }
+    .franchise-faq details {
+      padding: 18px 20px;
+      border: 1px solid rgba(198, 161, 90, .2);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, .82);
+      box-shadow: 0 14px 30px rgba(65, 49, 17, .07);
+    }
+    .franchise-faq summary {
+      color: var(--franchise-ink);
+      font-size: 15px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+    .franchise-faq p {
+      margin: 12px 0 0;
+      color: #6f6759;
+      line-height: 1.8;
+    }
+    .franchise-form-card {
+      width: min(92vw, 880px);
+      margin: 0 auto;
+      padding: clamp(22px, 4vw, 34px);
+    }
+    .franchise-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .franchise-form-card label {
+      display: grid;
+      gap: 7px;
+      color: #4d4332;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .franchise-form-card input,
+    .franchise-form-card select,
+    .franchise-form-card textarea {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid rgba(198, 161, 90, .26);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .9);
+      color: var(--franchise-ink);
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .franchise-form-card textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    .franchise-form-full {
+      grid-column: 1 / -1;
+    }
+    .franchise-form-message {
+      min-height: 24px;
+      margin: 14px 0 0;
+      color: var(--franchise-gold-deep);
+      font-weight: 900;
+      line-height: 1.6;
+    }
+    .franchise-footer {
+      width: min(92vw, 980px);
+      margin: clamp(60px, 9vw, 100px) auto 0;
+      padding: 34px;
+      border-radius: 30px;
+      background: #11100e;
+      color: rgba(255, 255, 255, .82);
+      box-shadow: 0 28px 60px rgba(0,0,0,.18);
+    }
+    .franchise-footer strong {
+      display: block;
+      color: #f6d98e;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+    .franchise-footer p {
+      margin: 12px 0 0;
+      color: rgba(255, 255, 255, .78);
+      line-height: 1.8;
+    }
+    .franchise-reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity .62s ease, transform .62s ease;
+    }
+    .franchise-reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .franchise-mockup-dialog {
+      width: min(92vw, 420px);
+      max-height: 88dvh;
+      padding: 14px;
+      border: 1px solid rgba(198, 161, 90, .28);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 30px 80px rgba(0,0,0,.28);
+    }
+    .franchise-mockup-dialog::backdrop {
+      background: rgba(5, 5, 5, .58);
+      backdrop-filter: blur(8px);
+    }
+    .franchise-mockup-dialog img {
+      display: block;
+      width: 100%;
+      max-height: 70dvh;
+      object-fit: contain;
+      border-radius: 20px;
+      background: #f7f0e5;
+    }
+    .franchise-mockup-dialog header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--franchise-ink);
+      font-weight: 950;
+    }
+    .franchise-mockup-dialog button {
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(198, 161, 90, .24);
+      border-radius: 50%;
+      background: #fff;
+      color: var(--franchise-ink);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    @media (max-width: 860px) {
+      .franchise-hero-inner,
+      .franchise-grow-showcase,
+      .franchise-grid,
+      .franchise-timeline,
+      .franchise-price-grid,
+      .franchise-stats {
+        grid-template-columns: 1fr;
+      }
+      .franchise-phone {
+        display: none;
+      }
+      .franchise-hero {
+        min-height: min(690px, calc(100svh - 120px));
+        border-radius: 28px;
+        background-position: 64% center;
+      }
+      .franchise-hero-inner {
+        align-items: center;
+        padding: 28px 22px 118px;
+      }
+      .franchise-hero h1 {
+        max-width: 10em;
+        font-size: clamp(34px, 9vw, 46px);
+        line-height: 1.04;
+      }
+      .franchise-hero-lead {
+        margin-top: 12px;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      .franchise-hero-brand {
+        margin-top: 12px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .franchise-cta-row {
+        margin-top: 18px;
+      }
+      .franchise-form-grid {
+        grid-template-columns: 1fr;
+      }
+      .franchise-color-grid {
+        grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+        gap: 9px;
+      }
+      .franchise-color-chip {
+        min-height: 106px;
+        padding: 8px 6px;
+      }
+      .franchise-color-chip img {
+        width: 38px;
+        height: 64px;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .franchise-reveal,
+      .franchise-glass-card,
+      .franchise-screen-card,
+      .franchise-scroll-cue::after {
+        transition: none;
+        animation: none;
+      }
     }
     .network-experience {
       position: relative;
@@ -5363,6 +6148,15 @@
             </span>
           </button>
 
+          <button type="button" class="home-action-panel" onclick="openPublicPage('franchiseRecruit')">
+            <span class="home-action-copy">
+              <h2>加盟店希望の方</h2>
+              <p>GrowエクステとKimikea Connectで、新しいメニュー導入をスマートに始める</p>
+              <span class="home-action-button">加盟店募集を見る</span>
+            </span>
+            <span class="home-franchise-icon" aria-hidden="true">GROW</span>
+          </button>
+
           <button type="button" class="home-action-panel home-line-panel" onclick="openNpoLine()">
             <span class="home-line-icon" aria-hidden="true">LINE</span>
             <span class="home-action-copy">
@@ -6110,6 +6904,16 @@
         imageUrl: homeGalleryImage('ai.jpg'),
         imagePosition: 'center center',
         sortOrder: 70,
+        isVisible: true,
+      },
+      {
+        key: 'franchiseRecruit',
+        label: 'PARTNER',
+        title: '加盟店希望の方',
+        subtitle: 'Growエクステ取扱加盟店募集',
+        imageUrl: homeGalleryImage('stylebook-20260714.jpg'),
+        imagePosition: 'center right',
+        sortOrder: 80,
         isVisible: true,
       },
     ];
@@ -7290,6 +8094,9 @@
       const target = document.getElementById('publicPageActions');
       if (target && page && typeof page.renderActions === 'function') {
         target.innerHTML = page.renderActions();
+        if (currentPublicPageKey === 'franchiseRecruit') {
+          window.requestAnimationFrame(initializeFranchiseLpEffects);
+        }
       }
     }
 
@@ -7333,6 +8140,7 @@
           refreshColorChartContent();
           if (currentPublicPageKey === 'popular') refreshCurrentPublicActions();
           if (currentPublicPageKey === 'ai') refreshCurrentPublicActions();
+          if (currentPublicPageKey === 'franchiseRecruit') refreshCurrentPublicActions();
         });
     }
 
@@ -10380,6 +11188,373 @@
       `;
     }
 
+    const FRANCHISE_COLOR_FALLBACK_CODES = 'DC001,DC002,DC003,DC004,DC005,DC006,DC007,DC008,DC009,DC010,DC011,DC012,DC013,DC014,DC015,DC016,DC017,DC018,DC019,DC020,DC021,DC022,DC023,DC024,DC025,DC026,DC027,DC028,DC029,DC030,LC001,LC002,LC003,LC004,LC005,LC006,LC008,LC009,LC010,LC011,LC012,LC013,LC014,LC015,LC016,LC017,OR001,OR002,OR003,OR004,OR005,OR006,OR007,OR008,OR009,OR010,OR011,OR012,OR013,OR014,OR015,OR016,OR017,OR018,OR019,OR020,OR021,OR022,OR023,OR024,OR025,OR026,OR027,OR028,OR029'.split(',');
+
+    const FRANCHISE_LP_STATS = [
+      { label: '加盟店', value: 5, suffix: '店舗' },
+      { label: '登録スタイル', value: 31, suffix: '作品' },
+      { label: 'AI診断', value: 120, suffix: '回' },
+      { label: '注文実績', value: 80, suffix: '件' },
+    ];
+
+    const FRANCHISE_SCREEN_ITEMS = [
+      { title: 'ホーム', imageUrl: './assets/home-gallery/news-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: '注文', imageUrl: './assets/home-gallery/order-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: 'AI診断', imageUrl: './assets/home-gallery/ai-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: 'スタイル図鑑', imageUrl: './assets/home-gallery/stylebook-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: '人気ランキング', imageUrl: './assets/home-gallery/ranking-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: '加盟店マップ', imageUrl: './assets/home-gallery/map-20260714.jpg?v=20260724-franchise-lp-1' },
+      { title: 'LINE通知', imageUrl: './assets/home-gallery/news.jpg?v=20260724-franchise-lp-1' },
+    ];
+
+    function franchiseColorCategoryFromCode(code) {
+      const normalized = normalizeColorCode(code);
+      if (normalized.startsWith('DC')) return 'ダークカラー';
+      if (normalized.startsWith('LC')) return 'ライトカラー';
+      if (normalized.startsWith('OR')) return '原色';
+      return 'カラー';
+    }
+
+    function getFranchiseLpColorItems() {
+      const products = getActiveColorChartProducts();
+      if (products.length >= 40) {
+        return products.map((product) => ({
+          code: product.code,
+          colorName: colorDisplayName(product),
+          category: product.category,
+          sortOrder: product.sortOrder || 0,
+        }));
+      }
+      return FRANCHISE_COLOR_FALLBACK_CODES.map((code, index) => ({
+        code,
+        colorName: '',
+        category: franchiseColorCategoryFromCode(code),
+        sortOrder: index + 1,
+      }));
+    }
+
+    function renderFranchiseColorChart() {
+      const colors = getFranchiseLpColorItems();
+      return `
+        <div class="franchise-color-chart franchise-reveal">
+          <div class="franchise-color-grid" aria-label="Growエクステカラーチャート">
+            ${colors.map((color) => {
+              const label = color.colorName || color.category.replace('カラー', '');
+              const src = colorImageUrlFromCode(color.code, 'jpg');
+              const fallbackSrc = colorImageUrlFromCode(color.code, 'png');
+              return `
+                <div class="franchise-color-chip">
+                  <img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='true';this.src=this.dataset.fallbackSrc;}else{this.hidden=true;}">
+                  <span>${escapeHtml(label)}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function franchiseLpSectionHead(kicker, title, lead = '') {
+      return `
+        <div class="franchise-section-head franchise-reveal">
+          <span class="franchise-section-kicker">${escapeHtml(kicker)}</span>
+          <h2>${title}</h2>
+          ${lead ? `<p>${lead}</p>` : ''}
+        </div>
+      `;
+    }
+
+    function renderFranchiseRecruitPage() {
+      window.setTimeout(loadPublicProductsForColorChart, 0);
+      const features = [
+        ['ORDER', '注文システム', 'スマホからカラーと数量を選んで、注文内容をそのまま管理できます。'],
+        ['COLOR', '75色以上カラーチャート', '毛束画像を使ったカラー確認で、お客様への提案がスムーズに。'],
+        ['STYLE', 'スタイル図鑑', '加盟店の作品を掲載し、サロンの世界観を発信できます。'],
+        ['AI', 'AI診断', '似合う色や装着イメージを、初めてのお客様にもわかりやすく案内。'],
+        ['RANK', '人気ランキング', '購入と投稿の実データから、注目カラーを可視化します。'],
+        ['MAP', '加盟店マップ', '近くの加盟店として検索導線に掲載できます。'],
+        ['LINE', 'LINE通知', '注文や案内の導線をLINE公式アカウントと連携できます。'],
+      ];
+      const benefits = [
+        ['売上アップ', ['単価アップ', 'リピート率アップ', '新規メニュー導入']],
+        ['業務効率化', ['スマホ注文', '注文履歴', 'LINE通知', 'カラー検索']],
+        ['集客サポート', ['加盟店マップ掲載', '人気ランキング掲載', 'スタイル図鑑掲載']],
+      ];
+      const flow = [
+        ['加盟申し込み', 'フォームから導入希望時期やサロン情報をお知らせください。'],
+        ['初期導入セット購入', '55,000円コースまたは88,000円コースから導入規模に合わせて選べます。'],
+        ['ID・パスワード発行', 'Kimikea Connectのログイン情報を発行し、注文と管理を開始できます。'],
+        ['利用開始', 'カラー提案、注文、スタイル投稿、集客導線を一つずつ運用へ乗せていきます。'],
+      ];
+      const faqs = [
+        ['初心者でも導入できますか？', 'はい。色選び、注文、スタイル提案までKimikea Connect上で確認できるため、初めてのサロン様でも導入しやすい設計です。'],
+        ['注文方法は？', '加盟店専用IDでログインし、カラー画像付きの商品一覧から数量を選んでスマホで注文できます。'],
+        ['送料はいくらですか？', '5袋以上のご注文で送料無料です。5袋未満の場合は所定の送料がかかります。'],
+        ['ログインIDはいつ発行されますか？', '加盟申し込みと初期導入セットの確認後、Kimikea ConnectのログインIDとパスワードを発行します。'],
+      ];
+
+      return `
+        <article class="franchise-lp">
+          <section class="franchise-hero">
+            <div class="franchise-hero-inner">
+              <div>
+                <p class="franchise-kicker">KIMIKEA CONNECT PARTNER</p>
+                <h1>エクステ導入を、<br>もっと簡単に。</h1>
+                <p class="franchise-hero-lead">注文・管理・AI診断まで。<br>すべてをひとつに。</p>
+                <p class="franchise-hero-brand">Kimikea Connect<br>Growエクステ取扱加盟店募集</p>
+                <div class="franchise-cta-row">
+                  <button type="button" class="franchise-cta" onclick="scrollToFranchiseForm()">加盟店に申し込む</button>
+                </div>
+              </div>
+              <div class="franchise-phone" aria-hidden="true">
+                <div class="franchise-phone-screen">
+                  <div class="franchise-phone-top"><span>Kimikea Connect</span><span>Grow</span></div>
+                  <div class="franchise-phone-title">
+                    <strong>Salon work,<br>connected.</strong>
+                    <span>注文、カラー、AI診断、LINE導線を1つの画面へ。</span>
+                  </div>
+                  <div class="franchise-phone-card-grid">
+                    <div class="franchise-phone-card"><span>ORDER</span><strong>スマホ注文</strong></div>
+                    <div class="franchise-phone-card"><span>COLOR</span><strong>75色以上</strong></div>
+                    <div class="franchise-phone-card"><span>AI</span><strong>似合わせ診断</strong></div>
+                    <div class="franchise-phone-card"><span>MAP</span><strong>加盟店掲載</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="franchise-scroll-cue">SCROLL</span>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('ABOUT', 'Kimikea Connectとは', 'Growエクステを導入するサロンの注文、提案、集客導線をまとめる加盟店向けシステムです。')}
+            <div class="franchise-grid">
+              ${features.map(([icon, title, text]) => `
+                <div class="franchise-glass-card franchise-feature-card franchise-reveal">
+                  <span class="franchise-feature-icon">${escapeHtml(icon)}</span>
+                  <h3>${escapeHtml(title)}</h3>
+                  <p>${escapeHtml(text)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('MERIT', '加盟するメリット', 'メニュー導入後の売上、運用、発信まで一連の流れをサポートします。')}
+            <div class="franchise-grid">
+              ${benefits.map(([title, items]) => `
+                <div class="franchise-glass-card franchise-benefit-card franchise-reveal">
+                  <h3>${escapeHtml(title)}</h3>
+                  <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('FLOW', '導入までの流れ', '申し込みから利用開始まで、サロンワークを止めずに進められる流れです。')}
+            <div class="franchise-timeline">
+              ${flow.map(([title, text], index) => `
+                <div class="franchise-glass-card franchise-flow-card franchise-reveal">
+                  <span class="franchise-flow-number">${index + 1}</span>
+                  <h3>${escapeHtml(title)}</h3>
+                  <p>${escapeHtml(text)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('GROW EXTENSION', 'Growエクステ紹介', '高品質で自然になじむ毛質と、豊富なカラー展開。提案の幅を広げる取扱ブランドです。')}
+            <div class="franchise-grow-showcase">
+              <div class="franchise-glass-card franchise-grow-logo-card franchise-reveal">
+                <img src="./rogo.png?v=20260724-franchise-lp-1" alt="Grow">
+                <div class="franchise-grow-samples" aria-hidden="true">
+                  <img src="${escapeHtml(colorImageUrlFromCode('DC001', 'jpg'))}" alt="">
+                  <img src="${escapeHtml(colorImageUrlFromCode('LC010', 'png'))}" alt="">
+                  <img src="${escapeHtml(colorImageUrlFromCode('OR006', 'jpg'))}" alt="">
+                </div>
+              </div>
+              <div class="franchise-glass-card franchise-grow-card franchise-reveal">
+                <h3>サロン提案に必要な品質と色幅を。</h3>
+                <ul>
+                  <li>高品質</li>
+                  <li>自然な仕上がり</li>
+                  <li>豊富なカラー展開</li>
+                </ul>
+                <p>地毛になじませる自然な提案から、デザインカラーまで対応できるラインナップです。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('PRICE & COLOR', '加盟店価格', '加盟店向け価格は下記で固定しています。')}
+            <div class="franchise-price-grid">
+              <div class="franchise-glass-card franchise-price-card franchise-reveal"><span>ダークカラー</span><strong>3,300円</strong><small>税込</small></div>
+              <div class="franchise-glass-card franchise-price-card franchise-reveal"><span>ライトカラー</span><strong>3,828円</strong><small>税込</small></div>
+              <div class="franchise-glass-card franchise-price-card franchise-reveal"><span>原色カラー</span><strong>3,828円</strong><small>税込</small></div>
+            </div>
+            ${renderFranchiseColorChart()}
+            <ul class="franchise-note-list franchise-color-chart franchise-reveal">
+              <li>5袋以上のご注文で送料無料</li>
+              <li>掲載価格は加盟店価格です。</li>
+              <li>TEAM hair・エクステランド富士店はNPO法人シールエクステ協会きみけあ運営店舗のため専用価格で運用しています。</li>
+            </ul>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('APP EXPERIENCE', 'Kimikea Connect画面紹介', '加盟後に使う主要画面を、横にスワイプして確認できます。')}
+            <div class="franchise-screen-rail franchise-reveal">
+              ${FRANCHISE_SCREEN_ITEMS.map((screen) => {
+                const action = `openFranchiseMockup(${JSON.stringify(screen.title)}, ${JSON.stringify(screen.imageUrl)})`;
+                return `
+                  <button type="button" class="franchise-screen-card" onclick="${escapeHtml(action)}">
+                    <img src="${escapeHtml(screen.imageUrl)}" alt="${escapeHtml(screen.title)}" loading="lazy">
+                    <strong>${escapeHtml(screen.title)}</strong>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('RESULTS', '導入実績', '数字は今後の実績に合わせて変更できます。')}
+            <div class="franchise-stats">
+              ${FRANCHISE_LP_STATS.map((stat) => `
+                <div class="franchise-glass-card franchise-stat-card franchise-reveal">
+                  <strong class="franchise-stat-value" data-target="${escapeHtml(String(stat.value))}" data-suffix="${escapeHtml(stat.suffix)}">0${escapeHtml(stat.suffix)}</strong>
+                  <span>${escapeHtml(stat.label)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <section class="franchise-section">
+            ${franchiseLpSectionHead('FAQ', 'よくある質問')}
+            <div class="franchise-faq">
+              ${faqs.map(([question, answer]) => `
+                <details class="franchise-reveal">
+                  <summary>${escapeHtml(question)}</summary>
+                  <p>${escapeHtml(answer)}</p>
+                </details>
+              `).join('')}
+            </div>
+          </section>
+
+          <section id="franchiseApplyForm" class="franchise-section">
+            ${franchiseLpSectionHead('ENTRY', '加盟申し込みフォーム', '導入をご希望のサロン様は、下記よりご連絡ください。')}
+            <form class="franchise-glass-card franchise-form-card franchise-reveal" onsubmit="handleFranchiseLeadSubmit(event)">
+              <div class="franchise-form-grid">
+                <label>お名前<input name="name" autocomplete="name" required></label>
+                <label>サロン名<input name="salonName" autocomplete="organization" required></label>
+                <label>電話番号<input name="phone" inputmode="tel" autocomplete="tel" required></label>
+                <label>メールアドレス<input name="email" type="email" autocomplete="email" required></label>
+                <label>都道府県<input name="prefecture" autocomplete="address-level1" required></label>
+                <label>エクステ導入経験<select name="experience" required><option value="">選択してください</option><option>未経験</option><option>導入経験あり</option><option>現在導入中</option></select></label>
+                <label class="franchise-form-full">導入希望時期<select name="timing" required><option value="">選択してください</option><option>すぐに導入したい</option><option>1か月以内</option><option>3か月以内</option><option>時期は相談したい</option></select></label>
+                <label class="franchise-form-full">ご質問<textarea name="question" placeholder="導入前に確認したいことがあればご記入ください"></textarea></label>
+              </div>
+              <button type="submit" class="franchise-cta" style="margin-top:18px;">加盟店に申し込む</button>
+              <p id="franchiseFormMessage" class="franchise-form-message" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <footer class="franchise-footer franchise-reveal">
+            <strong>Kimikea Connect</strong>
+            <p>シールエクステをもっと身近に。<br>Growエクステ取扱加盟店募集</p>
+            <p><b>運営団体</b><br>NPO法人 シールエクステ協会きみけあ<br>シールエクステの技術普及と、美容業界の発展を目的に活動しています。</p>
+          </footer>
+
+          <dialog id="franchiseMockupDialog" class="franchise-mockup-dialog">
+            <header>
+              <span id="franchiseMockupTitle">画面紹介</span>
+              <button type="button" onclick="closeFranchiseMockup()" aria-label="閉じる">×</button>
+            </header>
+            <img id="franchiseMockupImage" src="" alt="">
+          </dialog>
+        </article>
+      `;
+    }
+
+    function scrollToFranchiseForm() {
+      document.getElementById('franchiseApplyForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function openFranchiseMockup(title, imageUrl) {
+      const dialog = document.getElementById('franchiseMockupDialog');
+      const image = document.getElementById('franchiseMockupImage');
+      const titleTarget = document.getElementById('franchiseMockupTitle');
+      if (!dialog || !image || !titleTarget) return;
+      titleTarget.textContent = title || '画面紹介';
+      image.src = imageUrl || '';
+      image.alt = title || 'Kimikea Connect画面';
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+    }
+
+    function closeFranchiseMockup() {
+      const dialog = document.getElementById('franchiseMockupDialog');
+      if (dialog?.open) dialog.close();
+    }
+
+    function handleFranchiseLeadSubmit(event) {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector('button[type="submit"]');
+      const message = document.getElementById('franchiseFormMessage');
+      if (button) {
+        button.disabled = true;
+        button.textContent = '送信内容を確認しました';
+      }
+      if (message) {
+        message.textContent = 'お申し込み内容を受け付けました。正式な送信先連携は次の段階で設定できます。お急ぎの場合は公式LINEからお問い合わせください。';
+      }
+    }
+
+    function initializeFranchiseLpEffects() {
+      const root = document.querySelector('.franchise-lp');
+      if (!root) return;
+      const revealItems = Array.from(root.querySelectorAll('.franchise-reveal'));
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          });
+        }, { threshold: .16 });
+        revealItems.forEach((item) => observer.observe(item));
+      } else {
+        revealItems.forEach((item) => item.classList.add('is-visible'));
+      }
+
+      const statItems = Array.from(root.querySelectorAll('.franchise-stat-value'));
+      const animateStat = (item) => {
+        if (item.dataset.counted === 'true') return;
+        item.dataset.counted = 'true';
+        const target = Number(item.dataset.target || 0);
+        const suffix = item.dataset.suffix || '';
+        const startTime = performance.now();
+        const duration = 1100;
+        const step = (now) => {
+          const progress = Math.min(1, (now - startTime) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          item.textContent = `${Math.round(target * eased).toLocaleString('ja-JP')}${suffix}`;
+          if (progress < 1) window.requestAnimationFrame(step);
+        };
+        window.requestAnimationFrame(step);
+      };
+      if ('IntersectionObserver' in window) {
+        const statObserver = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            animateStat(entry.target);
+            statObserver.unobserve(entry.target);
+          });
+        }, { threshold: .4 });
+        statItems.forEach((item) => statObserver.observe(item));
+      } else {
+        statItems.forEach(animateStat);
+      }
+    }
+
     const publicPages = {
       colorChart: {
         title: 'カラーチャート',
@@ -10404,6 +11579,12 @@
         lead: '質問診断と写真シミュレーターから、似合うエクステの方向性を探せます。',
         items: [],
         renderActions: renderStyleDiagnosisPage
+      },
+      franchiseRecruit: {
+        title: '加盟店希望の方',
+        lead: 'Growエクステ取扱加盟店募集ページです。',
+        items: [],
+        renderActions: renderFranchiseRecruitPage
       },
       notice: {
         title: 'お知らせ',
@@ -10434,6 +11615,7 @@
       publicPageView.hidden = false;
       publicPageView.classList.toggle('is-academy-page', pageKey === 'coordinator');
       publicPageView.classList.toggle('is-network-page', pageKey === 'map');
+      publicPageView.classList.toggle('is-franchise-page', pageKey === 'franchiseRecruit');
       document.getElementById('publicPageTitle').textContent = page.title;
       document.getElementById('publicPageLead').textContent = page.lead;
       document.getElementById('publicPageList').innerHTML = (page.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
@@ -10446,6 +11628,9 @@
           initializeNetworkMap();
           queueKimikeaMapStyleLoads(visibleKimikeaMapEntries());
         });
+      }
+      if (pageKey === 'franchiseRecruit') {
+        window.requestAnimationFrame(initializeFranchiseLpEffects);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       notifyKimikeaNavigationState();
@@ -11305,6 +12490,10 @@
       }
       if (view === 'stylebook') {
         openStylebook();
+        return;
+      }
+      if (view === 'franchise' || view === 'franchise-recruit') {
+        openPublicPage('franchiseRecruit');
         return;
       }
       if (view && publicPages[view]) openPublicPage(view);
