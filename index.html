@@ -1725,15 +1725,40 @@
       align-content: center;
       justify-items: center;
       min-height: 210px;
+      gap: 18px;
       background:
         linear-gradient(145deg, rgba(17, 14, 12, .95), rgba(49, 39, 23, .86)),
         radial-gradient(circle at 50% 18%, rgba(246, 217, 142, .24), transparent 42%);
     }
+    .franchise-grow-logo-label {
+      margin: 0;
+      color: rgba(255, 249, 231, .82);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .franchise-grow-logo-frame {
+      width: min(86vw, 500px);
+      padding: clamp(18px, 4vw, 28px);
+      border-radius: 28px;
+      border: 1px solid rgba(218, 177, 89, .32);
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, .94), rgba(255, 250, 236, .84)),
+        radial-gradient(circle at 24% 16%, rgba(244, 204, 122, .24), transparent 44%);
+      box-shadow:
+        0 22px 46px rgba(0, 0, 0, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .9);
+    }
     .franchise-grow-logo-card img {
-      width: min(50vw, 210px);
-      max-height: 120px;
+      display: block;
+      width: 100%;
+      max-width: 460px;
+      height: auto;
+      max-height: 150px;
       object-fit: contain;
-      filter: drop-shadow(0 18px 24px rgba(0,0,0,.24));
+      margin: 0 auto;
+      filter: drop-shadow(0 14px 18px rgba(43, 30, 13, .14));
     }
     .franchise-grow-samples {
       display: flex;
@@ -11727,7 +11752,10 @@
           ${franchiseLpSectionHead('MAKER', '取扱メーカー', 'Growエクステを、Kimikea Connect加盟店向けにご案内しています。')}
           <div class="franchise-grow-showcase">
             <div class="franchise-glass-card franchise-grow-logo-card franchise-reveal">
-              <img src="./rogo.png?v=20260724-franchise-lp-1" alt="Grow">
+              <p class="franchise-grow-logo-label">Grow Extension</p>
+              <div class="franchise-grow-logo-frame">
+                <img src="./images/brands/grow-logo.png?v=20260725-grow-logo-1" alt="Grow Extension" loading="lazy" decoding="async">
+              </div>
               <div class="franchise-grow-samples" aria-hidden="true">
                 <img src="${escapeHtml(colorImageUrlFromCode('DC001', 'jpg'))}" alt="">
                 <img src="${escapeHtml(colorImageUrlFromCode('LC010', 'png'))}" alt="">
