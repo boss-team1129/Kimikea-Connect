@@ -6597,6 +6597,8 @@
       cart: [],
       orderUnlocked: false,
       pendingOpenOrder: false,
+      pendingAuthRoute: null,
+      pendingPostLoginRoute: null,
       orderSettings: { shippingFee: 1000, freeShippingBags: 5 },
       colorChartFilter: 'すべて',
       colorChartSearch: '',
@@ -6740,7 +6742,9 @@
       setBusy('loginButton', false);
     }
 
-    function showOrderLogin() {
+    function showOrderLogin(returnRoute = null) {
+      if (returnRoute) state.pendingAuthRoute = returnRoute;
+      if (!state.pendingAuthRoute) state.pendingAuthRoute = getCurrentKimikeaRoute();
       rememberKimikeaRoute('login');
       document.getElementById('portalView').hidden = true;
       document.getElementById('passwordSetupView').hidden = true;
@@ -6802,6 +6806,7 @@
       state.cart = [];
       state.orderUnlocked = false;
       state.pendingOpenOrder = false;
+      state.pendingPostLoginRoute = null;
       state.myPageActiveTab = 'profile';
       state.myPageLoading = false;
       state.myPageStylebook = {
@@ -6814,11 +6819,21 @@
       };
     }
 
-    function handleSessionError(error) {
+    function handleSessionError(error, options = {}) {
       const message = getErrorMessage(error);
+      const route = options.route || getCurrentKimikeaRoute();
       clearSession();
-      showOrderLogin();
-      setLoginActionMessage(message || 'ログインの有効期限が切れました。再度ログインしてください。', true);
+      if (options.forceLogin || isLoginRequiredKimikeaRoute(route)) {
+        showOrderLogin(route);
+        setLoginActionMessage(message || 'ログインの有効期限が切れました。再度ログインしてください。', true);
+        return;
+      }
+      updateAuthDisplay();
+      if (!initialRouteApplied) {
+        showDashboard();
+      } else {
+        notifyKimikeaNavigationState();
+      }
     }
 
     function getErrorMessage(error) {
@@ -6977,9 +6992,13 @@
           state.franchise = response.franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.orderUnlocked = true;
-          state.pendingOpenOrder = true;
+          const returnRoute = isLoginRequiredKimikeaRoute(state.pendingAuthRoute)
+            ? state.pendingAuthRoute
+            : { name: 'order' };
+          state.pendingAuthRoute = null;
+          state.pendingOpenOrder = returnRoute.name === 'order';
+          state.pendingPostLoginRoute = returnRoute.name === 'order' ? null : returnRoute;
           showDashboard();
-          openOrderPage();
           loadPortalData();
         })
         .catch((error) => {
@@ -7029,9 +7048,13 @@
           document.getElementById('newPassword').value = '';
           document.getElementById('confirmPassword').value = '';
           state.orderUnlocked = true;
-          state.pendingOpenOrder = true;
+          const returnRoute = isLoginRequiredKimikeaRoute(state.pendingAuthRoute)
+            ? state.pendingAuthRoute
+            : { name: 'order' };
+          state.pendingAuthRoute = null;
+          state.pendingOpenOrder = returnRoute.name === 'order';
+          state.pendingPostLoginRoute = returnRoute.name === 'order' ? null : returnRoute;
           showDashboard();
-          openOrderPage();
           loadPortalData();
         })
         .catch((error) => {
@@ -7076,9 +7099,15 @@
           if (state.pendingOpenOrder) {
             state.pendingOpenOrder = false;
             openOrderPage();
-          } else {
-            showHomePage();
+          } else if (state.pendingPostLoginRoute) {
+            const route = state.pendingPostLoginRoute;
+            state.pendingPostLoginRoute = null;
+            restoreKimikeaRoute(route);
+          } else if (!initialRouteApplied) {
+            showHomePage({ updateUrl: false });
             applyInitialRoute();
+          } else {
+            notifyKimikeaNavigationState();
           }
         })
         .catch((error) => {
@@ -7088,7 +7117,7 @@
             return;
           }
           if (isSessionExpiredError(error)) {
-            handleSessionError(error);
+            handleSessionError(error, { route: routeFromKimikeaUrl() });
             return;
           }
           showDashboard();
@@ -7103,7 +7132,7 @@
       setMessage('loginMessage', '', false);
       renderProfile();
       updateAuthDisplay();
-      showHomePage();
+      showHomePage({ updateUrl: false });
       applyInitialRoute();
     }
 
@@ -7571,6 +7600,78 @@
     const kimikeaAppHistory = [];
     let isRestoringKimikeaRoute = false;
     let currentPublicPageKey = '';
+    let isApplyingBrowserRoute = false;
+
+    const PUBLIC_PAGE_VIEW_ALIASES = {
+      academy: 'coordinator',
+      'ai-diagnosis': 'ai',
+      'color-chart': 'colorChart',
+      franchise: 'franchiseRecruit',
+      'franchise-recruit': 'franchiseRecruit',
+      stylebook: 'stylebook',
+    };
+
+    const PUBLIC_PAGE_KEY_TO_VIEW = {
+      coordinator: 'academy',
+      ai: 'ai-diagnosis',
+      colorChart: 'color-chart',
+      franchiseRecruit: 'franchise-recruit',
+      map: 'map',
+      notice: 'notice',
+      popular: 'popular',
+      search: 'search',
+      mypage: 'mypage',
+    };
+
+    function normalizeKimikeaView(value) {
+      return String(value || '').trim();
+    }
+
+    function routeFromKimikeaUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const view = normalizeKimikeaView(params.get('view'));
+      const page = normalizeKimikeaView(params.get('page'));
+      if (page === 'color-chart') return { name: 'public', key: 'colorChart' };
+      if (view === 'order') return { name: 'order' };
+      if (view === 'mypage') return { name: 'public', key: 'mypage', tab: params.get('tab') || 'profile' };
+      if (view === 'stylebook') return { name: 'stylebook' };
+      if (PUBLIC_PAGE_VIEW_ALIASES[view]) return { name: 'public', key: PUBLIC_PAGE_VIEW_ALIASES[view] };
+      if (view && publicPages[view]) return { name: 'public', key: view };
+      return { name: 'home' };
+    }
+
+    function isLoginRequiredKimikeaRoute(route) {
+      return route?.name === 'order' || (route?.name === 'public' && route?.key === 'mypage');
+    }
+
+    function setKimikeaUrlForRoute(route, options = {}) {
+      if (isApplyingBrowserRoute || !window.history?.pushState) return;
+      const normalizedRoute = route || { name: 'home' };
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      url.searchParams.delete('page');
+      url.searchParams.delete('tab');
+      if (normalizedRoute.name === 'order') {
+        url.searchParams.set('view', 'order');
+      } else if (normalizedRoute.name === 'public') {
+        const view = PUBLIC_PAGE_KEY_TO_VIEW[normalizedRoute.key] || normalizedRoute.key || '';
+        if (view) url.searchParams.set('view', view);
+        if (normalizedRoute.key === 'mypage' && normalizedRoute.tab) url.searchParams.set('tab', normalizedRoute.tab);
+      }
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+      if (nextUrl === `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+        return;
+      }
+      const method = options.replace ? 'replaceState' : 'pushState';
+      window.history[method]({ kimikeaRoute: normalizedRoute }, '', nextUrl);
+    }
+
+    function requireKimikeaLogin(route, message) {
+      state.pendingAuthRoute = route;
+      showOrderLogin(route);
+      setLoginActionMessage(message, false);
+      return false;
+    }
 
     function getCurrentKimikeaRoute() {
       const loginView = document.getElementById('loginView');
@@ -7634,7 +7735,7 @@
       isRestoringKimikeaRoute = true;
       try {
         if (!route || route.name === 'home') {
-          showHomePage();
+          showHomePage({ replaceUrl: true });
           return;
         }
         if (route.name === 'login') {
@@ -7642,30 +7743,35 @@
           return;
         }
         if (route.name === 'order') {
-          openOrderPage();
+          openOrderPage({ replaceUrl: true });
+          return;
+        }
+        if (route.name === 'stylebook') {
+          openStylebook();
           return;
         }
         if (route.name === 'public') {
           if (route.key === 'search') {
-            openSearchPage();
+            openSearchPage({ replaceUrl: true });
             return;
           }
           if (route.key === 'mypage') {
-            openMyPage();
+            openMyPage(route.tab || 'profile', { replaceUrl: true });
             return;
           }
-          openPublicPage(route.key || 'notice');
+          openPublicPage(route.key || 'notice', { replaceUrl: true });
           return;
         }
-        showHomePage();
+        showHomePage({ replaceUrl: true });
       } finally {
         isRestoringKimikeaRoute = false;
       }
     }
 
-    function showHomePage() {
+    function showHomePage(options = {}) {
       if (blockExtensionSimulatorNavigation()) return;
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
+      currentPublicPageKey = '';
       rememberKimikeaRoute('home');
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
@@ -7674,14 +7780,15 @@
       loadPublicNotices();
       initializeHomeGallery();
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (options.updateUrl !== false) setKimikeaUrlForRoute({ name: 'home' }, { replace: Boolean(options.replaceUrl) });
       notifyKimikeaNavigationState();
     }
 
-    function openOrderPage() {
+    function openOrderPage(options = {}) {
       if (blockExtensionSimulatorNavigation()) return;
       if (!state.orderUnlocked || !isAuthenticatedSessionActive()) {
-        showOrderLogin();
-        setLoginActionMessage('注文機能を利用するにはログインしてください。', false);
+        requireKimikeaLogin({ name: 'order' }, '注文機能を利用するにはログインしてください。');
+        setKimikeaUrlForRoute({ name: 'order' }, { replace: Boolean(options.replaceUrl) });
         return;
       }
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
@@ -7695,6 +7802,7 @@
         setMessage('orderMessage', '注文機能はApps Script版で利用できます。ホーム画面とスタイル図鑑はこのまま確認できます。', true);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (options.updateUrl !== false) setKimikeaUrlForRoute({ name: 'order' }, { replace: Boolean(options.replaceUrl) });
       notifyKimikeaNavigationState();
     }
 
@@ -12023,7 +12131,7 @@
       }
     };
 
-    function openPublicPage(pageKey) {
+    function openPublicPage(pageKey, options = {}) {
       if (blockExtensionSimulatorNavigation()) return;
       const previousPublicPageKey = currentPublicPageKey;
       if (previousPublicPageKey === 'ai' && pageKey !== 'ai') {
@@ -12056,6 +12164,9 @@
         window.requestAnimationFrame(initializeFranchiseLpEffects);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (options.updateUrl !== false) {
+        setKimikeaUrlForRoute({ name: 'public', key: pageKey }, { replace: Boolean(options.replaceUrl) });
+      }
       notifyKimikeaNavigationState();
     }
 
@@ -12134,7 +12245,7 @@
       input?.focus({ preventScroll: true });
     }
 
-    function openSearchPage() {
+    function openSearchPage(options = {}) {
       if (blockExtensionSimulatorNavigation()) return;
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('public', 'search');
@@ -12147,6 +12258,9 @@
       document.getElementById('publicPageList').innerHTML = '<li>検索機能：準備中</li><li>今後、投稿レシピや加盟店情報も検索対象に追加します。</li>';
       renderSearchResults('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (options.updateUrl !== false) {
+        setKimikeaUrlForRoute({ name: 'public', key: 'search' }, { replace: Boolean(options.replaceUrl) });
+      }
       notifyKimikeaNavigationState();
     }
 
@@ -12407,7 +12521,7 @@
         .catch((error) => {
           console.warn('MyPage stylebook data error:', getErrorMessage(error));
           if (isSessionExpiredError(error)) {
-            handleSessionError(error);
+            handleSessionError(error, { route: { name: 'public', key: 'mypage', tab: state.myPageActiveTab || 'profile' }, forceLogin: true });
             return state.myPageStylebook;
           }
           state.myPageStylebook = {
@@ -12422,6 +12536,9 @@
 
     function renderMyPageTab(tab = 'profile') {
       state.myPageActiveTab = tab;
+      if (currentPublicPageKey === 'mypage' && tab !== 'logout') {
+        setKimikeaUrlForRoute({ name: 'public', key: 'mypage', tab }, { replace: true });
+      }
       document.querySelectorAll('.mypage-tabbar button').forEach((button) => {
         button.classList.toggle('is-active', button.dataset.tab === tab);
       });
@@ -12578,7 +12695,7 @@
         .catch((error) => {
           state.myPageLoading = false;
           if (isSessionExpiredError(error)) {
-            handleSessionError(error);
+            handleSessionError(error, { route: { name: 'public', key: 'mypage', tab: state.myPageActiveTab || 'profile' }, forceLogin: true });
             return;
           }
           renderMyPageTab(state.myPageActiveTab || 'profile');
@@ -12682,11 +12799,11 @@
         });
     }
 
-    function openMyPage(initialTab = 'profile') {
+    function openMyPage(initialTab = 'profile', options = {}) {
       if (blockExtensionSimulatorNavigation()) return;
       if (!isAuthenticatedSessionActive()) {
-        showOrderLogin();
-        setLoginActionMessage('マイページは加盟店・コーディネーター専用です。ログインしてください。', false);
+        requireKimikeaLogin({ name: 'public', key: 'mypage', tab: initialTab || 'profile' }, 'マイページは加盟店・コーディネーター専用です。ログインしてください。');
+        setKimikeaUrlForRoute({ name: 'public', key: 'mypage', tab: initialTab || 'profile' }, { replace: Boolean(options.replaceUrl) });
         return;
       }
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
@@ -12750,6 +12867,9 @@
       renderMyPageTab(state.myPageActiveTab);
       refreshMyPageData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (options.updateUrl !== false) {
+        setKimikeaUrlForRoute({ name: 'public', key: 'mypage', tab: state.myPageActiveTab }, { replace: Boolean(options.replaceUrl) });
+      }
       notifyKimikeaNavigationState();
     }
 
@@ -12884,42 +13004,27 @@
     function applyInitialRoute() {
       if (initialRouteApplied) return;
       initialRouteApplied = true;
-      const params = new URLSearchParams(window.location.search);
-      const view = params.get('view');
-      const page = params.get('page');
-      if (page === 'color-chart') openPublicPage('colorChart');
-      if (view === 'search') openSearchPage();
-      if (view === 'mypage') {
-        openMyPage(params.get('tab') || 'profile');
-        return;
-      }
-      if (view === 'order') {
-        state.pendingOpenOrder = true;
-        if (isAuthenticatedSessionActive() && !state.orderUnlocked) return;
-        openOrderPage();
-        return;
-      }
-      if (view === 'academy') {
-        openPublicPage('coordinator');
-        return;
-      }
-      if (view === 'ai-diagnosis') {
-        openPublicPage('ai');
-        return;
-      }
-      if (view === 'color-chart') {
-        openPublicPage('colorChart');
-        return;
-      }
-      if (view === 'stylebook') {
+      const route = routeFromKimikeaUrl();
+      if (route.name === 'home') return;
+      if (route.name === 'stylebook') {
         openStylebook();
         return;
       }
-      if (view === 'franchise' || view === 'franchise-recruit') {
-        openPublicPage('franchiseRecruit');
+      if (route.name === 'order') {
+        state.pendingOpenOrder = true;
+        if (isAuthenticatedSessionActive() && !state.orderUnlocked) return;
+        openOrderPage({ replaceUrl: true });
         return;
       }
-      if (view && publicPages[view]) openPublicPage(view);
+      if (route.name === 'public' && route.key === 'mypage') {
+        openMyPage(route.tab || 'profile', { replaceUrl: true });
+        return;
+      }
+      if (route.name === 'public' && route.key === 'search') {
+        openSearchPage({ replaceUrl: true });
+        return;
+      }
+      if (route.name === 'public') openPublicPage(route.key || 'notice', { replaceUrl: true });
     }
 
     window.KimikeaConnectNav = {
@@ -12930,6 +13035,31 @@
       canGoBack: canKimikeaGoBack,
       isLocked: isExtensionSimulatorGenerating,
     };
+
+    window.addEventListener('popstate', () => {
+      if (blockExtensionSimulatorNavigation()) return;
+      isApplyingBrowserRoute = true;
+      try {
+        const route = routeFromKimikeaUrl();
+        if (route.name === 'home') {
+          showHomePage({ updateUrl: false });
+        } else if (route.name === 'order') {
+          openOrderPage({ updateUrl: false });
+        } else if (route.name === 'stylebook') {
+          openStylebook();
+        } else if (route.name === 'public' && route.key === 'search') {
+          openSearchPage({ updateUrl: false });
+        } else if (route.name === 'public' && route.key === 'mypage') {
+          openMyPage(route.tab || 'profile', { updateUrl: false });
+        } else if (route.name === 'public') {
+          openPublicPage(route.key || 'notice', { updateUrl: false });
+        } else {
+          showHomePage({ updateUrl: false });
+        }
+      } finally {
+        isApplyingBrowserRoute = false;
+      }
+    });
 
     function renderProfile() {
       const franchise = state.franchise || {};
