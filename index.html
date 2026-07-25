@@ -2043,6 +2043,14 @@
       color: var(--franchise-gold-deep);
       font-weight: 900;
       line-height: 1.6;
+      white-space: pre-line;
+    }
+    .franchise-form-message.error {
+      color: #b3392f;
+    }
+    .franchise-form-card :is(input, select, textarea).is-invalid {
+      border-color: rgba(179, 57, 47, .72);
+      box-shadow: 0 0 0 3px rgba(179, 57, 47, .1);
     }
     .franchise-footer {
       width: min(92vw, 980px);
@@ -6601,6 +6609,7 @@
       pendingOpenOrder: false,
       pendingAuthRoute: null,
       pendingPostLoginRoute: null,
+      franchiseLeadSubmitting: false,
       orderSettings: { shippingFee: 1000, freeShippingBags: 5 },
       colorChartFilter: 'すべて',
       colorChartSearch: '',
@@ -11945,15 +11954,15 @@
 
           <section id="franchiseApplyForm" class="franchise-section">
             ${franchiseLpSectionHead('ENTRY', '加盟申し込みフォーム', '導入をご希望のサロン様は、下記よりご連絡ください。')}
-            <form class="franchise-glass-card franchise-form-card franchise-reveal" onsubmit="handleFranchiseLeadSubmit(event)">
+            <form class="franchise-glass-card franchise-form-card franchise-reveal" onsubmit="handleFranchiseLeadSubmit(event)" novalidate>
               <div class="franchise-form-grid">
                 <label>お名前<input name="name" autocomplete="name" required></label>
                 <label>サロン名<input name="salonName" autocomplete="organization" required></label>
                 <label>電話番号<input name="phone" inputmode="tel" autocomplete="tel" required></label>
                 <label>メールアドレス<input name="email" type="email" autocomplete="email" required></label>
                 <label>都道府県<input name="prefecture" autocomplete="address-level1" required></label>
-                <label>エクステ導入経験<select name="experience" required><option value="">選択してください</option><option>未経験</option><option>導入経験あり</option><option>現在導入中</option></select></label>
-                <label class="franchise-form-full">導入希望時期<select name="timing" required><option value="">選択してください</option><option>すぐに導入したい</option><option>1か月以内</option><option>3か月以内</option><option>時期は相談したい</option></select></label>
+                <label>エクステ導入経験<select name="experience"><option value="">選択してください</option><option>未経験</option><option>導入経験あり</option><option>現在導入中</option></select></label>
+                <label class="franchise-form-full">導入希望時期<select name="timing"><option value="">選択してください</option><option>すぐに導入したい</option><option>1か月以内</option><option>3か月以内</option><option>時期は相談したい</option></select></label>
                 <label class="franchise-form-full">ご質問<textarea name="question" placeholder="導入前に確認したいことがあればご記入ください"></textarea></label>
               </div>
               <button type="submit" class="franchise-cta" style="margin-top:18px;">加盟店に申し込む</button>
@@ -12002,15 +12011,87 @@
 
     function handleFranchiseLeadSubmit(event) {
       event.preventDefault();
-      const button = event.currentTarget.querySelector('button[type="submit"]');
+      const form = event.currentTarget;
+      if (state.franchiseLeadSubmitting) return;
+      const button = form.querySelector('button[type="submit"]');
       const message = document.getElementById('franchiseFormMessage');
+      const originalButtonText = button?.textContent || '加盟店に申し込む';
+      const payload = collectFranchiseLeadForm_(form);
+      const validationErrors = validateFranchiseLeadForm_(form, payload);
+      setFranchiseFormMessage_(message, validationErrors.join('\n'), validationErrors.length > 0);
+      if (validationErrors.length > 0) return;
+
+      state.franchiseLeadSubmitting = true;
       if (button) {
         button.disabled = true;
-        button.textContent = '送信内容を確認しました';
+        button.textContent = '送信中…';
       }
-      if (message) {
-        message.textContent = 'お申し込み内容を受け付けました。正式な送信先連携は次の段階で設定できます。お急ぎの場合は公式LINEからお問い合わせください。';
+      setFranchiseFormMessage_(message, '送信しています…', false);
+
+      callServer('submitFranchiseLead', payload)
+        .then(() => {
+          form.reset();
+          setFranchiseFormMessage_(message, 'お申し込みありがとうございます。\n内容を確認後、担当者よりご連絡いたします。', false);
+        })
+        .catch((error) => {
+          console.warn('Franchise lead submit failed:', getErrorMessage(error));
+          setFranchiseFormMessage_(message, '送信に失敗しました。\n時間を置いて、もう一度お試しください。', true);
+        })
+        .finally(() => {
+          state.franchiseLeadSubmitting = false;
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalButtonText;
+          }
+        });
+    }
+
+    function collectFranchiseLeadForm_(form) {
+      const formData = new FormData(form);
+      const text = (name) => String(formData.get(name) || '').normalize('NFKC').trim();
+      return {
+        name: text('name'),
+        salonName: text('salonName'),
+        phone: text('phone').replace(/[−–—―ー]/g, '-'),
+        email: text('email').toLowerCase(),
+        prefecture: text('prefecture'),
+        experience: text('experience'),
+        timing: text('timing'),
+        question: text('question'),
+      };
+    }
+
+    function validateFranchiseLeadForm_(form, payload) {
+      const requiredFields = [
+        ['name', 'お名前'],
+        ['salonName', 'サロン名'],
+        ['phone', '電話番号'],
+        ['email', 'メールアドレス'],
+        ['prefecture', '都道府県'],
+      ];
+      form.querySelectorAll('.is-invalid').forEach((field) => field.classList.remove('is-invalid'));
+      const errors = [];
+      requiredFields.forEach(([fieldName, label]) => {
+        if (payload[fieldName]) return;
+        errors.push(`${label}を入力してください。`);
+        form.elements[fieldName]?.classList.add('is-invalid');
+      });
+      if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        errors.push('メールアドレスの形式を確認してください。');
+        form.elements.email?.classList.add('is-invalid');
       }
+      const phoneForCheck = String(payload.phone || '').replace(/[\s()-]/g, '');
+      if (payload.phone && !/^\+?\d{9,13}$/.test(phoneForCheck)) {
+        errors.push('電話番号の形式を確認してください。');
+        form.elements.phone?.classList.add('is-invalid');
+      }
+      return errors;
+    }
+
+    function setFranchiseFormMessage_(element, text, isError) {
+      if (!element) return;
+      element.textContent = text || '';
+      element.classList.toggle('error', Boolean(isError));
     }
 
     function initializeFranchiseLpEffects() {

@@ -23,6 +23,7 @@ const KCO_CONFIG = {
   STYLEBOOK_SAVES: 'style_saves',
   NOTICES: 'お知らせ',
   MAP_ENTRIES: '加盟店マップ',
+  FRANCHISE_LEADS: '加盟店申し込み',
   SETTINGS: '設定',
   ORDER_PREFIX: 'KCO',
   SHIPPING_FREE_BAGS: 5,
@@ -239,6 +240,21 @@ const KCO_MAP_HEADERS = [
   'updatedAt',
 ];
 
+const KCO_FRANCHISE_LEAD_NOTIFY_EMAIL = 'takeshinomise@yahoo.co.jp';
+const KCO_FRANCHISE_LEAD_HEADERS = [
+  '受付ID',
+  '送信日時',
+  'お名前',
+  'サロン名',
+  '電話番号',
+  'メールアドレス',
+  '都道府県',
+  'エクステ導入経験',
+  '導入希望時期',
+  'ご質問',
+  '対応状況',
+];
+
 const KCO_MAP_TYPES = ['加盟店', 'コーディネーター'];
 const KCO_MAP_STATUS_OPTIONS = ['下書き', '公開', '非公開'];
 const KCO_FRANCHISE_HEADER_ALIASES = {
@@ -356,6 +372,7 @@ function handleJsonpApi_(event) {
     getPublicColorRankings,
     getPublicNotices,
     getPublicMapEntries,
+    submitFranchiseLead,
     getExtensionSimulatorQuota,
     getPortalData,
     getMyPageStylebookData,
@@ -489,6 +506,7 @@ function setupMasterColumns() {
     runSetupStep_('order details', () => setupOrderDetails_(ss));
     runSetupStep_('notices', () => setupNotices_(ss));
     runSetupStep_('map entries', () => setupMapEntries_(ss));
+    runSetupStep_('franchise leads', () => setupFranchiseLeads_(ss));
     runSetupStep_('settings', () => setupSettings_(ss));
 
     summary.durationMs = Date.now() - startedAt;
@@ -1296,6 +1314,134 @@ function getPublicNotices() {
     latest: notices[0] || null,
     categories: KCO_NOTICE_CATEGORIES,
   };
+}
+
+function submitFranchiseLead(input) {
+  const lead = normalizeFranchiseLeadPayload_(input || {});
+  validateFranchiseLead_(lead);
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    throw new Error('ただいま送信が混み合っています。少し時間をおいてもう一度お試しください。');
+  }
+
+  try {
+    const now = new Date();
+    const leadId = createFranchiseLeadId_(now);
+    const sentAt = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+    const ss = getKcoSpreadsheet_();
+    setupFranchiseLeads_(ss);
+    const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_LEADS);
+    const headers = getHeaderValues_(sheet);
+    const rowValues = buildFranchiseLeadRow_(headers, {
+      ...lead,
+      leadId,
+      sentAt,
+      status: '未対応',
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, rowValues.length).setValues([rowValues]);
+
+    const subject = '【Kimikea Connect】加盟店申し込みがありました';
+    const body = buildFranchiseLeadEmailBody_(lead, sentAt);
+    MailApp.sendEmail({
+      to: KCO_FRANCHISE_LEAD_NOTIFY_EMAIL,
+      subject,
+      body,
+      name: 'Kimikea Connect',
+      replyTo: lead.email,
+    });
+
+    logOrderDebug_('franchise lead submitted', {
+      leadId,
+      salonName: lead.salonName,
+      email: lead.email,
+      sheetName: sheet.getName(),
+      spreadsheetId: ss.getId(),
+    });
+
+    return {
+      ok: true,
+      leadId,
+      sentAt,
+      message: 'お申し込みありがとうございます。内容を確認後、担当者よりご連絡いたします。',
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function normalizeFranchiseLeadPayload_(input) {
+  const text = (value) => String(value || '').normalize('NFKC').trim();
+  return {
+    name: text(input.name),
+    salonName: text(input.salonName),
+    phone: text(input.phone).replace(/[−–—―ー]/g, '-'),
+    email: text(input.email).toLowerCase(),
+    prefecture: text(input.prefecture),
+    experience: text(input.experience),
+    timing: text(input.timing),
+    question: text(input.question),
+  };
+}
+
+function validateFranchiseLead_(lead) {
+  const missing = [];
+  if (!lead.name) missing.push('お名前');
+  if (!lead.salonName) missing.push('サロン名');
+  if (!lead.phone) missing.push('電話番号');
+  if (!lead.email) missing.push('メールアドレス');
+  if (!lead.prefecture) missing.push('都道府県');
+  if (missing.length) {
+    throw new Error(`入力されていない項目があります：${missing.join('、')}`);
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) {
+    throw new Error('メールアドレスの形式を確認してください。');
+  }
+  const phoneForCheck = lead.phone.replace(/[\s()-]/g, '');
+  if (!/^\+?\d{9,13}$/.test(phoneForCheck)) {
+    throw new Error('電話番号の形式を確認してください。');
+  }
+}
+
+function createFranchiseLeadId_(date) {
+  const ymd = Utilities.formatDate(date || new Date(), 'Asia/Tokyo', 'yyyyMMdd');
+  const suffix = Utilities.getUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
+  return `FRL-${ymd}-${suffix}`;
+}
+
+function buildFranchiseLeadRow_(headers, lead) {
+  const valuesByHeader = {
+    '受付ID': lead.leadId,
+    '送信日時': lead.sentAt,
+    'お名前': lead.name,
+    'サロン名': lead.salonName,
+    '電話番号': lead.phone,
+    'メールアドレス': lead.email,
+    '都道府県': lead.prefecture,
+    'エクステ導入経験': lead.experience,
+    '導入希望時期': lead.timing,
+    'ご質問': lead.question,
+    '対応状況': lead.status || '未対応',
+  };
+  return headers.map((header) => valuesByHeader[String(header || '').trim()] || '');
+}
+
+function buildFranchiseLeadEmailBody_(lead, sentAt) {
+  return [
+    '以下の内容で加盟店申し込みがありました。',
+    '',
+    `お名前：${lead.name}`,
+    `サロン名：${lead.salonName}`,
+    `電話番号：${lead.phone}`,
+    `メールアドレス：${lead.email}`,
+    `都道府県：${lead.prefecture}`,
+    `エクステ導入経験：${lead.experience || '未入力'}`,
+    `導入希望時期：${lead.timing || '未入力'}`,
+    `ご質問：${lead.question || '未入力'}`,
+    `送信日時：${sentAt}`,
+    '',
+    'このメールを受信後、記載されたメールアドレスまたは電話番号へ連絡できるようにしてください。',
+  ].join('\n');
 }
 
 function normalizeNoticeForClient_(row, index, rowNumber) {
@@ -2264,6 +2410,19 @@ function setupNotices_(ss) {
   return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
 }
 
+function setupFranchiseLeads_(ss) {
+  const sheet = getOrCreateSheet_(ss, KCO_CONFIG.FRANCHISE_LEADS);
+  const wasEmpty = sheet.getLastRow() === 0;
+  if (wasEmpty) {
+    sheet.getRange(1, 1, 1, KCO_FRANCHISE_LEAD_HEADERS.length).setValues([KCO_FRANCHISE_LEAD_HEADERS]);
+  } else {
+    ensureFranchiseLeadHeaders_(sheet);
+  }
+  applyHeaderStyle_(sheet, KCO_FRANCHISE_LEAD_HEADERS.length);
+  safeSetupAutoResize_(sheet, KCO_FRANCHISE_LEAD_HEADERS.length);
+  return { sheet: sheet.getName(), lastRow: sheet.getLastRow(), createdHeaders: wasEmpty };
+}
+
 function setupMapEntries_(ss) {
   const sheet = getOrCreateSheet_(ss, KCO_CONFIG.MAP_ENTRIES);
   const wasEmpty = sheet.getLastRow() === 0;
@@ -3226,6 +3385,20 @@ function ensureNoticeHeaders_(sheet) {
     .map((value) => String(value || '').trim());
 
   KCO_NOTICE_HEADERS.forEach((header) => {
+    if (currentHeaders.indexOf(header) !== -1) return;
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
+    currentHeaders.push(header);
+  });
+}
+
+function ensureFranchiseLeadHeaders_(sheet) {
+  const currentHeaders = sheet
+    .getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((value) => String(value || '').trim());
+
+  KCO_FRANCHISE_LEAD_HEADERS.forEach((header) => {
     if (currentHeaders.indexOf(header) !== -1) return;
     sheet.insertColumnAfter(sheet.getLastColumn());
     sheet.getRange(1, sheet.getLastColumn()).setValue(header);
