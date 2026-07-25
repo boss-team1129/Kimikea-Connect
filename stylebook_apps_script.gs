@@ -54,6 +54,8 @@ const KC_POST_HEADERS = [
   'deleteReason',
   'authorId',
   'isDeleted',
+  'visitorId',
+  'editPasscodeHash',
 ];
 
 const KC_SAVE_HEADERS = ['id', 'userId', 'stylePostId', 'createdAt', 'styleId'];
@@ -93,7 +95,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     const payload = JSON.parse((e.postData && e.postData.contents) || '{}');
-    const userId = payload.userId || 'user-member';
+    const userId = payload.userId || '';
     const action = payload.action || '';
     logStylebookDebug_('doPost received', {
       action,
@@ -101,9 +103,10 @@ function doPost(e) {
       hasPost: Boolean(payload.post),
       postId: payload.post && payload.post.id,
     });
-    if (action === 'savePost') return json_(savePost_(payload.post, userId));
-    if (action === 'publishPost') return json_(publishPost_(payload.postId, userId));
-    if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || ''));
+    const auth = stylebookAuthContext_(payload, userId);
+    if (action === 'savePost') return json_(savePost_(payload.post, userId, auth));
+    if (action === 'publishPost') return json_(publishPost_(payload.postId, userId, auth));
+    if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || '', auth));
     if (action === 'restorePost') return json_(restorePost_(payload.postId, userId));
     if (action === 'hardDeletePost') return json_(hardDeletePost_(payload.postId, userId));
     if (action === 'toggleSave') return json_(toggleSave_(payload.postId, userId));
@@ -401,16 +404,17 @@ function normalizeRankingColorKey_(value) {
   return String(value || '').normalize('NFKC').trim().replace(/[\s\-‐‑‒–—―]+/g, '').toUpperCase();
 }
 
-function savePost_(post, userId) {
+function savePost_(post, userId, authContext) {
   const startedAt = Date.now();
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   const setupMs = Date.now() - startedAt;
-  const user = getUser_(userId);
-  if (!user) throw new Error('ログインユーザーが見つかりません。');
+  const auth = authContext || stylebookAuthContext_({ post }, userId);
+  const user = auth.user;
+  if (!user && !(auth.visitorId && auth.editPasscode)) throw new Error('一般投稿では編集・削除用パスコードが必要です。');
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
-  if (existing && !canManagePost_(existing.object, user)) {
+  if (existing && !canManagePost_(existing.object, auth)) {
     throw new Error('この投稿を編集する権限がありません。');
   }
 
@@ -428,15 +432,15 @@ function savePost_(post, userId) {
   const additional = saveAdditionalImages_(id, incomingAdditionalImages, existing && existing.object.additionalImageFileIds);
   const additionalImageMs = Date.now() - additionalImageStart;
   const status = post.status === 'published' ? 'published' : 'draft';
-  const resolvedShopId = existing ? String(existing.object.shopId || '') : String(user.shopId || '');
+  const resolvedShopId = existing ? String(existing.object.shopId || '') : String((user && user.shopId) || post.shopId || '');
   const submittedStaffId = String(post.staffId || '').trim();
-  const resolvedStaffId = existing ? String(existing.object.staffId || '') : (submittedStaffId || String(user.staffId || ''));
+  const resolvedStaffId = existing ? String(existing.object.staffId || '') : (submittedStaffId || String((user && user.staffId) || ''));
   const hasSubmittedSalonName = Object.prototype.hasOwnProperty.call(post || {}, 'salonName');
   const hasSubmittedStaffName = Object.prototype.hasOwnProperty.call(post || {}, 'staffName');
   const submittedSalonName = String(post.salonName || '').trim();
   const submittedStaffName = String(post.staffName || '').trim();
-  const fallbackSalonName = String(getShopName_(resolvedShopId) || user.shopName || user.name || '').trim();
-  const fallbackStaffName = String(getStaffName_(resolvedStaffId) || user.displayName || user.name || '').trim();
+  const fallbackSalonName = String(getShopName_(resolvedShopId) || (user && (user.shopName || user.name)) || '').trim();
+  const fallbackStaffName = String(getStaffName_(resolvedStaffId) || (user && (user.displayName || user.name)) || '').trim();
   const resolvedSalonName = submittedSalonName
     || (hasSubmittedSalonName ? fallbackSalonName : (existing ? String(existing.object.salonName || '').trim() : ''))
     || fallbackSalonName;
@@ -458,7 +462,7 @@ function savePost_(post, userId) {
     staffId: resolvedStaffId,
     salonName: resolvedSalonName,
     staffName: resolvedStaffName,
-    createdByUserId: existing ? (existing.object.createdByUserId || existing.object.authorId || user.id) : user.id,
+    createdByUserId: existing ? (existing.object.createdByUserId || existing.object.authorId || (user && user.id) || '') : ((user && user.id) || ''),
     createdAt: existing ? existing.object.createdAt : now,
     updatedAt: now,
     saveCount: existing ? Number(existing.object.saveCount || 0) : 0,
@@ -467,8 +471,10 @@ function savePost_(post, userId) {
     deletedAt: existing ? existing.object.deletedAt : '',
     deletedByUserId: existing ? existing.object.deletedByUserId : '',
     deleteReason: existing ? existing.object.deleteReason : '',
-    authorId: existing ? postAuthorId_(existing.object) : user.id,
+    authorId: existing ? postAuthorId_(existing.object) : ((user && user.id) || ''),
     isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
+    visitorId: existing ? String(existing.object.visitorId || '') : (!user ? auth.visitorId : ''),
+    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : (!user ? hashStylebookPasscode_(auth.editPasscode) : ''),
   };
   const sheetStart = Date.now();
   const writeResult = upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
@@ -506,18 +512,19 @@ function savePost_(post, userId) {
     savedPostId: id,
     createdAt: normalizedPost.createdAt,
     createdByUserId: normalizedPost.createdByUserId,
+    visitorId: normalizedPost.visitorId,
     spreadsheetId: ss.getId(),
     sheetName: sheet.getName(),
     rowNumber: verified.row,
   };
 }
 
-function publishPost_(postId, userId) {
+function publishPost_(postId, userId, authContext) {
   const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
-  const user = getUser_(userId);
+  const auth = authContext || stylebookAuthContext_({}, userId);
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
-  if (!canManagePost_(found.object, user)) throw new Error('この投稿を公開する権限がありません。');
+  if (!canManagePost_(found.object, auth)) throw new Error('この投稿を公開する権限がありません。');
   found.object.status = 'published';
   found.object.isPublished = true;
   found.object.updatedAt = new Date().toISOString();
@@ -525,17 +532,18 @@ function publishPost_(postId, userId) {
   return { ok: true, id: postId, post: normalizePost_(found.object) };
 }
 
-function deletePost_(postId, userId, reason) {
+function deletePost_(postId, userId, reason, authContext) {
   const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
-  const user = getUser_(userId);
+  const auth = authContext || stylebookAuthContext_({}, userId);
+  const user = auth.user;
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
-  if (!canDeletePost_(found.object, user)) throw new Error('この投稿を削除する権限がありません。');
+  if (!canDeletePost_(found.object, auth)) throw new Error('この投稿を削除する権限がありません。');
   found.object.status = 'deleted';
   found.object.isPublished = false;
   found.object.isDeleted = true;
   found.object.deletedAt = new Date().toISOString();
-  found.object.deletedByUserId = user.id;
+  found.object.deletedByUserId = user ? user.id : auth.visitorId;
   found.object.deleteReason = reason || '';
   found.object.updatedAt = new Date().toISOString();
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
@@ -695,14 +703,64 @@ function defaultTypes_() {
     .map((name, index) => [`type-${String(index + 1).padStart(2, '0')}`, name, true, index + 1]);
 }
 
-function canManagePost_(post, user) {
-  if (!user) return false;
-  return isHeadquartersAdmin_(user) || sameUserId_(postAuthorId_(post), user.id);
+function stylebookAuthContext_(payload, userId) {
+  const post = payload && payload.post || {};
+  const normalizedUserId = normalizeUserId_(userId || payload.userId || '');
+  const user = getUser_(normalizedUserId);
+  return {
+    user,
+    staffId: String((payload && payload.staffId) || post.staffId || '').trim(),
+    staffName: String((payload && payload.staffName) || post.staffName || '').trim(),
+    visitorId: String((payload && payload.visitorId) || post.visitorId || '').trim(),
+    editPasscode: String((payload && payload.editPasscode) || post.editPasscode || '').trim(),
+  };
 }
 
-function canDeletePost_(post, user) {
+function canManagePost_(post, authOrUser) {
+  const auth = authOrUser && Object.prototype.hasOwnProperty.call(authOrUser, 'user')
+    ? authOrUser
+    : { user: authOrUser, staffId: '', staffName: '', visitorId: '', editPasscode: '' };
+  const user = auth.user;
+  if (isHeadquartersAdmin_(user)) return true;
+  if (canVisitorManagePost_(post, auth)) return true;
+  return canStaffManagePost_(post, auth);
+}
+
+function canDeletePost_(post, authOrUser) {
+  return canManagePost_(post, authOrUser);
+}
+
+function canStaffManagePost_(post, auth) {
+  const user = auth.user;
   if (!user) return false;
-  return isHeadquartersAdmin_(user) || sameUserId_(postAuthorId_(post), user.id);
+  const postShopId = String(post && post.shopId || '').trim();
+  const userShopId = String(user.shopId || '').trim();
+  if (postShopId && userShopId && postShopId !== userShopId) return false;
+  const authorId = postAuthorId_(post);
+  if (authorId && !sameUserId_(authorId, user.id)) return false;
+  const postStaffId = String(post && post.staffId || '').trim();
+  if (postStaffId) return postStaffId === String(auth.staffId || user.staffId || '').trim();
+  const postStaffName = String(post && post.staffName || '').trim();
+  if (postStaffName && auth.staffName) return postStaffName === String(auth.staffName || '').trim();
+  return Boolean(authorId && sameUserId_(authorId, user.id));
+}
+
+function canVisitorManagePost_(post, auth) {
+  const postVisitorId = String(post && post.visitorId || '').trim();
+  if (!postVisitorId) return false;
+  if (postVisitorId && postVisitorId === String(auth.visitorId || '').trim()) return true;
+  const storedHash = String(post && post.editPasscodeHash || '').trim();
+  return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
+}
+
+function hashStylebookPasscode_(passcode) {
+  const value = String(passcode || '').trim();
+  if (!value) return '';
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value, Utilities.Charset.UTF_8);
+  return bytes.map(function(byte) {
+    const v = (byte + 256) % 256;
+    return ('0' + v.toString(16)).slice(-2);
+  }).join('');
 }
 
 function postAuthorId_(post) {
@@ -978,6 +1036,7 @@ function normalizePost_(row) {
     deleteReason: row.deleteReason || '',
     authorId: row.authorId || row.createdByUserId || '',
     isDeleted: normalizeBoolean_(row.isDeleted),
+    visitorId: row.visitorId || '',
   };
 }
 

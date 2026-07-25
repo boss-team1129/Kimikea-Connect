@@ -6,6 +6,8 @@ const LEGACY_DB_KEYS = [
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const CONNECT_FRANCHISE_KEY = 'kimikeaFranchise';
 const STAFF_SELECTION_KEY = 'kimikea_stylebook_selected_staff_v1';
+const VISITOR_ID_KEY = 'kimikea_stylebook_visitor_id_v1';
+const VISITOR_PASSCODES_KEY = 'kimikea_stylebook_visitor_passcodes_v1';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
 const DEBUG_STYLEBOOK = false;
@@ -13,7 +15,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260725-stylebook-staff-device-fix-1';
+const STYLEBOOK_ASSET_VERSION = '20260725-public-stylebook-auth-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -125,6 +127,8 @@ const el = {
   statusInput: document.getElementById('statusInput'),
   salonNameInput: document.getElementById('salonNameInput'),
   staffNameInput: document.getElementById('staffNameInput'),
+  visitorPasscodeField: document.getElementById('visitorPasscodeField'),
+  visitorPasscodeInput: document.getElementById('visitorPasscodeInput'),
   shopNameOptions: document.getElementById('shopNameOptions'),
   staffNameOptions: document.getElementById('staffNameOptions'),
   shopSelect: document.getElementById('shopSelect'),
@@ -475,18 +479,32 @@ function requestJson(url, options = {}) {
   return Promise.reject(new Error('このブラウザでは通信機能を利用できません。'));
 }
 
+function stylebookAuthPayload(extra = {}) {
+  const user = currentUser();
+  return {
+    userId: user?.id || '',
+    staffId: currentSelectedStaffId(),
+    staffName: currentSelectedStaffName(),
+    visitorId: getStylebookVisitorId(),
+    ...extra,
+  };
+}
+
 async function apiRequest(action, payload = {}) {
   if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
+  const auth = stylebookAuthPayload();
   debugStylebook('API POST request', {
     action,
-    userId: currentUser()?.id || state.currentUserId,
+    userId: auth.userId,
+    staffId: auth.staffId,
+    visitorId: auth.visitorId,
   });
   const data = await requestJson(STYLEBOOK_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({
       action,
-      userId: currentUser()?.id || state.currentUserId,
+      ...auth,
       ...payload,
     }),
   });
@@ -830,7 +848,7 @@ function currentUser() {
 }
 
 function canPost() {
-  return Boolean(currentUser());
+  return true;
 }
 
 function canManageAll() {
@@ -910,22 +928,85 @@ function saveStyleId(save) {
   return String(save?.styleId || save?.stylePostId || save?.postId || '').trim();
 }
 
-function isPostAuthor(post) {
+function postVisitorId(post) {
+  return String(post?.visitorId || '').trim();
+}
+
+function currentSelectedStaffId() {
+  const selected = String(el.staffSelect?.value || '').trim();
+  if (selected) return selected;
+  const saved = readSelectedStaffForDevice(currentUser()?.shopId || '');
+  return String(saved?.staffId || currentUser()?.staffId || '').trim();
+}
+
+function currentSelectedStaffName() {
+  const selectedOption = Array.from(el.staffSelect?.options || []).find(option => option.value === el.staffSelect.value);
+  return String(selectedOption?.textContent || el.staffNameInput?.value || readSelectedStaffForDevice(currentUser()?.shopId || '')?.staffName || '').trim();
+}
+
+function isStaffPostOwner(post) {
   const user = currentUser();
   if (!user) return false;
-  return isSameUserId(postAuthorId(post), user.id);
+  const postShopId = String(post?.shopId || '').trim();
+  const userShopId = String(user.shopId || '').trim();
+  if (postShopId && userShopId && postShopId !== userShopId) return false;
+  const authorId = postAuthorId(post);
+  if (authorId && !isSameUserId(authorId, user.id)) return false;
+  const postStaffId = String(post?.staffId || '').trim();
+  if (postStaffId) return postStaffId === currentSelectedStaffId();
+  const postStaffName = String(post?.staffName || '').trim();
+  if (postStaffName) return postStaffName === currentSelectedStaffName();
+  return isSameUserId(authorId, user.id);
+}
+
+function visitorPasscodes() {
+  try {
+    return JSON.parse(localStorage.getItem(VISITOR_PASSCODES_KEY) || '{}') || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function rememberVisitorPasscode(postId, passcode) {
+  const normalizedPostId = String(postId || '').trim();
+  const normalizedPasscode = String(passcode || '').trim();
+  if (!normalizedPostId || !normalizedPasscode) return;
+  const store = visitorPasscodes();
+  store[normalizedPostId] = normalizedPasscode;
+  localStorage.setItem(VISITOR_PASSCODES_KEY, JSON.stringify(store));
+}
+
+function visitorPasscodeForPost(postId) {
+  return String(visitorPasscodes()[String(postId || '').trim()] || '').trim();
+}
+
+function getStylebookVisitorId() {
+  let visitorId = String(localStorage.getItem(VISITOR_ID_KEY) || '').trim();
+  if (!visitorId) {
+    visitorId = `visitor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(VISITOR_ID_KEY, visitorId);
+  }
+  return visitorId;
+}
+
+function isVisitorPostOwner(post) {
+  const visitorId = postVisitorId(post);
+  if (!visitorId) return false;
+  return visitorId === getStylebookVisitorId() || Boolean(visitorPasscodeForPost(post.id));
+}
+
+function isPostAuthor(post) {
+  return isStaffPostOwner(post) || isVisitorPostOwner(post);
 }
 
 function canEditPost(post) {
-  const user = currentUser();
-  if (!user) return false;
   if (canManageAll()) return true;
-  if (isPostAuthor(post)) return true;
-  return false;
+  return isPostAuthor(post);
 }
 
 function canDeletePost(post) {
-  return canManageAll() || isPostAuthor(post);
+  if (canManageAll()) return true;
+  return isPostAuthor(post);
 }
 
 function canManagePost(post) {
@@ -2031,6 +2112,8 @@ function clearPostForm() {
   el.staffNameInput.value = '';
   el.shopSelect.value = '';
   el.staffSelect.value = '';
+  if (el.visitorPasscodeInput) el.visitorPasscodeInput.value = '';
+  if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
@@ -2047,6 +2130,11 @@ function defaultStaffNameForCurrentUser() {
   const user = currentUser();
   if (!user) return '';
   return String(user.displayName || user.name || getById('staff', user.staffId)?.name || '').trim();
+}
+
+function updatePostIdentityFields() {
+  if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
+  if (el.visitorPasscodeInput) el.visitorPasscodeInput.required = !currentUser() && !state.currentEditId;
 }
 
 function fillPostForm(post) {
@@ -2076,11 +2164,8 @@ function fillPostForm(post) {
 
 function showPostForm(postId = '', options = {}) {
   const { push = true } = options;
-  if (!canPost()) {
-    alert('ログイン中のユーザーは投稿できます。ユーザーを選択してください。');
-    return;
-  }
   clearPostForm();
+  updatePostIdentityFields();
   if (postId) {
     const post = state.db.stylePosts.find(item => item.id === postId);
     if (!post || !canManagePost(post)) {
@@ -2088,6 +2173,7 @@ function showPostForm(postId = '', options = {}) {
       return;
     }
     fillPostForm(post);
+    updatePostIdentityFields();
   } else {
     el.salonNameInput.value = defaultSalonNameForCurrentUser();
     el.staffNameInput.value = defaultStaffNameForCurrentUser();
@@ -2095,6 +2181,7 @@ function showPostForm(postId = '', options = {}) {
     if (user?.shopId) el.shopSelect.value = user.shopId;
     renderStaffSelectForForm();
     if (!el.staffNameInput.value) applySelectedStaffToForm();
+    updatePostIdentityFields();
   }
   showView('post', { push, id: postId });
 }
@@ -2102,7 +2189,6 @@ function showPostForm(postId = '', options = {}) {
 async function submitPost(event) {
   event.preventDefault();
   if (state.isSubmittingPost) return;
-  if (!canPost()) return;
   const editing = state.currentEditId ? state.db.stylePosts.find(post => post.id === state.currentEditId) : null;
   if (editing && !canManagePost(editing)) {
     alert('この投稿を編集する権限がありません。');
@@ -2130,6 +2216,12 @@ async function submitPost(event) {
   const staffName = el.staffNameInput.value.trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || '');
+  const visitorPasscode = String(el.visitorPasscodeInput?.value || visitorPasscodeForPost(editing?.id) || '').trim();
+  if (!user && !editing && visitorPasscode.length < 4) {
+    el.formMessage.textContent = '一般投稿では、編集・削除用パスコードを4文字以上で入力してください。';
+    el.formMessage.classList.add('error');
+    return;
+  }
   const resolvedStaffId = editing ? (editing.staffId || '') : (el.staffSelect?.value || user?.staffId || '');
   const post = {
     id: editing?.id || uid('post'),
@@ -2144,8 +2236,8 @@ async function submitPost(event) {
     staffId: resolvedStaffId,
     salonName,
     staffName,
-    authorId: editing ? postAuthorId(editing) : user.id,
-    createdByUserId: editing?.createdByUserId || editing?.authorId || user.id,
+    authorId: editing ? postAuthorId(editing) : (user?.id || ''),
+    createdByUserId: editing?.createdByUserId || editing?.authorId || user?.id || '',
     createdAt: editing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     saveCount: editing?.saveCount || 0,
@@ -2154,6 +2246,8 @@ async function submitPost(event) {
     deletedAt: editing?.deletedAt || '',
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
+    visitorId: editing?.visitorId || (!user ? getStylebookVisitorId() : ''),
+    editPasscode: !user ? visitorPasscode : visitorPasscodeForPost(editing?.id),
   };
   if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount || !post.salonName || !post.staffName)) {
     el.formMessage.textContent = '公開するには、写真、本数、施術、サロン名、担当者名を入力してください。';
@@ -2170,6 +2264,7 @@ async function submitPost(event) {
         throw new Error(result?.message || '投稿データを本番管理表へ保存できませんでした。');
       }
       upsertLocalPost(result.post || post);
+      if (!user && visitorPasscode) rememberVisitorPasscode(result.id || post.id, visitorPasscode);
       clearPostForm();
       setPostSubmitting(false);
       alert(requestedStatus === 'draft' ? '下書きを保存しました。' : '投稿しました。');

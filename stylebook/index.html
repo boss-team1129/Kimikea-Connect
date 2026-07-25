@@ -183,6 +183,10 @@
             <span>担当者名</span>
             <input id="staffNameInput" type="text" list="staffNameOptions" placeholder="鈴木花子" required>
           </label>
+          <label id="visitorPasscodeField" class="field" hidden>
+            <span>編集・削除用パスコード</span>
+            <input id="visitorPasscodeInput" type="text" inputmode="text" autocomplete="off" placeholder="4文字以上" minlength="4">
+          </label>
         </div>
         <datalist id="shopNameOptions"></datalist>
         <datalist id="staffNameOptions"></datalist>
@@ -246,7 +250,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260725-stylebook-staff-device-fix-1"></script>
+  <script src="./script.js?v=20260725-public-stylebook-auth-1"></script>
   <script src="../shared-nav.js?v=20260714-nav-1"></script>
 </body>
 </html>
