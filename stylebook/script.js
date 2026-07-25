@@ -12,7 +12,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260719-post-save-verify-1';
+const STYLEBOOK_ASSET_VERSION = '20260725-stylebook-staff-session-fix-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -577,11 +577,14 @@ function userFromConnectFranchise(franchise) {
   if (!id) return null;
   return {
     id,
-    name: franchise?.displayName || franchise?.contactName || franchise?.salonName || franchise?.franchiseName || id,
+    name: franchise?.staffName || franchise?.displayName || franchise?.contactName || franchise?.salonName || franchise?.franchiseName || id,
     email: franchise?.email || '',
     role: franchise?.role || franchise?.permission || roles.member,
     shopId: shopIdFromFranchise(franchise),
     staffId: franchise?.staffId || '',
+    salonName: franchise?.salonName || franchise?.franchiseName || franchise?.shopName || '',
+    shopName: franchise?.salonName || franchise?.franchiseName || franchise?.shopName || '',
+    displayName: franchise?.staffName || franchise?.displayName || franchise?.contactName || '',
   };
 }
 
@@ -597,6 +600,9 @@ function syncCurrentUserFromConnectSession() {
     existing.shopId = user.shopId || existing.shopId;
     existing.staffId = user.staffId || existing.staffId;
     existing.role = user.role || existing.role || roles.member;
+    existing.salonName = user.salonName || existing.salonName || '';
+    existing.shopName = user.shopName || existing.shopName || '';
+    existing.displayName = user.displayName || existing.displayName || '';
   } else {
     state.db.users.push(user);
   }
@@ -814,7 +820,12 @@ async function refreshRemoteDb() {
 function currentUser() {
   const currentId = normalizeUserId(state.currentUserId);
   if (!currentId) return null;
-  return state.db?.users?.find(user => isSameUserId(user.id, currentId)) || null;
+  const user = state.db?.users?.find(item => isSameUserId(item.id, currentId));
+  if (user) return user;
+  if (syncCurrentUserFromConnectSession()) {
+    return state.db?.users?.find(item => isSameUserId(item.id, state.currentUserId)) || null;
+  }
+  return null;
 }
 
 function canPost() {
@@ -1260,12 +1271,52 @@ function renderColorChoiceList() {
     : '<small>選択中の色はありません。</small>';
 }
 
+function staffOptionIdForUser(user) {
+  return String(user?.staffId || user?.id || '').trim();
+}
+
+function staffOptionsForForm(shopId = '') {
+  const normalizedShopId = String(shopId || '').trim();
+  const options = [];
+  const seen = new Set();
+  const addOption = (id, name, source = 'staff') => {
+    const normalizedId = String(id || '').trim();
+    const normalizedName = String(name || '').trim();
+    const key = normalizedId || normalizedName;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    options.push({ id: normalizedId || normalizedName, name: normalizedName || normalizedId, source });
+  };
+  (state.db.staff || [])
+    .filter(person => person.isActive && (!normalizedShopId || String(person.shopId || '').trim() === normalizedShopId))
+    .forEach(person => addOption(person.id, person.name, 'staff'));
+  (state.db.users || [])
+    .filter(user => !normalizedShopId || String(user.shopId || '').trim() === normalizedShopId)
+    .forEach(user => addOption(staffOptionIdForUser(user), user.name || user.displayName, 'user'));
+  const user = currentUser();
+  if (user && (!normalizedShopId || String(user.shopId || '').trim() === normalizedShopId)) {
+    addOption(staffOptionIdForUser(user), user.name || user.displayName, 'current-user');
+  }
+  return options;
+}
+
 function renderStaffSelectForForm() {
   const shopId = el.shopSelect.value || '';
-  el.staffSelect.innerHTML = state.db.staff
-    .filter(person => person.isActive && (!shopId || person.shopId === shopId))
-    .map(person => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
-    .join('');
+  if (!el.staffSelect) return;
+  const options = staffOptionsForForm(shopId);
+  const currentStaffName = String(el.staffNameInput?.value || '').trim();
+  const currentUserStaffId = String(currentUser()?.staffId || currentUser()?.id || '').trim();
+  el.staffSelect.innerHTML = [
+    '<option value="">スタッフを選択してください</option>',
+    ...options.map(person => `<option value="${escapeHtml(person.id)}">${escapeHtml(person.name)}</option>`),
+  ].join('');
+  const matchedByName = options.find(person => currentStaffName && person.name === currentStaffName);
+  const matchedCurrentUser = options.find(person => currentUserStaffId && person.id === currentUserStaffId);
+  const selected = matchedByName || matchedCurrentUser || (options.length === 1 ? options[0] : null);
+  if (selected) {
+    el.staffSelect.value = selected.id;
+    if (el.staffNameInput && !currentStaffName) el.staffNameInput.value = selected.name;
+  }
 }
 
 function findShopByName(name) {
@@ -1278,6 +1329,12 @@ function findStaffByName(name, shopId = '') {
   return state.db.staff.find(person => person.isActive && person.name === normalized && (!shopId || person.shopId === shopId))
     || state.db.staff.find(person => person.isActive && person.name === normalized)
     || null;
+}
+
+function applySelectedStaffToForm() {
+  if (!el.staffSelect || !el.staffNameInput) return;
+  const option = Array.from(el.staffSelect.options || []).find(item => item.value === el.staffSelect.value);
+  if (option && option.value) el.staffNameInput.value = option.textContent.trim();
 }
 
 function colorLabels(post) {
@@ -2005,6 +2062,10 @@ function showPostForm(postId = '', options = {}) {
   } else {
     el.salonNameInput.value = defaultSalonNameForCurrentUser();
     el.staffNameInput.value = defaultStaffNameForCurrentUser();
+    const user = currentUser();
+    if (user?.shopId) el.shopSelect.value = user.shopId;
+    renderStaffSelectForForm();
+    if (!el.staffNameInput.value) applySelectedStaffToForm();
   }
   showView('post', { push, id: postId });
 }
@@ -2036,10 +2097,11 @@ async function submitPost(event) {
   ].filter(Boolean);
   const selectedColorIds = selectedValues(el.colorSelect);
   const salonName = el.salonNameInput.value.trim();
+  if (!el.staffNameInput.value.trim()) applySelectedStaffToForm();
   const staffName = el.staffNameInput.value.trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || '');
-  const resolvedStaffId = editing ? (editing.staffId || '') : (user?.staffId || '');
+  const resolvedStaffId = editing ? (editing.staffId || '') : (el.staffSelect?.value || user?.staffId || '');
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
@@ -2340,6 +2402,13 @@ function bindEvents() {
       }
       renderGallery();
     });
+  }
+  el.shopSelect.addEventListener('change', () => {
+    renderStaffSelectForForm();
+    applySelectedStaffToForm();
+  });
+  if (el.staffSelect) {
+    el.staffSelect.addEventListener('change', applySelectedStaffToForm);
   }
   el.filterToggle.addEventListener('click', () => { el.filterPanel.hidden = !el.filterPanel.hidden; });
   el.sortSelect.addEventListener('change', event => { state.sort = event.target.value; renderGallery(); });

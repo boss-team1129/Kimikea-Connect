@@ -176,6 +176,10 @@
             <input id="salonNameInput" type="text" list="shopNameOptions" placeholder="エクステランド" required>
           </label>
           <label class="field">
+            <span>スタッフ選択</span>
+            <select id="staffSelect"></select>
+          </label>
+          <label class="field">
             <span>担当者名</span>
             <input id="staffNameInput" type="text" list="staffNameOptions" placeholder="鈴木花子" required>
           </label>
@@ -183,7 +187,6 @@
         <datalist id="shopNameOptions"></datalist>
         <datalist id="staffNameOptions"></datalist>
         <select id="shopSelect" hidden></select>
-        <select id="staffSelect" hidden></select>
 
         <div class="form-actions">
           <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
@@ -243,7 +246,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260719-post-save-verify-1"></script>
+  <script src="./script.js?v=20260725-stylebook-staff-session-fix-1"></script>
   <script src="../shared-nav.js?v=20260714-nav-1"></script>
 </body>
 </html>
