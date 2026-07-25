@@ -429,7 +429,8 @@ function savePost_(post, userId) {
   const additionalImageMs = Date.now() - additionalImageStart;
   const status = post.status === 'published' ? 'published' : 'draft';
   const resolvedShopId = existing ? String(existing.object.shopId || '') : String(user.shopId || '');
-  const resolvedStaffId = existing ? String(existing.object.staffId || '') : String(user.staffId || '');
+  const submittedStaffId = String(post.staffId || '').trim();
+  const resolvedStaffId = existing ? String(existing.object.staffId || '') : (submittedStaffId || String(user.staffId || ''));
   const hasSubmittedSalonName = Object.prototype.hasOwnProperty.call(post || {}, 'salonName');
   const hasSubmittedStaffName = Object.prototype.hasOwnProperty.call(post || {}, 'staffName');
   const submittedSalonName = String(post.salonName || '').trim();

@@ -5,6 +5,7 @@ const LEGACY_DB_KEYS = [
 ];
 const SESSION_KEY = 'kimikea_stylebook_current_user_v1';
 const CONNECT_FRANCHISE_KEY = 'kimikeaFranchise';
+const STAFF_SELECTION_KEY = 'kimikea_stylebook_selected_staff_v1';
 const SCROLL_KEY = 'kimikea_stylebook_scroll_y_v1';
 const PAGE_SIZE = 18;
 const DEBUG_STYLEBOOK = false;
@@ -12,7 +13,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260725-stylebook-staff-session-fix-1';
+const STYLEBOOK_ASSET_VERSION = '20260725-stylebook-staff-device-fix-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -1275,6 +1276,26 @@ function staffOptionIdForUser(user) {
   return String(user?.staffId || user?.id || '').trim();
 }
 
+function selectedStaffStorageKey(shopId = '') {
+  const normalizedShopId = String(shopId || currentUser()?.shopId || 'default').trim() || 'default';
+  return `${STAFF_SELECTION_KEY}_${normalizedShopId}`;
+}
+
+function readSelectedStaffForDevice(shopId = '') {
+  try {
+    return JSON.parse(localStorage.getItem(selectedStaffStorageKey(shopId)) || 'null') || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function rememberSelectedStaffForDevice(shopId = '', staff = {}) {
+  const staffId = String(staff.staffId || staff.id || '').trim();
+  const staffName = String(staff.staffName || staff.name || '').trim();
+  if (!staffId && !staffName) return;
+  localStorage.setItem(selectedStaffStorageKey(shopId), JSON.stringify({ staffId, staffName }));
+}
+
 function staffOptionsForForm(shopId = '') {
   const normalizedShopId = String(shopId || '').trim();
   const options = [];
@@ -1306,16 +1327,18 @@ function renderStaffSelectForForm() {
   const options = staffOptionsForForm(shopId);
   const currentStaffName = String(el.staffNameInput?.value || '').trim();
   const currentUserStaffId = String(currentUser()?.staffId || currentUser()?.id || '').trim();
+  const savedStaff = readSelectedStaffForDevice(shopId);
   el.staffSelect.innerHTML = [
     '<option value="">スタッフを選択してください</option>',
     ...options.map(person => `<option value="${escapeHtml(person.id)}">${escapeHtml(person.name)}</option>`),
   ].join('');
+  const matchedSaved = options.find(person => savedStaff && (person.id === savedStaff.staffId || person.name === savedStaff.staffName));
   const matchedByName = options.find(person => currentStaffName && person.name === currentStaffName);
   const matchedCurrentUser = options.find(person => currentUserStaffId && person.id === currentUserStaffId);
-  const selected = matchedByName || matchedCurrentUser || (options.length === 1 ? options[0] : null);
+  const selected = matchedSaved || matchedByName || (options.length === 1 ? options[0] : null) || matchedCurrentUser;
   if (selected) {
     el.staffSelect.value = selected.id;
-    if (el.staffNameInput && !currentStaffName) el.staffNameInput.value = selected.name;
+    if (el.staffNameInput && (!currentStaffName || matchedSaved)) el.staffNameInput.value = selected.name;
   }
 }
 
@@ -1334,7 +1357,13 @@ function findStaffByName(name, shopId = '') {
 function applySelectedStaffToForm() {
   if (!el.staffSelect || !el.staffNameInput) return;
   const option = Array.from(el.staffSelect.options || []).find(item => item.value === el.staffSelect.value);
-  if (option && option.value) el.staffNameInput.value = option.textContent.trim();
+  if (!option || !option.value) return;
+  const staffName = option.textContent.trim();
+  el.staffNameInput.value = staffName;
+  rememberSelectedStaffForDevice(el.shopSelect?.value || currentUser()?.shopId || '', {
+    staffId: option.value,
+    staffName,
+  });
 }
 
 function colorLabels(post) {
