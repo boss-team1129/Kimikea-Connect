@@ -7008,13 +7008,11 @@
           state.franchise = response.franchise || state.franchise;
           if (state.franchise) localStorage.setItem('kimikeaFranchise', JSON.stringify(state.franchise));
           state.orderUnlocked = true;
-          const returnRoute = isLoginRequiredKimikeaRoute(state.pendingAuthRoute)
-            ? state.pendingAuthRoute
-            : { name: 'order' };
+          const returnRoute = resolvePostLoginRoute({ name: 'home' });
           state.pendingAuthRoute = null;
           state.pendingOpenOrder = returnRoute.name === 'order';
           state.pendingPostLoginRoute = returnRoute.name === 'order' ? null : returnRoute;
-          showDashboard();
+          showDashboard({ deferRoute: state.pendingOpenOrder || Boolean(state.pendingPostLoginRoute) });
           loadPortalData();
         })
         .catch((error) => {
@@ -7064,13 +7062,11 @@
           document.getElementById('newPassword').value = '';
           document.getElementById('confirmPassword').value = '';
           state.orderUnlocked = true;
-          const returnRoute = isLoginRequiredKimikeaRoute(state.pendingAuthRoute)
-            ? state.pendingAuthRoute
-            : { name: 'order' };
+          const returnRoute = resolvePostLoginRoute({ name: 'home' });
           state.pendingAuthRoute = null;
           state.pendingOpenOrder = returnRoute.name === 'order';
           state.pendingPostLoginRoute = returnRoute.name === 'order' ? null : returnRoute;
-          showDashboard();
+          showDashboard({ deferRoute: state.pendingOpenOrder || Boolean(state.pendingPostLoginRoute) });
           loadPortalData();
         })
         .catch((error) => {
@@ -7140,7 +7136,14 @@
         });
     }
 
-    function showDashboard() {
+    function resolvePostLoginRoute(defaultRoute = { name: 'home' }) {
+      if (isLoginRequiredKimikeaRoute(state.pendingAuthRoute)) return state.pendingAuthRoute;
+      const urlRoute = routeFromKimikeaUrl();
+      if (isLoginRequiredKimikeaRoute(urlRoute)) return urlRoute;
+      return defaultRoute;
+    }
+
+    function showDashboard(options = {}) {
       document.getElementById('loginView').hidden = true;
       document.getElementById('passwordSetupView').hidden = true;
       document.getElementById('portalView').hidden = false;
@@ -7148,6 +7151,13 @@
       setMessage('loginMessage', '', false);
       renderProfile();
       updateAuthDisplay();
+      if (options.deferRoute) {
+        document.getElementById('homeView').hidden = true;
+        document.getElementById('publicPageView').hidden = true;
+        document.getElementById('orderWorkspace').hidden = true;
+        notifyKimikeaNavigationState();
+        return;
+      }
       showHomePage({ updateUrl: false });
       applyInitialRoute();
     }
@@ -13548,7 +13558,18 @@
       loadPortal();
     } else {
       state.sessionToken = '';
-      showDashboard();
+      const initialRoute = routeFromKimikeaUrl();
+      if (isLoginRequiredKimikeaRoute(initialRoute)) {
+        showOrderLogin(initialRoute);
+        setLoginActionMessage(
+          initialRoute.name === 'order'
+            ? '注文機能を利用するにはログインしてください。'
+            : 'ログインしてください。',
+          false
+        );
+      } else {
+        showDashboard();
+      }
     }
     runOpeningSplash();
   </script>
