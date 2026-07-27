@@ -7988,6 +7988,24 @@
       );
     }
 
+    const ORDER_PRODUCT_IMAGE_BASE_PATH = 'images/products/';
+    const ORDER_PRODUCT_IMAGE_VERSION = '20260727-products-1';
+    const ORDER_PRODUCT_IMAGE_FILENAMES = new Set([
+      'color-chart.jpg',
+      'extension-pliers.jpg',
+      'oil-remover-120ml.jpg',
+      'extension-treatment.jpg',
+    ]);
+
+    function orderProductImageUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const clean = raw.split('#')[0].split('?')[0];
+      const fileName = clean.split('/').pop();
+      if (!ORDER_PRODUCT_IMAGE_FILENAMES.has(fileName)) return raw;
+      return `${ORDER_PRODUCT_IMAGE_BASE_PATH}${fileName}?v=${ORDER_PRODUCT_IMAGE_VERSION}`;
+    }
+
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
     const STYLE_DIAGNOSIS_COLOR_FILTER_STORAGE_KEY = 'kimikeaDiagnosisColorFilter';
     const EXTENSION_SIMULATOR_STORAGE_KEY = 'kimikea_extension_simulator_v1';
@@ -8296,6 +8314,18 @@
       const label = colorDisplayName(color);
       if (!src) return `<span class="${className} is-missing" data-size="${escapeHtml(size)}">画像準備中</span>`;
       return `<span class="${className}" data-size="${escapeHtml(size)}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><span>画像準備中</span></span>`;
+    }
+
+    function orderProductImageMarkup(product, color) {
+      const src = orderProductImageUrl(
+        product.swatchImageUrl
+        || product.imageUrl
+        || product['色見本画像URL']
+        || product['画像URL']
+      );
+      const label = colorDisplayName(color);
+      if (!src) return colorImageMarkup(color, 'order-product-image');
+      return `<span class="order-product-image"><img src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.parentElement.classList.add('is-missing');this.remove();"><span>画像準備中</span></span>`;
     }
 
     function colorDisplayName(color) {
@@ -13220,7 +13250,7 @@
         color: product.color,
         colorName: product.colorName || product.color,
         category: product.category,
-        swatchImageUrl: product.swatchImageUrl || product.imageUrl || '',
+        swatchImageUrl: orderProductImageUrl(product.swatchImageUrl || product.imageUrl || ''),
       };
     }
 
@@ -13256,7 +13286,7 @@
         const selected = String(index) === String(productSelect.value);
         return `
           <button type="button" class="order-product-card${selected ? ' is-selected' : ''}" onclick="selectOrderProduct(${index})">
-            ${colorImageMarkup(color, 'order-product-image')}
+            ${orderProductImageMarkup(product, color)}
             <strong>${escapeHtml(colorDisplayName(color))}</strong>
             <span>${escapeHtml(color.category || '')}</span>
           </button>
