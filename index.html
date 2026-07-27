@@ -7989,13 +7989,25 @@
     }
 
     const ORDER_PRODUCT_IMAGE_BASE_PATH = 'images/products/';
-    const ORDER_PRODUCT_IMAGE_VERSION = '20260727-products-1';
+    const ORDER_PRODUCT_IMAGE_VERSION = '20260727-products-2';
     const ORDER_PRODUCT_IMAGE_FILENAMES = new Set([
       'color-chart.jpg',
       'extension-pliers.jpg',
       'oil-remover-120ml.jpg',
       'extension-treatment.jpg',
     ]);
+    const ORDER_PRODUCT_IMAGE_BY_CODE = {
+      OT001: 'color-chart.jpg',
+      OT002: 'extension-pliers.jpg',
+      OT003: 'oil-remover-120ml.jpg',
+      OT004: 'extension-treatment.jpg',
+    };
+    const ORDER_PRODUCT_IMAGE_BY_KEYWORD = [
+      { pattern: /カラーチャート|毛束|color.?chart/i, fileName: 'color-chart.jpg' },
+      { pattern: /ペンチ|プライヤ|plier/i, fileName: 'extension-pliers.jpg' },
+      { pattern: /リムーバ|remover|oil/i, fileName: 'oil-remover-120ml.jpg' },
+      { pattern: /トリートメント|treatment/i, fileName: 'extension-treatment.jpg' },
+    ];
 
     function orderProductImageUrl(value) {
       const raw = String(value || '').trim();
@@ -8004,6 +8016,25 @@
       const fileName = clean.split('/').pop();
       if (!ORDER_PRODUCT_IMAGE_FILENAMES.has(fileName)) return raw;
       return `${ORDER_PRODUCT_IMAGE_BASE_PATH}${fileName}?v=${ORDER_PRODUCT_IMAGE_VERSION}`;
+    }
+
+    function orderProductBundledImageUrl(product) {
+      const code = String(product?.productCode || product?.code || product?.['商品コード'] || '').normalize('NFKC').trim().toUpperCase();
+      const fileByCode = ORDER_PRODUCT_IMAGE_BY_CODE[code];
+      if (fileByCode) return orderProductImageUrl(fileByCode);
+      const searchable = [
+        product?.category,
+        product?.productCategory,
+        product?.color,
+        product?.colorName,
+        product?.name,
+        product?.colorCode,
+        product?.['商品カテゴリー'],
+        product?.['カラー'],
+        product?.['カラー名'],
+      ].map((value) => String(value || '').normalize('NFKC').trim()).filter(Boolean).join(' ');
+      const matched = ORDER_PRODUCT_IMAGE_BY_KEYWORD.find((item) => item.pattern.test(searchable));
+      return matched ? orderProductImageUrl(matched.fileName) : '';
     }
 
     const STYLE_DIAGNOSIS_STORAGE_KEY = 'kimikea_style_diagnosis_result_v1';
@@ -8322,7 +8353,7 @@
         || product.imageUrl
         || product['色見本画像URL']
         || product['画像URL']
-      );
+      ) || orderProductBundledImageUrl(product);
       const label = colorDisplayName(color);
       if (!src) return colorImageMarkup(color, 'order-product-image');
       return `<span class="order-product-image"><img src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.parentElement.classList.add('is-missing');this.remove();"><span>画像準備中</span></span>`;
@@ -13250,7 +13281,7 @@
         color: product.color,
         colorName: product.colorName || product.color,
         category: product.category,
-        swatchImageUrl: orderProductImageUrl(product.swatchImageUrl || product.imageUrl || ''),
+        swatchImageUrl: orderProductImageUrl(product.swatchImageUrl || product.imageUrl || '') || orderProductBundledImageUrl(product),
       };
     }
 
