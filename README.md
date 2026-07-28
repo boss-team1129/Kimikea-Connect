@@ -21,6 +21,19 @@ Kimikea Connect は、注文サイトではない。
 - キャッシュ対策は公開URLを変えず、ファイルのバージョン更新やキャッシュ更新で対応する
 - 今後の更新でも、既存のログイン情報、投稿データ、注文履歴、保存データを削除しない
 
+## 固定ディープリンクURL
+
+ホームページ、Instagram、LINEなどから各画面へ直接案内するURLは以下に統一する。
+
+- カラーチャート: [https://boss-team1129.github.io/Kimikea-Connect/color-chart/](https://boss-team1129.github.io/Kimikea-Connect/color-chart/)
+- 注文画面: [https://boss-team1129.github.io/Kimikea-Connect/order/](https://boss-team1129.github.io/Kimikea-Connect/order/)
+- AI診断: [https://boss-team1129.github.io/Kimikea-Connect/ai-diagnosis/](https://boss-team1129.github.io/Kimikea-Connect/ai-diagnosis/)
+- 加盟店マップ: [https://boss-team1129.github.io/Kimikea-Connect/map/](https://boss-team1129.github.io/Kimikea-Connect/map/)
+- スタイル図鑑: [https://boss-team1129.github.io/Kimikea-Connect/stylebook/](https://boss-team1129.github.io/Kimikea-Connect/stylebook/)
+- マイページ: [https://boss-team1129.github.io/Kimikea-Connect/mypage/](https://boss-team1129.github.io/Kimikea-Connect/mypage/)
+
+各ディープリンクはGitHub Pages上の固定パスとして管理し、必要な画面へ自動遷移する。
+
 ## 目的
 
 - 加盟店・コーディネーターが毎日の仕事で使える
