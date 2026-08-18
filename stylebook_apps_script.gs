@@ -740,25 +740,6 @@ function canDeletePost_(post, authOrUser) {
   return canManagePost_(post, authOrUser);
 }
 
-function canStaffManagePost_(post, auth) {
-  const user = auth.user;
-  if (!user) return false;
-  const postShopId = String(post && post.shopId || '').trim();
-  const userShopId = String(user.shopId || '').trim();
-  if (postShopId && userShopId && postShopId !== userShopId) return false;
-  const authorId = postAuthorId_(post);
-  if (authorId && !sameUserId_(authorId, user.id)) return false;
-  const postStaffId = String(post && post.staffId || '').trim();
-  if (postStaffId) return postStaffId === String(auth.staffId || user.staffId || '').trim();
-  const postStaffName = String(post && post.staffName || '').trim();
-  if (postStaffName && auth.staffName) return postStaffName === String(auth.staffName || '').trim();
-  return Boolean(authorId && sameUserId_(authorId, user.id));
-}
-
-function canVisitorManagePost_(post, auth) {
-  return canEditPasscodeManagePost_(post, auth);
-}
-
 function canEditPasscodeManagePost_(post, auth) {
   const storedHash = String(post && post.editPasscodeHash || '').trim();
   return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
