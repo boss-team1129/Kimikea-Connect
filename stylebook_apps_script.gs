@@ -745,6 +745,42 @@ function canEditPasscodeManagePost_(post, auth) {
   return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
 }
 
+function setStylebookEditPasscodeForPost(postId, passcode) {
+  const normalizedPostId = String(postId || '').trim();
+  const hash = hashStylebookPasscode_(passcode);
+  if (!normalizedPostId) throw new Error('postIdを指定してください。');
+  if (!hash) throw new Error('編集パスワードを指定してください。');
+
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) throw new Error('style_postsに投稿データがありません。');
+
+  const headers = values[0].map(function(header) {
+    return String(header || '').trim();
+  });
+  const idColumnIndex = headers.indexOf('id');
+  const hashColumnIndex = headers.indexOf('editPasscodeHash');
+  if (idColumnIndex < 0) throw new Error('style_postsにid列がありません。');
+  if (hashColumnIndex < 0) throw new Error('style_postsにeditPasscodeHash列がありません。');
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const rowPostId = String(values[rowIndex][idColumnIndex] || '').trim();
+    if (rowPostId !== normalizedPostId) continue;
+    sheet.getRange(rowIndex + 1, hashColumnIndex + 1).setValue(hash);
+    SpreadsheetApp.flush();
+    Logger.log('style_posts editPasscodeHash set: postId=%s', normalizedPostId);
+    return {
+      ok: true,
+      postId: normalizedPostId,
+      updatedColumn: 'editPasscodeHash',
+    };
+  }
+
+  throw new Error('指定されたpostIdの投稿が見つかりません。postId=' + normalizedPostId);
+}
+
 function hashStylebookPasscode_(passcode) {
   const value = String(passcode || '').trim();
   if (!value) return '';
