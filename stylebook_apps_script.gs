@@ -426,7 +426,8 @@ function savePost_(post, userId, authContext) {
   const user = auth.user;
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
-  if (!existing && !auth.franchiseEditPasscode) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
+  const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(auth.franchiseEditPasscode);
+  if (!existing && !newPostEditPasscodeHash) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
   if (existing && !auth.editPasscode) throw new Error('加盟店IDを入力してください。');
   if (existing && !canManagePost_(existing.object, auth)) {
     throw new Error('この投稿を編集する権限がありません。');
@@ -488,7 +489,7 @@ function savePost_(post, userId, authContext) {
     authorId: existing ? postAuthorId_(existing.object) : ((user && user.id) || ''),
     isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
     visitorId: existing ? String(existing.object.visitorId || '') : (!user ? auth.visitorId : ''),
-    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : hashStylebookPasscode_(auth.franchiseEditPasscode),
+    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : newPostEditPasscodeHash,
   };
   const sheetStart = Date.now();
   const writeResult = upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
