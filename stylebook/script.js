@@ -15,7 +15,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-form-clean-2';
+const STYLEBOOK_ASSET_VERSION = '20260818-form-clean-3';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -129,10 +129,6 @@ const el = {
   staffNameInput: document.getElementById('staffNameInput'),
   visitorPasscodeField: document.getElementById('visitorPasscodeField'),
   visitorPasscodeInput: document.getElementById('visitorPasscodeInput'),
-  shopNameOptions: document.getElementById('shopNameOptions'),
-  staffNameOptions: document.getElementById('staffNameOptions'),
-  shopSelect: document.getElementById('shopSelect'),
-  staffSelect: document.getElementById('staffSelect'),
   cancelEditButton: document.getElementById('cancelEditButton'),
   formMessage: document.getElementById('formMessage'),
 };
@@ -933,15 +929,12 @@ function postVisitorId(post) {
 }
 
 function currentSelectedStaffId() {
-  const selected = String(el.staffSelect?.value || '').trim();
-  if (selected) return selected;
   const saved = readSelectedStaffForDevice(currentUser()?.shopId || '');
   return String(saved?.staffId || currentUser()?.staffId || '').trim();
 }
 
 function currentSelectedStaffName() {
-  const selectedOption = Array.from(el.staffSelect?.options || []).find(option => option.value === el.staffSelect?.value);
-  return String(selectedOption?.textContent || el.staffNameInput?.value || readSelectedStaffForDevice(currentUser()?.shopId || '')?.staffName || '').trim();
+  return String(readSelectedStaffForDevice(currentUser()?.shopId || '')?.staffName || currentUser()?.displayName || currentUser()?.name || '').trim();
 }
 
 function isStaffPostOwner(post) {
@@ -1287,25 +1280,6 @@ function renderSelectOptions() {
     .filter(type => type.isActive)
     .map(type => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
     .join('');
-  if (el.shopSelect) {
-    el.shopSelect.innerHTML = state.db.shops
-      .filter(shop => shop.isActive)
-      .map(shop => `<option value="${shop.id}">${escapeHtml(shop.name)}</option>`)
-      .join('');
-  }
-  if (el.shopNameOptions) {
-    el.shopNameOptions.innerHTML = state.db.shops
-      .filter(shop => shop.isActive)
-      .map(shop => `<option value="${escapeHtml(shop.name)}"></option>`)
-      .join('');
-  }
-  if (el.staffNameOptions) {
-    el.staffNameOptions.innerHTML = state.db.staff
-      .filter(person => person.isActive)
-      .map(person => `<option value="${escapeHtml(person.name)}"></option>`)
-      .join('');
-  }
-  renderStaffSelectForForm();
 }
 
 function renderColorChoiceList() {
@@ -1359,10 +1333,6 @@ function renderColorChoiceList() {
     : '<small>選択中の色はありません。</small>';
 }
 
-function staffOptionIdForUser(user) {
-  return String(user?.staffId || user?.id || '').trim();
-}
-
 function selectedStaffStorageKey(shopId = '') {
   const normalizedShopId = String(shopId || currentUser()?.shopId || 'default').trim() || 'default';
   return `${STAFF_SELECTION_KEY}_${normalizedShopId}`;
@@ -1383,52 +1353,6 @@ function rememberSelectedStaffForDevice(shopId = '', staff = {}) {
   localStorage.setItem(selectedStaffStorageKey(shopId), JSON.stringify({ staffId, staffName }));
 }
 
-function staffOptionsForForm(shopId = '') {
-  const normalizedShopId = String(shopId || '').trim();
-  const options = [];
-  const seen = new Set();
-  const addOption = (id, name, source = 'staff') => {
-    const normalizedId = String(id || '').trim();
-    const normalizedName = String(name || '').trim();
-    const key = normalizedId || normalizedName;
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    options.push({ id: normalizedId || normalizedName, name: normalizedName || normalizedId, source });
-  };
-  (state.db.staff || [])
-    .filter(person => person.isActive && (!normalizedShopId || String(person.shopId || '').trim() === normalizedShopId))
-    .forEach(person => addOption(person.id, person.name, 'staff'));
-  (state.db.users || [])
-    .filter(user => !normalizedShopId || String(user.shopId || '').trim() === normalizedShopId)
-    .forEach(user => addOption(staffOptionIdForUser(user), user.name || user.displayName, 'user'));
-  const user = currentUser();
-  if (user && (!normalizedShopId || String(user.shopId || '').trim() === normalizedShopId)) {
-    addOption(staffOptionIdForUser(user), user.name || user.displayName, 'current-user');
-  }
-  return options;
-}
-
-function renderStaffSelectForForm() {
-  if (!el.staffSelect || !el.shopSelect) return;
-  const shopId = el.shopSelect.value || '';
-  const options = staffOptionsForForm(shopId);
-  const currentStaffName = String(el.staffNameInput?.value || '').trim();
-  const currentUserStaffId = String(currentUser()?.staffId || currentUser()?.id || '').trim();
-  const savedStaff = readSelectedStaffForDevice(shopId);
-  el.staffSelect.innerHTML = [
-    '<option value="">スタッフを選択してください</option>',
-    ...options.map(person => `<option value="${escapeHtml(person.id)}">${escapeHtml(person.name)}</option>`),
-  ].join('');
-  const matchedSaved = options.find(person => savedStaff && (person.id === savedStaff.staffId || person.name === savedStaff.staffName));
-  const matchedByName = options.find(person => currentStaffName && person.name === currentStaffName);
-  const matchedCurrentUser = options.find(person => currentUserStaffId && person.id === currentUserStaffId);
-  const selected = matchedSaved || matchedByName || (options.length === 1 ? options[0] : null) || matchedCurrentUser;
-  if (selected) {
-    el.staffSelect.value = selected.id;
-    if (el.staffNameInput && (!currentStaffName || matchedSaved)) el.staffNameInput.value = selected.name;
-  }
-}
-
 function findShopByName(name) {
   const normalized = String(name || '').trim();
   return state.db.shops.find(shop => shop.isActive && shop.name === normalized) || null;
@@ -1439,18 +1363,6 @@ function findStaffByName(name, shopId = '') {
   return state.db.staff.find(person => person.isActive && person.name === normalized && (!shopId || person.shopId === shopId))
     || state.db.staff.find(person => person.isActive && person.name === normalized)
     || null;
-}
-
-function applySelectedStaffToForm() {
-  if (!el.staffSelect || !el.staffNameInput) return;
-  const option = Array.from(el.staffSelect.options || []).find(item => item.value === el.staffSelect.value);
-  if (!option || !option.value) return;
-  const staffName = option.textContent.trim();
-  el.staffNameInput.value = staffName;
-  rememberSelectedStaffForDevice(el.shopSelect?.value || currentUser()?.shopId || '', {
-    staffId: option.value,
-    staffName,
-  });
 }
 
 function colorLabels(post) {
@@ -2116,26 +2028,12 @@ function clearPostForm() {
   el.additionalImagesInput.value = '';
   if (el.salonNameInput) el.salonNameInput.value = '';
   if (el.staffNameInput) el.staffNameInput.value = '';
-  if (el.shopSelect) el.shopSelect.value = '';
-  if (el.staffSelect) el.staffSelect.value = '';
   if (el.visitorPasscodeInput) el.visitorPasscodeInput.value = '';
   if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
   renderSelectOptions();
-}
-
-function defaultSalonNameForCurrentUser() {
-  const user = currentUser();
-  if (!user) return '';
-  return String(user.shopName || user.salonName || getById('shops', user.shopId)?.name || '').trim();
-}
-
-function defaultStaffNameForCurrentUser() {
-  const user = currentUser();
-  if (!user) return '';
-  return String(user.displayName || user.name || getById('staff', user.staffId)?.name || '').trim();
 }
 
 function updatePostIdentityFields() {
@@ -2156,9 +2054,6 @@ function fillPostForm(post) {
   el.statusInput.value = post.status;
   if (el.salonNameInput) el.salonNameInput.value = displaySalonName(post);
   if (el.staffNameInput) el.staffNameInput.value = displayStaffName(post);
-  if (el.shopSelect) el.shopSelect.value = post.shopId || '';
-  renderStaffSelectForForm();
-  if (el.staffSelect) el.staffSelect.value = post.staffId || '';
   if (el.colorSelect) {
     Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
   }
@@ -2211,8 +2106,8 @@ async function submitPost(event) {
     ...state.currentAdditionalImageData,
   ].filter(Boolean);
   const selectedColorIds = selectedValues(el.colorSelect);
-  const salonName = editing ? displaySalonName(editing) : '';
-  const staffName = editing ? displayStaffName(editing) : '';
+  const salonName = String(el.salonNameInput?.value || '').trim();
+  const staffName = String(el.staffNameInput?.value || '').trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : '';
   const visitorPasscode = String(el.visitorPasscodeInput?.value || visitorPasscodeForPost(editing?.id) || '').trim();
@@ -2526,15 +2421,6 @@ function bindEvents() {
       renderGallery();
     });
   }
-  if (el.shopSelect) {
-    el.shopSelect.addEventListener('change', () => {
-      renderStaffSelectForForm();
-      applySelectedStaffToForm();
-    });
-  }
-  if (el.staffSelect) {
-    el.staffSelect.addEventListener('change', applySelectedStaffToForm);
-  }
   el.filterToggle.addEventListener('click', () => { el.filterPanel.hidden = !el.filterPanel.hidden; });
   el.sortSelect.addEventListener('change', event => { state.sort = event.target.value; renderGallery(); });
   el.savedOnlyToggle.addEventListener('change', event => { state.savedOnly = event.target.checked; renderGallery(); });
@@ -2549,7 +2435,6 @@ function bindEvents() {
     state.selectedStaffIds = new Set(selectedValues(el.staffFilter));
     renderGallery();
   });
-  if (el.shopSelect) el.shopSelect.addEventListener('change', renderStaffSelectForForm);
   el.imageInput.addEventListener('change', async event => {
     const file = event.target.files?.[0];
     if (!file) return;
