@@ -14,7 +14,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-franchise-passcode-1';
+const STYLEBOOK_ASSET_VERSION = '20260818-loading-ux-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -74,6 +74,8 @@ const state = {
   isSubmittingPost: false,
   currentManageEditPasscode: '',
   currentManagedPosts: [],
+  mineLoadState: 'idle',
+  mineLoadError: '',
   externalShopId: STYLEBOOK_INITIAL_SHOP_ID,
   externalShopName: STYLEBOOK_INITIAL_SHOP_NAME,
   externalShopScopeApplied: false,
@@ -627,6 +629,16 @@ function syncCurrentUserFromConnectSession() {
   state.currentUserId = user.id;
   localStorage.setItem(SESSION_KEY, user.id);
   return previousUserId !== normalizeUserId(user.id);
+}
+
+function syncCurrentUserIdFromConnectSessionBeforeLoad() {
+  const franchiseUserId = stylebookUserIdFromFranchise(readConnectFranchiseSession());
+  if (!franchiseUserId || isSameUserId(state.currentUserId, franchiseUserId)) return false;
+  const previousUserId = state.currentUserId;
+  state.currentUserId = franchiseUserId;
+  localStorage.setItem(SESSION_KEY, franchiseUserId);
+  clearStylebookUserCaches(previousUserId);
+  return true;
 }
 
 function applyExternalShopScope() {
@@ -1462,10 +1474,17 @@ function renderActiveChips() {
 function renderGalleryLoading() {
   el.galleryGrid.innerHTML = `
     <div class="gallery-loading-state" aria-live="polite">
-      <strong>読み込み中...</strong>
-      <span>スタイルを取得しています</span>
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <strong>スタイルを読み込んでいます...</strong>
+      <span>投稿一覧を準備しています</span>
       <div class="skeleton-gallery" aria-hidden="true">
-        ${Array.from({ length: 6 }).map(() => '<i></i>').join('')}
+        ${Array.from({ length: 6 }).map(() => `
+          <i>
+            <b></b>
+            <em></em>
+            <small></small>
+          </i>
+        `).join('')}
       </div>
     </div>`;
 }
@@ -1826,6 +1845,8 @@ async function showDrafts(options = {}) {
 }
 
 function renderMinePasscodeForm(message = '') {
+  state.mineLoadState = 'idle';
+  state.mineLoadError = message || '';
   el.mineGrid.innerHTML = `
     <form id="minePasscodeForm" class="post-form">
       <label class="field">
@@ -1846,15 +1867,43 @@ function renderMinePasscodeForm(message = '') {
   }
 }
 
+function renderMineLoading() {
+  state.mineLoadState = 'loading';
+  state.mineLoadError = '';
+  el.mineGrid.innerHTML = `
+    <div class="mine-loading-state" aria-live="polite">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <strong>投稿を読み込んでいます...</strong>
+      <span>加盟店IDに紐づく投稿を確認しています</span>
+    </div>`;
+}
+
+function renderMineError(message = '') {
+  state.mineLoadState = 'error';
+  state.mineLoadError = message || '投稿の読み込みに失敗しました。もう一度お試しください。';
+  el.mineGrid.innerHTML = `
+    <div class="empty-state">
+      <strong>投稿の読み込みに失敗しました。もう一度お試しください。</strong>
+      ${message ? `<span>${escapeHtml(message)}</span>` : ''}
+      <button class="primary-button" type="button" data-action="show-mine">再試行する</button>
+    </div>`;
+}
+
 function renderMine(posts = state.currentManagedPosts) {
+  if (state.mineLoadState === 'loading') {
+    renderMineLoading();
+    return;
+  }
   const published = posts.filter(post => post.isPublished && post.status === 'published');
   const drafts = posts.filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished);
+  state.mineLoadState = posts.length ? 'success' : 'empty';
+  state.mineLoadError = '';
   el.mineGrid.innerHTML = posts.length ? `
     <div class="manage-section-title">公開中 ${published.length}件</div>
     ${published.map(post => renderManageItem(post, 'mine')).join('') || '<p class="empty-state compact">公開中の投稿はありません。</p>'}
     <div class="manage-section-title">下書き ${drafts.length}件</div>
     ${drafts.map(post => renderManageItem(post, 'drafts')).join('') || '<p class="empty-state compact">下書きはありません。</p>'}
-  ` : '<p class="empty-state">自分の投稿はまだありません。</p>';
+  ` : '<p class="empty-state">自分の投稿はありません。</p>';
 }
 
 async function showMine(options = {}) {
@@ -1866,9 +1915,10 @@ async function showMine(options = {}) {
     renderMinePasscodeForm();
     return;
   }
-  el.mineGrid.innerHTML = '<p class="empty-state">投稿を読み込んでいます...</p>';
+  renderMineLoading();
   try {
-    state.currentManagedPosts = state.backendMode === 'remote'
+    const shouldFetchRemote = state.backendMode === 'remote' || hasRemoteApi();
+    state.currentManagedPosts = shouldFetchRemote
       ? await fetchPostsByEditPasscodeFromApi(state.currentManageEditPasscode)
       : [];
     state.currentManagedPosts.forEach(upsertLocalPost);
@@ -1876,7 +1926,7 @@ async function showMine(options = {}) {
   } catch (error) {
     state.currentManageEditPasscode = '';
     state.currentManagedPosts = [];
-    renderMinePasscodeForm(error.message || '投稿を取得できませんでした。');
+    renderMineError(error.message || '');
   }
 }
 
@@ -2628,6 +2678,7 @@ async function init() {
   if (!state.db) {
     state.backendMode = hasRemoteApi() ? 'loading' : 'local';
   }
+  syncCurrentUserIdFromConnectSessionBeforeLoad();
   primeDbForImmediateNavigation();
   bindEvents();
   showView('menu', { push: false });
