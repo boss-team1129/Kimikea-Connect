@@ -15,7 +15,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-form-clean-3';
+const STYLEBOOK_ASSET_VERSION = '20260818-edit-code-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -127,8 +127,7 @@ const el = {
   statusInput: document.getElementById('statusInput'),
   salonNameInput: document.getElementById('salonNameInput'),
   staffNameInput: document.getElementById('staffNameInput'),
-  visitorPasscodeField: document.getElementById('visitorPasscodeField'),
-  visitorPasscodeInput: document.getElementById('visitorPasscodeInput'),
+  editCodeInput: document.getElementById('editCodeInput'),
   cancelEditButton: document.getElementById('cancelEditButton'),
   formMessage: document.getElementById('formMessage'),
 };
@@ -973,6 +972,25 @@ function visitorPasscodeForPost(postId) {
   return String(visitorPasscodes()[String(postId || '').trim()] || '').trim();
 }
 
+function postEditCode(post) {
+  return String(post?.editCode || post?.editPasscode || '').trim();
+}
+
+function requirePostEditCode(post, actionLabel = '編集') {
+  const savedCode = postEditCode(post);
+  if (!savedCode) {
+    alert('この投稿には編集パスコードが設定されていません。管理者にお問い合わせください。');
+    return false;
+  }
+  const inputCode = prompt(`${actionLabel}パスコードを入力してください`);
+  if (inputCode === null) return false;
+  if (String(inputCode).trim() !== savedCode) {
+    alert('編集パスコードが違います');
+    return false;
+  }
+  return true;
+}
+
 function getStylebookVisitorId() {
   let visitorId = String(localStorage.getItem(VISITOR_ID_KEY) || '').trim();
   if (!visitorId) {
@@ -993,13 +1011,11 @@ function isPostAuthor(post) {
 }
 
 function canEditPost(post) {
-  if (canManageAll()) return true;
-  return isPostAuthor(post);
+  return Boolean(post && !isDeletedStylePost(post));
 }
 
 function canDeletePost(post) {
-  if (canManageAll()) return true;
-  return isPostAuthor(post);
+  return Boolean(post && !isDeletedStylePost(post));
 }
 
 function canManagePost(post) {
@@ -1018,7 +1034,7 @@ function detailModeForCurrentView() {
 
 function canShowManageButtons(post, mode = 'public') {
   const detailMode = normalizeDetailMode(mode);
-  if (detailMode === 'myPosts') return isPostAuthor(post);
+  if (detailMode === 'myPosts') return true;
   if (detailMode === 'admin') return canManageAll();
   return false;
 }
@@ -1802,6 +1818,12 @@ function ownPosts({ draftsOnly = false } = {}) {
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
+function managedPosts() {
+  return state.db.stylePosts
+    .filter(post => !isDeletedStylePost(post))
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+}
+
 function renderDrafts(posts = ownPosts({ draftsOnly: true })) {
   el.draftsGrid.innerHTML = posts.length ? posts.map(post => renderManageItem(post, 'drafts')).join('') : '<p class="empty-state">下書きはまだありません。</p>';
 }
@@ -1820,7 +1842,7 @@ async function showDrafts(options = {}) {
   }
 }
 
-function renderMine(posts = ownPosts()) {
+function renderMine(posts = managedPosts()) {
   const published = posts.filter(post => post.isPublished && post.status === 'published');
   const drafts = posts.filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished);
   el.mineGrid.innerHTML = posts.length ? `
@@ -1834,14 +1856,12 @@ function renderMine(posts = ownPosts()) {
 async function showMine(options = {}) {
   const { push = true } = options;
   showView('mine', { push });
-  el.mineGrid.innerHTML = '<p class="empty-state">自分の投稿を読み込んでいます...</p>';
+  el.mineGrid.innerHTML = '<p class="empty-state">投稿を読み込んでいます...</p>';
   try {
-    const posts = state.backendMode === 'remote'
-      ? await fetchOwnPostsFromApi({ draftsOnly: false })
-      : ownPosts();
-    renderMine(posts);
+    if (state.backendMode === 'remote') await refreshRemoteDb();
+    renderMine(managedPosts());
   } catch (error) {
-    el.mineGrid.innerHTML = `<p class="empty-state">${escapeHtml(error.message || '自分の投稿を取得できませんでした。')}</p>`;
+    el.mineGrid.innerHTML = `<p class="empty-state">${escapeHtml(error.message || '投稿を取得できませんでした。')}</p>`;
   }
 }
 
@@ -2028,8 +2048,7 @@ function clearPostForm() {
   el.additionalImagesInput.value = '';
   if (el.salonNameInput) el.salonNameInput.value = '';
   if (el.staffNameInput) el.staffNameInput.value = '';
-  if (el.visitorPasscodeInput) el.visitorPasscodeInput.value = '';
-  if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
+  if (el.editCodeInput) el.editCodeInput.value = '';
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
@@ -2037,8 +2056,7 @@ function clearPostForm() {
 }
 
 function updatePostIdentityFields() {
-  if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
-  if (el.visitorPasscodeInput) el.visitorPasscodeInput.required = !currentUser() && !state.currentEditId;
+  if (el.editCodeInput) el.editCodeInput.required = !state.currentEditId;
 }
 
 function fillPostForm(post) {
@@ -2054,6 +2072,7 @@ function fillPostForm(post) {
   el.statusInput.value = post.status;
   if (el.salonNameInput) el.salonNameInput.value = displaySalonName(post);
   if (el.staffNameInput) el.staffNameInput.value = displayStaffName(post);
+  if (el.editCodeInput) el.editCodeInput.value = postEditCode(post);
   if (el.colorSelect) {
     Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
   }
@@ -2073,6 +2092,7 @@ function showPostForm(postId = '', options = {}) {
       alert('この投稿を編集する権限がありません。');
       return;
     }
+    if (!requirePostEditCode(post, '編集')) return;
     fillPostForm(post);
     updatePostIdentityFields();
   } else {
@@ -2108,11 +2128,11 @@ async function submitPost(event) {
   const selectedColorIds = selectedValues(el.colorSelect);
   const salonName = String(el.salonNameInput?.value || '').trim();
   const staffName = String(el.staffNameInput?.value || '').trim();
+  const editCode = String(el.editCodeInput?.value || '').trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : '';
-  const visitorPasscode = String(el.visitorPasscodeInput?.value || visitorPasscodeForPost(editing?.id) || '').trim();
-  if (!user && !editing && visitorPasscode.length < 4) {
-    el.formMessage.textContent = '一般投稿では、編集・削除用パスコードを4文字以上で入力してください。';
+  if (!editCode) {
+    el.formMessage.textContent = '編集パスコードを入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -2141,7 +2161,8 @@ async function submitPost(event) {
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
     visitorId: editing?.visitorId || (!user ? getStylebookVisitorId() : ''),
-    editPasscode: !user ? visitorPasscode : visitorPasscodeForPost(editing?.id),
+    editCode,
+    editPasscode: editCode,
   };
   if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount)) {
     el.formMessage.textContent = '公開するには、写真、本数、施術を入力してください。';
@@ -2158,7 +2179,6 @@ async function submitPost(event) {
         throw new Error(result?.message || '投稿データを本番管理表へ保存できませんでした。');
       }
       upsertLocalPost(result.post || post);
-      if (!user && visitorPasscode) rememberVisitorPasscode(result.id || post.id, visitorPasscode);
       clearPostForm();
       setPostSubmitting(false);
       alert(requestedStatus === 'draft' ? '下書きを保存しました。' : '投稿しました。');
@@ -2209,12 +2229,14 @@ async function logicalDeletePost(postId) {
     alert('この投稿を削除する権限がありません。');
     return;
   }
+  if (!requirePostEditCode(post, '削除')) return;
+  const editCode = postEditCode(post);
   if (!confirm('この投稿を削除します。よろしいですか？')) return;
   const reason = '投稿者本人による削除';
   const previousPost = { ...post };
   try {
     if (state.backendMode === 'remote') {
-      const result = await apiRequest('deletePost', { postId, reason });
+      const result = await apiRequest('deletePost', { postId, reason, editCode, editPasscode: editCode });
       markLocalPostDeleted(postId, result.post);
     } else {
       post.deletedAt = new Date().toISOString();
