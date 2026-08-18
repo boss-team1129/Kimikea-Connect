@@ -15,7 +15,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260725-public-stylebook-auth-1';
+const STYLEBOOK_ASSET_VERSION = '20260818-form-clean-2';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -940,7 +940,7 @@ function currentSelectedStaffId() {
 }
 
 function currentSelectedStaffName() {
-  const selectedOption = Array.from(el.staffSelect?.options || []).find(option => option.value === el.staffSelect.value);
+  const selectedOption = Array.from(el.staffSelect?.options || []).find(option => option.value === el.staffSelect?.value);
   return String(selectedOption?.textContent || el.staffNameInput?.value || readSelectedStaffForDevice(currentUser()?.shopId || '')?.staffName || '').trim();
 }
 
@@ -1287,18 +1287,24 @@ function renderSelectOptions() {
     .filter(type => type.isActive)
     .map(type => `<option value="${type.id}">${escapeHtml(type.name)}</option>`)
     .join('');
-  el.shopSelect.innerHTML = state.db.shops
-    .filter(shop => shop.isActive)
-    .map(shop => `<option value="${shop.id}">${escapeHtml(shop.name)}</option>`)
-    .join('');
-  el.shopNameOptions.innerHTML = state.db.shops
-    .filter(shop => shop.isActive)
-    .map(shop => `<option value="${escapeHtml(shop.name)}"></option>`)
-    .join('');
-  el.staffNameOptions.innerHTML = state.db.staff
-    .filter(person => person.isActive)
-    .map(person => `<option value="${escapeHtml(person.name)}"></option>`)
-    .join('');
+  if (el.shopSelect) {
+    el.shopSelect.innerHTML = state.db.shops
+      .filter(shop => shop.isActive)
+      .map(shop => `<option value="${shop.id}">${escapeHtml(shop.name)}</option>`)
+      .join('');
+  }
+  if (el.shopNameOptions) {
+    el.shopNameOptions.innerHTML = state.db.shops
+      .filter(shop => shop.isActive)
+      .map(shop => `<option value="${escapeHtml(shop.name)}"></option>`)
+      .join('');
+  }
+  if (el.staffNameOptions) {
+    el.staffNameOptions.innerHTML = state.db.staff
+      .filter(person => person.isActive)
+      .map(person => `<option value="${escapeHtml(person.name)}"></option>`)
+      .join('');
+  }
   renderStaffSelectForForm();
 }
 
@@ -1403,8 +1409,8 @@ function staffOptionsForForm(shopId = '') {
 }
 
 function renderStaffSelectForForm() {
+  if (!el.staffSelect || !el.shopSelect) return;
   const shopId = el.shopSelect.value || '';
-  if (!el.staffSelect) return;
   const options = staffOptionsForForm(shopId);
   const currentStaffName = String(el.staffNameInput?.value || '').trim();
   const currentUserStaffId = String(currentUser()?.staffId || currentUser()?.id || '').trim();
@@ -2108,10 +2114,10 @@ function clearPostForm() {
   el.postForm.reset();
   el.postId.value = '';
   el.additionalImagesInput.value = '';
-  el.salonNameInput.value = '';
-  el.staffNameInput.value = '';
-  el.shopSelect.value = '';
-  el.staffSelect.value = '';
+  if (el.salonNameInput) el.salonNameInput.value = '';
+  if (el.staffNameInput) el.staffNameInput.value = '';
+  if (el.shopSelect) el.shopSelect.value = '';
+  if (el.staffSelect) el.staffSelect.value = '';
   if (el.visitorPasscodeInput) el.visitorPasscodeInput.value = '';
   if (el.visitorPasscodeField) el.visitorPasscodeField.hidden = Boolean(currentUser());
   el.imagePreview.innerHTML = '写真プレビュー';
@@ -2148,11 +2154,11 @@ function fillPostForm(post) {
   state.currentAdditionalImageData = [];
   el.extensionCountInput.value = post.extensionCount;
   el.statusInput.value = post.status;
-  el.salonNameInput.value = displaySalonName(post);
-  el.staffNameInput.value = displayStaffName(post);
-  el.shopSelect.value = post.shopId || '';
+  if (el.salonNameInput) el.salonNameInput.value = displaySalonName(post);
+  if (el.staffNameInput) el.staffNameInput.value = displayStaffName(post);
+  if (el.shopSelect) el.shopSelect.value = post.shopId || '';
   renderStaffSelectForForm();
-  el.staffSelect.value = post.staffId || '';
+  if (el.staffSelect) el.staffSelect.value = post.staffId || '';
   if (el.colorSelect) {
     Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
   }
@@ -2175,12 +2181,6 @@ function showPostForm(postId = '', options = {}) {
     fillPostForm(post);
     updatePostIdentityFields();
   } else {
-    el.salonNameInput.value = defaultSalonNameForCurrentUser();
-    el.staffNameInput.value = defaultStaffNameForCurrentUser();
-    const user = currentUser();
-    if (user?.shopId) el.shopSelect.value = user.shopId;
-    renderStaffSelectForForm();
-    if (!el.staffNameInput.value) applySelectedStaffToForm();
     updatePostIdentityFields();
   }
   showView('post', { push, id: postId });
@@ -2211,18 +2211,17 @@ async function submitPost(event) {
     ...state.currentAdditionalImageData,
   ].filter(Boolean);
   const selectedColorIds = selectedValues(el.colorSelect);
-  const salonName = el.salonNameInput.value.trim();
-  if (!el.staffNameInput.value.trim()) applySelectedStaffToForm();
-  const staffName = el.staffNameInput.value.trim();
+  const salonName = editing ? displaySalonName(editing) : '';
+  const staffName = editing ? displayStaffName(editing) : '';
   const user = currentUser();
-  const resolvedShopId = editing ? (editing.shopId || '') : (user?.shopId || '');
+  const resolvedShopId = editing ? (editing.shopId || '') : '';
   const visitorPasscode = String(el.visitorPasscodeInput?.value || visitorPasscodeForPost(editing?.id) || '').trim();
   if (!user && !editing && visitorPasscode.length < 4) {
     el.formMessage.textContent = '一般投稿では、編集・削除用パスコードを4文字以上で入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
-  const resolvedStaffId = editing ? (editing.staffId || '') : (el.staffSelect?.value || user?.staffId || '');
+  const resolvedStaffId = editing ? (editing.staffId || '') : '';
   const post = {
     id: editing?.id || uid('post'),
     title: el.titleInput.value.trim(),
@@ -2249,8 +2248,8 @@ async function submitPost(event) {
     visitorId: editing?.visitorId || (!user ? getStylebookVisitorId() : ''),
     editPasscode: !user ? visitorPasscode : visitorPasscodeForPost(editing?.id),
   };
-  if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount || !post.salonName || !post.staffName)) {
-    el.formMessage.textContent = '公開するには、写真、本数、施術、サロン名、担当者名を入力してください。';
+  if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount)) {
+    el.formMessage.textContent = '公開するには、写真、本数、施術を入力してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -2527,10 +2526,12 @@ function bindEvents() {
       renderGallery();
     });
   }
-  el.shopSelect.addEventListener('change', () => {
-    renderStaffSelectForForm();
-    applySelectedStaffToForm();
-  });
+  if (el.shopSelect) {
+    el.shopSelect.addEventListener('change', () => {
+      renderStaffSelectForForm();
+      applySelectedStaffToForm();
+    });
+  }
   if (el.staffSelect) {
     el.staffSelect.addEventListener('change', applySelectedStaffToForm);
   }
@@ -2548,7 +2549,7 @@ function bindEvents() {
     state.selectedStaffIds = new Set(selectedValues(el.staffFilter));
     renderGallery();
   });
-  el.shopSelect.addEventListener('change', renderStaffSelectForForm);
+  if (el.shopSelect) el.shopSelect.addEventListener('change', renderStaffSelectForForm);
   el.imageInput.addEventListener('change', async event => {
     const file = event.target.files?.[0];
     if (!file) return;

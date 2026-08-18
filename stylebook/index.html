@@ -171,26 +171,11 @@
         </label>
         <input id="statusInput" type="hidden" value="published">
         <div class="field-grid">
-          <label class="field">
-            <span>サロン名</span>
-            <input id="salonNameInput" type="text" list="shopNameOptions" placeholder="エクステランド" required>
-          </label>
-          <label class="field">
-            <span>スタッフ選択</span>
-            <select id="staffSelect"></select>
-          </label>
-          <label class="field">
-            <span>担当者名</span>
-            <input id="staffNameInput" type="text" list="staffNameOptions" placeholder="鈴木花子" required>
-          </label>
           <label id="visitorPasscodeField" class="field" hidden>
             <span>編集・削除用パスコード</span>
             <input id="visitorPasscodeInput" type="text" inputmode="text" autocomplete="off" placeholder="4文字以上" minlength="4">
           </label>
         </div>
-        <datalist id="shopNameOptions"></datalist>
-        <datalist id="staffNameOptions"></datalist>
-        <select id="shopSelect" hidden></select>
 
         <div class="form-actions">
           <button id="cancelEditButton" class="ghost-button" type="button" hidden>編集をやめる</button>
@@ -250,7 +235,7 @@
 
   </main>
 
-  <script src="./script.js?v=20260725-public-stylebook-auth-1"></script>
+  <script src="./script.js?v=20260818-form-clean-2"></script>
   <script src="../shared-nav.js?v=20260714-nav-1"></script>
 </body>
 </html>
