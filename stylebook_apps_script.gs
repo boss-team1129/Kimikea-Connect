@@ -105,6 +105,7 @@ function doPost(e) {
     });
     const auth = stylebookAuthContext_(payload, userId);
     if (action === 'savePost') return json_(savePost_(payload.post, userId, auth));
+    if (action === 'getPostsByEditPasscode') return json_(getStylebookPostsByEditPasscode_(payload.editPasscode || ''));
     if (action === 'publishPost') return json_(publishPost_(payload.postId, userId, auth));
     if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || '', auth));
     if (action === 'restorePost') return json_(restorePost_(payload.postId, userId));
@@ -199,6 +200,18 @@ function getOwnStylebookPosts_(userId, draftsOnly) {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
       return draftsOnly ? isDraft : true;
     })
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+}
+
+function getStylebookPostsByEditPasscode_(editPasscode) {
+  const hash = hashStylebookPasscode_(editPasscode);
+  if (!hash) throw new Error('編集パスワードを入力してください。');
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
+    .filter(row => String(row.editPasscodeHash || '').trim() === hash)
+    .map(normalizePost_)
+    .filter(post => !isDeletedStylebookPost_(post))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
@@ -411,7 +424,7 @@ function savePost_(post, userId, authContext) {
   const setupMs = Date.now() - startedAt;
   const auth = authContext || stylebookAuthContext_({ post }, userId);
   const user = auth.user;
-  if (!user && !(auth.visitorId && auth.editPasscode)) throw new Error('一般投稿では編集・削除用パスコードが必要です。');
+  if (!auth.editPasscode) throw new Error('編集パスワードを入力してください。');
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
   if (existing && !canManagePost_(existing.object, auth)) {
@@ -441,12 +454,12 @@ function savePost_(post, userId, authContext) {
   const submittedStaffName = String(post.staffName || '').trim();
   const fallbackSalonName = String(getShopName_(resolvedShopId) || (user && (user.shopName || user.name)) || '').trim();
   const fallbackStaffName = String(getStaffName_(resolvedStaffId) || (user && (user.displayName || user.name)) || '').trim();
-  const resolvedSalonName = submittedSalonName
-    || (hasSubmittedSalonName ? fallbackSalonName : (existing ? String(existing.object.salonName || '').trim() : ''))
-    || fallbackSalonName;
-  const resolvedStaffName = submittedStaffName
-    || (hasSubmittedStaffName ? fallbackStaffName : (existing ? String(existing.object.staffName || '').trim() : ''))
-    || fallbackStaffName;
+  const resolvedSalonName = hasSubmittedSalonName
+    ? submittedSalonName
+    : ((existing ? String(existing.object.salonName || '').trim() : '') || fallbackSalonName);
+  const resolvedStaffName = hasSubmittedStaffName
+    ? submittedStaffName
+    : ((existing ? String(existing.object.staffName || '').trim() : '') || fallbackStaffName);
   const row = {
     id,
     title: post.title || '',
@@ -474,7 +487,7 @@ function savePost_(post, userId, authContext) {
     authorId: existing ? postAuthorId_(existing.object) : ((user && user.id) || ''),
     isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
     visitorId: existing ? String(existing.object.visitorId || '') : (!user ? auth.visitorId : ''),
-    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : (!user ? hashStylebookPasscode_(auth.editPasscode) : ''),
+    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : hashStylebookPasscode_(auth.editPasscode),
   };
   const sheetStart = Date.now();
   const writeResult = upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
@@ -720,10 +733,7 @@ function canManagePost_(post, authOrUser) {
   const auth = authOrUser && Object.prototype.hasOwnProperty.call(authOrUser, 'user')
     ? authOrUser
     : { user: authOrUser, staffId: '', staffName: '', visitorId: '', editPasscode: '' };
-  const user = auth.user;
-  if (isHeadquartersAdmin_(user)) return true;
-  if (canVisitorManagePost_(post, auth)) return true;
-  return canStaffManagePost_(post, auth);
+  return canEditPasscodeManagePost_(post, auth);
 }
 
 function canDeletePost_(post, authOrUser) {
@@ -746,9 +756,10 @@ function canStaffManagePost_(post, auth) {
 }
 
 function canVisitorManagePost_(post, auth) {
-  const postVisitorId = String(post && post.visitorId || '').trim();
-  if (!postVisitorId) return false;
-  if (postVisitorId && postVisitorId === String(auth.visitorId || '').trim()) return true;
+  return canEditPasscodeManagePost_(post, auth);
+}
+
+function canEditPasscodeManagePost_(post, auth) {
   const storedHash = String(post && post.editPasscodeHash || '').trim();
   return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
 }
