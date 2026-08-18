@@ -786,6 +786,204 @@ function canEditPasscodeManagePost_(post, auth) {
   return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
 }
 
+function previewStylebookEditPasscodeBackfillForExistingPosts() {
+  return backfillStylebookEditPasscodeHashForExistingPosts_(true);
+}
+
+function applyStylebookEditPasscodeBackfillForExistingPosts() {
+  return backfillStylebookEditPasscodeHashForExistingPosts_(false);
+}
+
+function backfillStylebookEditPasscodeHashForExistingPosts_(dryRun, targetNames) {
+  const requestedNames = (Array.isArray(targetNames) && targetNames.length ? targetNames : [
+    'エクステランド',
+    'ガガ藤枝',
+    'OCEAN',
+    'TEAM hair',
+  ])
+    .map(function(name) { return String(name || '').trim(); })
+    .filter(Boolean);
+
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const postValues = postSheet.getDataRange().getValues();
+  if (postValues.length < 2) throw new Error('style_postsに投稿データがありません。');
+
+  const postHeaders = postValues[0].map(function(header) { return String(header || '').trim(); });
+  const hashColumnIndex = postHeaders.indexOf('editPasscodeHash');
+  if (hashColumnIndex < 0) throw new Error('style_postsにeditPasscodeHash列がありません。');
+
+  const targets = resolveStylebookBackfillFranchiseTargets_(ss, requestedNames);
+  const unresolved = targets.filter(function(target) { return !target.memberId; });
+  if (unresolved.length) {
+    throw new Error('加盟店マスタで正式な加盟店IDを確認できない店舗があります: ' + unresolved.map(function(target) {
+      return target.requestedName;
+    }).join('、'));
+  }
+
+  const changedRows = [];
+  const summaries = targets.map(function(target) {
+    const targetHash = hashStylebookPasscode_(target.memberId);
+    const summary = {
+      requestedName: target.requestedName,
+      masterName: target.masterName,
+      memberId: target.memberId,
+      shopId: target.shopId,
+      matched: 0,
+      updated: 0,
+      alreadyCorrect: 0,
+      activeAfterUpdate: 0,
+      rows: [],
+    };
+
+    for (let rowIndex = 1; rowIndex < postValues.length; rowIndex += 1) {
+      const row = postValues[rowIndex];
+      const post = rowToObjectByHeaders_(postHeaders, row);
+      if (!isStylebookBackfillPostForTarget_(post, target)) continue;
+      summary.matched += 1;
+      const currentHash = String(row[hashColumnIndex] || '').trim();
+      const rowNumber = rowIndex + 1;
+      const rowInfo = {
+        row: rowNumber,
+        postId: String(post.id || '').trim(),
+        salonName: String(post.salonName || '').trim(),
+        staffName: String(post.staffName || '').trim(),
+        status: String(post.status || '').trim(),
+        isPublished: normalizeBoolean_(post.isPublished),
+        action: currentHash === targetHash ? 'already_correct' : (dryRun ? 'would_update' : 'updated'),
+      };
+      summary.rows.push(rowInfo);
+      if (currentHash === targetHash) {
+        summary.alreadyCorrect += 1;
+        continue;
+      }
+      summary.updated += 1;
+      changedRows.push({
+        rowNumber,
+        hash: targetHash,
+      });
+    }
+    return summary;
+  });
+
+  if (!dryRun) {
+    changedRows.forEach(function(change) {
+      postSheet.getRange(change.rowNumber, hashColumnIndex + 1).setValue(change.hash);
+    });
+    SpreadsheetApp.flush();
+    summaries.forEach(function(summary) {
+      summary.activeAfterUpdate = getStylebookPostsByEditPasscode_(summary.memberId).length;
+    });
+  }
+
+  Logger.log('style_posts editPasscodeHash backfill %s: targets=%s, changedRows=%s',
+    dryRun ? 'preview' : 'applied',
+    summaries.length,
+    changedRows.length);
+
+  return {
+    ok: true,
+    dryRun: Boolean(dryRun),
+    sheetName: KC_STYLEBOOK.POSTS,
+    hashColumn: 'editPasscodeHash',
+    targetCount: summaries.length,
+    changedRowCount: changedRows.length,
+    summaries,
+  };
+}
+
+function resolveStylebookBackfillFranchiseTargets_(ss, requestedNames) {
+  const franchiseSheet = ss.getSheetByName(KC_STYLEBOOK.FRANCHISE_MASTER);
+  if (!franchiseSheet || franchiseSheet.getLastRow() <= 1) {
+    throw new Error('加盟店マスタに加盟店データがありません。');
+  }
+  const franchises = rowsToObjects_(franchiseSheet);
+  return requestedNames.map(function(requestedName) {
+    const franchise = findStylebookBackfillFranchiseByName_(franchises, requestedName);
+    if (!franchise) {
+      return { requestedName, memberId: '', masterName: '', shopId: '' };
+    }
+    const memberId = String(firstDefined_(franchise.memberId, franchise['memberId'], franchise['加盟店ID'], franchise['会員ID'])).trim();
+    const userId = String(firstDefined_(franchise.userId, franchise['userId'], franchise['ユーザーID'], memberId)).trim();
+    const shopId = String(firstDefined_(franchise.shopId, franchise['shopId'], franchise['店舗ID'], stylebookGeneratedShopId_(memberId || userId))).trim();
+    const masterName = String(firstDefined_(franchise.salonName, franchise.shopName, franchise['店舗名'], franchise['加盟店名'], franchise.franchiseName, franchise.name)).trim();
+    return {
+      requestedName,
+      memberId,
+      shopId,
+      masterName,
+      matchLabels: [requestedName, masterName].filter(Boolean),
+    };
+  });
+}
+
+function findStylebookBackfillFranchiseByName_(franchises, requestedName) {
+  const normalizedRequest = normalizeStylebookBackfillName_(requestedName);
+  const japaneseRequest = normalizeStylebookBackfillJapaneseName_(requestedName);
+  for (let i = 0; i < franchises.length; i += 1) {
+    const franchise = franchises[i];
+    const labels = [
+      franchise.salonName,
+      franchise.shopName,
+      franchise['店舗名'],
+      franchise['加盟店名'],
+      franchise.franchiseName,
+      franchise.name,
+    ].map(function(value) { return String(value || '').trim(); }).filter(Boolean);
+    for (let j = 0; j < labels.length; j += 1) {
+      const normalizedLabel = normalizeStylebookBackfillName_(labels[j]);
+      const japaneseLabel = normalizeStylebookBackfillJapaneseName_(labels[j]);
+      if (normalizedLabel && normalizedLabel === normalizedRequest) return franchise;
+      if (normalizedLabel && normalizedRequest && (normalizedLabel.indexOf(normalizedRequest) >= 0 || normalizedRequest.indexOf(normalizedLabel) >= 0)) return franchise;
+      if (japaneseLabel && japaneseRequest && (japaneseLabel === japaneseRequest || japaneseLabel.indexOf(japaneseRequest) >= 0 || japaneseRequest.indexOf(japaneseLabel) >= 0)) return franchise;
+    }
+  }
+  return null;
+}
+
+function isStylebookBackfillPostForTarget_(post, target) {
+  const salonName = String(firstDefined_(post.salonName, post.salon, post.shopName, post['サロン名'], post['店舗名'])).trim();
+  if (salonName) {
+    return (target.matchLabels || []).some(function(label) {
+      return stylebookBackfillNameMatches_(salonName, label);
+    });
+  }
+  const postShopId = String(firstDefined_(post.shopId, post['shopId'], post['店舗ID'])).trim();
+  return Boolean(postShopId && target.shopId && postShopId === target.shopId);
+}
+
+function stylebookBackfillNameMatches_(postName, targetName) {
+  const normalizedPost = normalizeStylebookBackfillName_(postName);
+  const normalizedTarget = normalizeStylebookBackfillName_(targetName);
+  const japanesePost = normalizeStylebookBackfillJapaneseName_(postName);
+  const japaneseTarget = normalizeStylebookBackfillJapaneseName_(targetName);
+  return Boolean(
+    (normalizedPost && normalizedTarget && (normalizedPost === normalizedTarget || normalizedPost.indexOf(normalizedTarget) >= 0 || normalizedTarget.indexOf(normalizedPost) >= 0))
+    || (japanesePost && japaneseTarget && (japanesePost === japaneseTarget || japanesePost.indexOf(japaneseTarget) >= 0 || japaneseTarget.indexOf(japanesePost) >= 0))
+  );
+}
+
+function normalizeStylebookBackfillName_(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[・･＿_\\-‐‑‒–—―〜~]/g, '')
+    .trim();
+}
+
+function normalizeStylebookBackfillJapaneseName_(value) {
+  return normalizeStylebookBackfillName_(value).replace(/[a-z0-9]/g, '');
+}
+
+function rowToObjectByHeaders_(headers, row) {
+  return headers.reduce(function(object, header, index) {
+    if (header) object[header] = row[index];
+    return object;
+  }, {});
+}
+
 function setStylebookEditPasscodeForPost(postId, passcode) {
   const normalizedPostId = String(postId || '').trim();
   const hash = hashStylebookPasscode_(passcode);
