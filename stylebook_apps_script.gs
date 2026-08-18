@@ -205,7 +205,7 @@ function getOwnStylebookPosts_(userId, draftsOnly) {
 
 function getStylebookPostsByEditPasscode_(editPasscode) {
   const hash = hashStylebookPasscode_(editPasscode);
-  if (!hash) throw new Error('編集パスワードを入力してください。');
+  if (!hash) throw new Error('加盟店IDを入力してください。');
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
   return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
@@ -424,9 +424,10 @@ function savePost_(post, userId, authContext) {
   const setupMs = Date.now() - startedAt;
   const auth = authContext || stylebookAuthContext_({ post }, userId);
   const user = auth.user;
-  if (!auth.editPasscode) throw new Error('編集パスワードを入力してください。');
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
+  if (!existing && !auth.franchiseEditPasscode) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
+  if (existing && !auth.editPasscode) throw new Error('加盟店IDを入力してください。');
   if (existing && !canManagePost_(existing.object, auth)) {
     throw new Error('この投稿を編集する権限がありません。');
   }
@@ -487,7 +488,7 @@ function savePost_(post, userId, authContext) {
     authorId: existing ? postAuthorId_(existing.object) : ((user && user.id) || ''),
     isDeleted: existing ? normalizeBoolean_(existing.object.isDeleted) : false,
     visitorId: existing ? String(existing.object.visitorId || '') : (!user ? auth.visitorId : ''),
-    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : hashStylebookPasscode_(auth.editPasscode),
+    editPasscodeHash: existing ? String(existing.object.editPasscodeHash || '') : hashStylebookPasscode_(auth.franchiseEditPasscode),
   };
   const sheetStart = Date.now();
   const writeResult = upsertObject_(sheet, KC_POST_HEADERS, row, 'id');
@@ -706,6 +707,44 @@ function firstDefined_() {
   return '';
 }
 
+function resolveStylebookFranchiseMemberId_(payload, user) {
+  const post = payload && payload.post || {};
+  const candidates = [
+    payload && payload.memberId,
+    payload && payload.franchiseId,
+    payload && payload.userId,
+    payload && payload.shopId,
+    post.memberId,
+    post.franchiseId,
+    post.createdByUserId,
+    post.authorId,
+    post.shopId,
+    user && user.id,
+    user && user.shopId,
+  ]
+    .map(function(value) { return String(value || '').trim(); })
+    .filter(Boolean);
+  if (!candidates.length) return '';
+
+  const ss = getKimikeaConnectSpreadsheet_();
+  const franchiseSheet = ss.getSheetByName(KC_STYLEBOOK.FRANCHISE_MASTER);
+  if (!franchiseSheet || franchiseSheet.getLastRow() <= 1) return '';
+  const franchises = rowsToObjects_(franchiseSheet);
+  for (let i = 0; i < franchises.length; i += 1) {
+    const franchise = franchises[i];
+    const visibleValue = firstDefined_(franchise['表示'], franchise.visible, franchise.isActive, true);
+    if (!normalizeBoolean_(visibleValue)) continue;
+    const memberId = String(firstDefined_(franchise.memberId, franchise['memberId'], franchise['加盟店ID'], franchise['会員ID'])).trim();
+    const userId = String(firstDefined_(franchise.userId, franchise['userId'], franchise['ユーザーID'], memberId)).trim();
+    const shopId = String(firstDefined_(franchise.shopId, franchise['shopId'], franchise['店舗ID'], stylebookGeneratedShopId_(memberId || userId))).trim();
+    const matchValues = [memberId, userId, shopId].map(function(value) { return String(value || '').trim(); }).filter(Boolean);
+    if (memberId && candidates.some(function(candidate) { return matchValues.indexOf(candidate) >= 0; })) {
+      return memberId;
+    }
+  }
+  return '';
+}
+
 function stylebookGeneratedShopId_(sourceId) {
   const id = String(sourceId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   return id ? `shop-${id}` : '';
@@ -720,12 +759,14 @@ function stylebookAuthContext_(payload, userId) {
   const post = payload && payload.post || {};
   const normalizedUserId = normalizeUserId_(userId || payload.userId || '');
   const user = getUser_(normalizedUserId);
+  const franchiseEditPasscode = resolveStylebookFranchiseMemberId_(payload || {}, user);
   return {
     user,
     staffId: String((payload && payload.staffId) || post.staffId || '').trim(),
     staffName: String((payload && payload.staffName) || post.staffName || '').trim(),
     visitorId: String((payload && payload.visitorId) || post.visitorId || '').trim(),
     editPasscode: String((payload && payload.editPasscode) || post.editPasscode || '').trim(),
+    franchiseEditPasscode,
   };
 }
 
@@ -749,7 +790,7 @@ function setStylebookEditPasscodeForPost(postId, passcode) {
   const normalizedPostId = String(postId || '').trim();
   const hash = hashStylebookPasscode_(passcode);
   if (!normalizedPostId) throw new Error('postIdを指定してください。');
-  if (!hash) throw new Error('編集パスワードを指定してください。');
+  if (!hash) throw new Error('加盟店IDを指定してください。');
 
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);

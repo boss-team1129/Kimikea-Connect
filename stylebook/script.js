@@ -14,7 +14,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-edit-passcode-hash-1';
+const STYLEBOOK_ASSET_VERSION = '20260818-franchise-passcode-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -128,7 +128,6 @@ const el = {
   statusInput: document.getElementById('statusInput'),
   salonNameInput: document.getElementById('salonNameInput'),
   staffNameInput: document.getElementById('staffNameInput'),
-  editPasscodeInput: document.getElementById('editPasscodeInput'),
   cancelEditButton: document.getElementById('cancelEditButton'),
   formMessage: document.getElementById('formMessage'),
 };
@@ -477,11 +476,15 @@ function requestJson(url, options = {}) {
 
 function stylebookAuthPayload(extra = {}) {
   const user = currentUser();
+  const franchise = readConnectFranchiseSession();
   return {
     userId: user?.id || '',
     staffId: currentSelectedStaffId(),
     staffName: currentSelectedStaffName(),
     visitorId: getStylebookVisitorId(),
+    memberId: String(franchise?.memberId || '').trim(),
+    franchiseId: String(franchise?.franchiseId || franchise?.memberId || '').trim(),
+    shopId: String(franchise?.shopId || user?.shopId || '').trim(),
     ...extra,
   };
 }
@@ -716,7 +719,7 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
 
 async function fetchPostsByEditPasscodeFromApi(editPasscode) {
   const normalizedPasscode = String(editPasscode || '').trim();
-  if (!normalizedPasscode) throw new Error('編集パスワードを入力してください。');
+  if (!normalizedPasscode) throw new Error('加盟店IDを入力してください。');
   const data = await apiRequest('getPostsByEditPasscode', { editPasscode: normalizedPasscode });
   const posts = Array.isArray(data.posts) ? data.posts : [];
   return posts.filter(post => !isDeletedStylePost(post));
@@ -1826,13 +1829,13 @@ function renderMinePasscodeForm(message = '') {
   el.mineGrid.innerHTML = `
     <form id="minePasscodeForm" class="post-form">
       <label class="field">
-        <span>編集パスワードを入力してください</span>
+        <span>加盟店IDを入力してください</span>
         <input id="mineEditPasscodeInput" type="password" autocomplete="new-password" placeholder="例：K-1" required>
       </label>
       <div class="form-actions">
         <button class="primary-button" type="submit">投稿を表示</button>
       </div>
-      ${message ? `<p class="message error">${escapeHtml(message)}</p>` : '<p class="empty-state compact">編集パスワードが一致する投稿だけを表示します。</p>'}
+      ${message ? `<p class="message error">${escapeHtml(message)}</p>` : '<p class="empty-state compact">加盟店IDが一致する投稿だけを表示します。</p>'}
     </form>`;
   const form = document.getElementById('minePasscodeForm');
   if (form) {
@@ -1881,7 +1884,7 @@ async function verifyMineEditPasscode() {
   const input = document.getElementById('mineEditPasscodeInput');
   const editPasscode = String(input?.value || '').trim();
   if (!editPasscode) {
-    renderMinePasscodeForm('編集パスワードを入力してください。');
+    renderMinePasscodeForm('加盟店IDを入力してください。');
     return;
   }
   state.currentManageEditPasscode = editPasscode;
@@ -2071,7 +2074,6 @@ function clearPostForm() {
   el.additionalImagesInput.value = '';
   if (el.salonNameInput) el.salonNameInput.value = '';
   if (el.staffNameInput) el.staffNameInput.value = '';
-  if (el.editPasscodeInput) el.editPasscodeInput.value = '';
   el.imagePreview.innerHTML = '写真プレビュー';
   el.cancelEditButton.hidden = true;
   el.postFormTitle.textContent = 'スタイル投稿';
@@ -2079,7 +2081,6 @@ function clearPostForm() {
 }
 
 function updatePostIdentityFields() {
-  if (el.editPasscodeInput) el.editPasscodeInput.required = !state.currentEditId;
 }
 
 function fillPostForm(post) {
@@ -2095,7 +2096,6 @@ function fillPostForm(post) {
   el.statusInput.value = post.status;
   if (el.salonNameInput) el.salonNameInput.value = displaySalonName(post);
   if (el.staffNameInput) el.staffNameInput.value = displayStaffName(post);
-  if (el.editPasscodeInput) el.editPasscodeInput.value = '';
   if (el.colorSelect) {
     Array.from(el.colorSelect.options).forEach(option => { option.selected = post.extensionColorIds.includes(option.value); });
   }
@@ -2116,7 +2116,7 @@ function showPostForm(postId = '', options = {}) {
       return;
     }
     if (!state.currentManageEditPasscode) {
-      alert('自分の投稿画面で編集パスワードを入力してから編集してください。');
+      alert('自分の投稿画面で加盟店IDを入力してから編集してください。');
       return;
     }
     fillPostForm(post);
@@ -2154,11 +2154,11 @@ async function submitPost(event) {
   const selectedColorIds = selectedValues(el.colorSelect);
   const salonName = String(el.salonNameInput?.value || '').trim();
   const staffName = String(el.staffNameInput?.value || '').trim();
-  const editPasscode = String((state.currentEditId && state.currentManageEditPasscode) || el.editPasscodeInput?.value || '').trim();
+  const editPasscode = String(state.currentEditId ? state.currentManageEditPasscode : '').trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : '';
-  if (!editPasscode) {
-    el.formMessage.textContent = '編集パスワードを入力してください。';
+  if (state.currentEditId && !editPasscode) {
+    el.formMessage.textContent = '自分の投稿画面で加盟店IDを入力してから編集してください。';
     el.formMessage.classList.add('error');
     return;
   }
@@ -2187,7 +2187,6 @@ async function submitPost(event) {
     deletedByUserId: editing?.deletedByUserId || '',
     deleteReason: editing?.deleteReason || '',
     visitorId: editing?.visitorId || (!user ? getStylebookVisitorId() : ''),
-    editPasscode,
   };
   if (requestedStatus === 'published' && (!imageUrl || !post.styleTypeIds.length || !post.extensionCount)) {
     el.formMessage.textContent = '公開するには、写真、本数、施術を入力してください。';
@@ -2199,7 +2198,7 @@ async function submitPost(event) {
     : '投稿内容を登録しています...');
   try {
     if (hasRemoteApi()) {
-      const result = await apiRequest('savePost', { post, editPasscode });
+      const result = await apiRequest('savePost', editPasscode ? { post, editPasscode } : { post });
       if (!result?.ok || !result?.post?.id || !result?.written) {
         throw new Error(result?.message || '投稿データを本番管理表へ保存できませんでした。');
       }
@@ -2235,7 +2234,7 @@ async function publishPost(postId) {
   }
   const editPasscode = state.currentManageEditPasscode;
   if (!editPasscode) {
-    alert('自分の投稿画面で編集パスワードを入力してから公開してください。');
+    alert('自分の投稿画面で加盟店IDを入力してから公開してください。');
     return;
   }
   try {
@@ -2262,7 +2261,7 @@ async function logicalDeletePost(postId) {
   }
   const editPasscode = state.currentManageEditPasscode;
   if (!editPasscode) {
-    alert('自分の投稿画面で編集パスワードを入力してから削除してください。');
+    alert('自分の投稿画面で加盟店IDを入力してから削除してください。');
     return;
   }
   if (!confirm('この投稿を削除します。よろしいですか？')) return;
