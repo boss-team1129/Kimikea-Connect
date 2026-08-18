@@ -14,7 +14,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-loading-ux-1';
+const STYLEBOOK_ASSET_VERSION = '20260818-mine-loading-fix-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -1890,10 +1890,6 @@ function renderMineError(message = '') {
 }
 
 function renderMine(posts = state.currentManagedPosts) {
-  if (state.mineLoadState === 'loading') {
-    renderMineLoading();
-    return;
-  }
   const published = posts.filter(post => post.isPublished && post.status === 'published');
   const drafts = posts.filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished);
   state.mineLoadState = posts.length ? 'success' : 'empty';
