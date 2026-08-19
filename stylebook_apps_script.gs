@@ -30,6 +30,7 @@ const KC_STYLEBOOK = {
 
 const KC_POST_HEADERS = [
   'id',
+  'ownerId',
   'title',
   'description',
   'imageUrl',
@@ -425,7 +426,8 @@ function savePost_(post, userId, authContext) {
   const user = auth.user;
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
-  const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(auth.franchiseEditPasscode);
+  const newPostOwnerId = existing ? '' : String(auth.ownerId || auth.franchiseEditPasscode || '').trim();
+  const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(newPostOwnerId);
   if (!existing && !newPostEditPasscodeHash) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
   if (existing && !auth.editPasscode) throw new Error('加盟店IDを入力してください。');
   if (existing && !canManagePost_(existing.object, auth)) {
@@ -463,6 +465,7 @@ function savePost_(post, userId, authContext) {
     : ((existing ? String(existing.object.staffName || '').trim() : '') || fallbackStaffName);
   const row = {
     id,
+    ownerId: existing ? String(existing.object.ownerId || '').trim() : newPostOwnerId,
     title: post.title || '',
     description: post.description || '',
     imageUrl: image.url || existingImageUrl || post.imageUrl || '',
@@ -499,6 +502,9 @@ function savePost_(post, userId, authContext) {
   }
   if (!existing && String(verified.object.editPasscodeHash || '').trim() !== newPostEditPasscodeHash) {
     throw new Error(`editPasscodeHashの保存確認に失敗しました。postId=${id}`);
+  }
+  if (!existing && String(verified.object.ownerId || '').trim() !== newPostOwnerId) {
+    throw new Error(`ownerIdの保存確認に失敗しました。postId=${id}`);
   }
   const sheetMs = Date.now() - sheetStart;
   const normalizedPost = normalizePost_(verified.object);
@@ -770,6 +776,7 @@ function stylebookAuthContext_(payload, userId) {
   const franchiseEditPasscode = resolveStylebookFranchiseMemberId_(payload || {}, user);
   return {
     user,
+    ownerId: franchiseEditPasscode,
     staffId: String((payload && payload.staffId) || post.staffId || '').trim(),
     staffName: String((payload && payload.staffName) || post.staffName || '').trim(),
     visitorId: String((payload && payload.visitorId) || post.visitorId || '').trim(),
@@ -1087,6 +1094,282 @@ function repairMisplacedStylebookEditPasscodeHash() {
   };
 }
 
+function createStylebookPostsBackupSheet() {
+  const ss = getKimikeaConnectSpreadsheet_();
+  const sourceSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmm');
+  let backupName = `style_posts_backup_${timestamp}`;
+  let suffix = 2;
+  while (ss.getSheetByName(backupName)) {
+    backupName = `style_posts_backup_${timestamp}_${suffix}`;
+    suffix += 1;
+  }
+  const backupSheet = sourceSheet.copyTo(ss).setName(backupName);
+  ss.setActiveSheet(backupSheet);
+  ss.moveActiveSheet(ss.getNumSheets());
+  Logger.log('style_posts backup created: %s rows=%s columns=%s', backupName, sourceSheet.getLastRow(), sourceSheet.getLastColumn());
+  return {
+    ok: true,
+    backupSheetName: backupName,
+    sourceSheetName: KC_STYLEBOOK.POSTS,
+    rowCount: sourceSheet.getLastRow(),
+    columnCount: sourceSheet.getLastColumn(),
+  };
+}
+
+function previewStylebookOwnerIdBackfillForExistingPosts() {
+  return backfillStylebookOwnerIdForExistingPosts_(true);
+}
+
+function applyStylebookOwnerIdBackfillForExistingPosts() {
+  return backfillStylebookOwnerIdForExistingPosts_(false);
+}
+
+function summarizeStylebookOwnerIdMigration() {
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 1) {
+    return {
+      ok: true,
+      totalPosts: 0,
+      ownerIdSetCount: 0,
+      ownerIdUnsetCount: 0,
+      ownerIdCounts: {},
+      unsetPosts: [],
+    };
+  }
+  const headers = values[0].map(function(header) { return String(header || '').trim(); });
+  const ownerIdIndex = headers.indexOf('ownerId');
+  if (ownerIdIndex < 0) throw new Error('style_postsにownerId列がありません。');
+  const idIndex = headers.indexOf('id');
+  const salonIndex = headers.indexOf('salonName');
+  const staffIndex = headers.indexOf('staffName');
+  const hashIndex = headers.indexOf('editPasscodeHash');
+  const ownerIdCounts = {};
+  const unsetPosts = [];
+  let ownerIdSetCount = 0;
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return value !== ''; })) continue;
+    const ownerId = String(row[ownerIdIndex] || '').trim();
+    if (ownerId) {
+      ownerIdSetCount += 1;
+      ownerIdCounts[ownerId] = Number(ownerIdCounts[ownerId] || 0) + 1;
+    } else {
+      unsetPosts.push({
+        row: rowIndex + 1,
+        id: idIndex >= 0 ? String(row[idIndex] || '').trim() : '',
+        salonName: salonIndex >= 0 ? String(row[salonIndex] || '').trim() : '',
+        staffName: staffIndex >= 0 ? String(row[staffIndex] || '').trim() : '',
+        hasEditPasscodeHash: hashIndex >= 0 ? Boolean(String(row[hashIndex] || '').trim()) : false,
+      });
+    }
+  }
+  return {
+    ok: true,
+    totalPosts: ownerIdSetCount + unsetPosts.length,
+    ownerIdSetCount,
+    ownerIdUnsetCount: unsetPosts.length,
+    ownerIdCounts,
+    unsetPosts,
+  };
+}
+
+function backfillStylebookOwnerIdForExistingPosts_(dryRun) {
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return {
+      ok: true,
+      dryRun: Boolean(dryRun),
+      beforeCount: 0,
+      afterCount: 0,
+      changedRowCount: 0,
+      ownerIdCounts: {},
+      unsetPosts: [],
+      rows: [],
+    };
+  }
+
+  const headers = values[0].map(function(header) { return String(header || '').trim(); });
+  const ownerIdIndex = headers.indexOf('ownerId');
+  if (ownerIdIndex < 0) throw new Error('style_postsにownerId列がありません。');
+  const targets = resolveStylebookOwnerIdBackfillTargets_(ss);
+  const beforeCount = countStylebookDataRows_(values);
+  const changes = [];
+  const unchanged = [];
+  const unsetPosts = [];
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return value !== ''; })) continue;
+    const post = rowToObjectByHeaders_(headers, row);
+    const currentOwnerId = String(post.ownerId || '').trim();
+    if (currentOwnerId) {
+      unchanged.push({
+        row: rowIndex + 1,
+        postId: String(post.id || '').trim(),
+        ownerId: currentOwnerId,
+        action: 'already_set',
+      });
+      continue;
+    }
+    const resolved = resolveStylebookOwnerIdForExistingPost_(post, targets);
+    if (resolved.ownerId) {
+      changes.push({
+        row: rowIndex + 1,
+        postId: String(post.id || '').trim(),
+        ownerId: resolved.ownerId,
+        method: resolved.method,
+        masterName: resolved.masterName,
+      });
+    } else {
+      unsetPosts.push({
+        row: rowIndex + 1,
+        id: String(post.id || '').trim(),
+        salonName: String(post.salonName || '').trim(),
+        staffName: String(post.staffName || '').trim(),
+        shopId: String(post.shopId || '').trim(),
+        hasEditPasscodeHash: Boolean(String(post.editPasscodeHash || '').trim()),
+        reason: resolved.reason || 'owner_not_resolved',
+      });
+    }
+  }
+
+  if (!dryRun) {
+    changes.forEach(function(change) {
+      sheet.getRange(change.row, ownerIdIndex + 1).setValue(change.ownerId);
+    });
+    SpreadsheetApp.flush();
+  }
+
+  const afterValues = sheet.getDataRange().getValues();
+  const afterCount = countStylebookDataRows_(afterValues);
+  if (beforeCount !== afterCount) {
+    throw new Error(`ownerId migrationで投稿行数が変化しました。before=${beforeCount}, after=${afterCount}`);
+  }
+
+  const summary = summarizeStylebookOwnerIdMigration();
+  Logger.log('style_posts ownerId backfill %s: before=%s after=%s changed=%s unset=%s',
+    dryRun ? 'preview' : 'applied',
+    beforeCount,
+    afterCount,
+    changes.length,
+    summary.ownerIdUnsetCount);
+  return {
+    ok: true,
+    dryRun: Boolean(dryRun),
+    beforeCount,
+    afterCount,
+    changedRowCount: changes.length,
+    alreadySetCount: unchanged.length,
+    ownerIdSetCount: summary.ownerIdSetCount,
+    ownerIdUnsetCount: summary.ownerIdUnsetCount,
+    ownerIdCounts: summary.ownerIdCounts,
+    unsetPosts: summary.unsetPosts,
+    rows: changes,
+  };
+}
+
+function resolveStylebookOwnerIdBackfillTargets_(ss) {
+  const franchiseSheet = ss.getSheetByName(KC_STYLEBOOK.FRANCHISE_MASTER);
+  if (!franchiseSheet || franchiseSheet.getLastRow() <= 1) {
+    throw new Error('加盟店マスタに加盟店データがありません。');
+  }
+  const franchises = rowsToObjects_(franchiseSheet);
+  const targets = [];
+  franchises.forEach(function(franchise) {
+    const visibleValue = firstDefined_(franchise['表示'], franchise.visible, franchise.isActive, true);
+    if (!normalizeBoolean_(visibleValue)) return;
+    const memberId = String(firstDefined_(franchise.memberId, franchise['memberId'], franchise['加盟店ID'], franchise['会員ID'])).trim();
+    if (!memberId) return;
+    const userId = String(firstDefined_(franchise.userId, franchise['userId'], franchise['ユーザーID'], memberId)).trim();
+    const shopId = String(firstDefined_(franchise.shopId, franchise['shopId'], franchise['店舗ID'], stylebookGeneratedShopId_(memberId || userId))).trim();
+    const masterName = String(firstDefined_(franchise.salonName, franchise.shopName, franchise['店舗名'], franchise['加盟店名'], franchise.franchiseName, franchise.name)).trim();
+    const labels = [
+      masterName,
+      franchise.salonName,
+      franchise.shopName,
+      franchise['店舗名'],
+      franchise['加盟店名'],
+      franchise.franchiseName,
+      franchise.name,
+    ].map(function(value) { return String(value || '').trim(); }).filter(Boolean);
+    targets.push({
+      ownerId: memberId,
+      memberId,
+      userId,
+      shopId,
+      masterName,
+      editPasscodeHash: hashStylebookPasscode_(memberId),
+      labels,
+    });
+  });
+  return targets;
+}
+
+function resolveStylebookOwnerIdForExistingPost_(post, targets) {
+  const currentHash = String(post.editPasscodeHash || '').trim();
+  if (currentHash) {
+    const hashMatches = targets.filter(function(target) {
+      return target.editPasscodeHash && target.editPasscodeHash === currentHash;
+    });
+    if (hashMatches.length === 1) {
+      return {
+        ownerId: hashMatches[0].ownerId,
+        method: 'editPasscodeHash',
+        masterName: hashMatches[0].masterName,
+      };
+    }
+    if (hashMatches.length > 1) return { ownerId: '', reason: 'ambiguous_editPasscodeHash' };
+  }
+
+  const postShopId = String(firstDefined_(post.shopId, post['shopId'], post['店舗ID'])).trim();
+  if (postShopId) {
+    const shopMatches = targets.filter(function(target) {
+      return target.shopId && target.shopId === postShopId;
+    });
+    if (shopMatches.length === 1) {
+      return {
+        ownerId: shopMatches[0].ownerId,
+        method: 'shopId',
+        masterName: shopMatches[0].masterName,
+      };
+    }
+    if (shopMatches.length > 1) return { ownerId: '', reason: 'ambiguous_shopId' };
+  }
+
+  const salonName = String(firstDefined_(post.salonName, post.salon, post.shopName, post['サロン名'], post['店舗名'])).trim();
+  if (salonName) {
+    const normalizedSalonName = normalizeStylebookBackfillName_(salonName);
+    const nameMatches = targets.filter(function(target) {
+      return (target.labels || []).some(function(label) {
+        return normalizeStylebookBackfillName_(label) === normalizedSalonName;
+      });
+    });
+    if (nameMatches.length === 1) {
+      return {
+        ownerId: nameMatches[0].ownerId,
+        method: 'salonName_exact',
+        masterName: nameMatches[0].masterName,
+      };
+    }
+    if (nameMatches.length > 1) return { ownerId: '', reason: 'ambiguous_salonName' };
+  }
+
+  return { ownerId: '', reason: 'no_reliable_match' };
+}
+
+function countStylebookDataRows_(values) {
+  return Math.max((values || []).filter(function(row, index) {
+    return index > 0 && row.some(function(value) { return value !== ''; });
+  }).length, 0);
+}
+
 function isStylebookSha256Hash_(value) {
   return /^[a-f0-9]{64}$/i.test(String(value || '').trim());
 }
@@ -1357,6 +1640,7 @@ function normalizePost_(row) {
   const imageUrl = row.imageUrl || row.imageUrls || row.photo || row.photoUrl || getFileUrl_(imageFileId) || '';
   return {
     id: row.id,
+    ownerId: row.ownerId || '',
     title: row.title || '',
     description: row.description || '',
     imageUrl,
