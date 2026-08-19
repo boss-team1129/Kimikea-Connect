@@ -51,6 +51,7 @@ const KC_POST_HEADERS = [
   'status',
   'isPublished',
   'deletedAt',
+  'deletedBy',
   'deletedByUserId',
   'deleteReason',
   'authorId',
@@ -497,6 +498,7 @@ function savePost_(post, userId, authContext) {
     status,
     isPublished: status === 'published',
     deletedAt: existing ? existing.object.deletedAt : '',
+    deletedBy: existing ? (existing.object.deletedBy || existing.object.deletedByUserId || '') : '',
     deletedByUserId: existing ? existing.object.deletedByUserId : '',
     deleteReason: existing ? existing.object.deleteReason : '',
     authorId: existing ? postAuthorId_(existing.object) : ((user && user.id) || ''),
@@ -569,24 +571,63 @@ function publishPost_(postId, userId, authContext) {
 function deletePost_(postId, userId, reason, authContext) {
   const sheet = getOrCreateSheet_(getKimikeaConnectSpreadsheet_(), KC_STYLEBOOK.POSTS);
   const auth = authContext || stylebookAuthContext_({}, userId);
-  const user = auth.user;
   const found = findRowObject_(sheet, 'id', postId);
   if (!found) throw new Error('投稿が見つかりません。');
-  if (!canDeletePost_(found.object, auth)) throw new Error('この投稿を削除する権限がありません。');
+  const currentMemberId = normalizeOwnerId_(auth && auth.ownerId);
+  const postOwnerId = normalizeOwnerId_(found.object && found.object.ownerId);
+  const beforeStatus = String(found.object.status || '').trim();
+  const canDelete = canDeletePost_(found.object, auth);
+  logStylebookDebug_('deletePost owner check', {
+    postId,
+    ownerId: postOwnerId,
+    currentMemberId,
+    beforeStatus,
+    canDelete,
+  });
+  if (!canDelete) throw new Error('この投稿を削除する権限がありません。');
+  const deletedAt = new Date().toISOString();
   found.object.status = 'deleted';
   found.object.isPublished = false;
   found.object.isDeleted = true;
-  found.object.deletedAt = new Date().toISOString();
-  found.object.deletedByUserId = user ? user.id : auth.visitorId;
+  found.object.deletedAt = deletedAt;
+  found.object.deletedBy = currentMemberId || postOwnerId;
+  found.object.deletedByUserId = currentMemberId || postOwnerId;
   found.object.deleteReason = reason || '';
-  found.object.updatedAt = new Date().toISOString();
+  found.object.updatedAt = deletedAt;
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
   SpreadsheetApp.flush();
   const verified = findRowObject_(sheet, 'id', postId);
-  if (!verified || !isDeletedStylebookPost_(verified.object)) {
-    throw new Error(`投稿の削除状態を確認できませんでした。postId=${postId}`);
+  const savedStatus = String((verified && verified.object && verified.object.status) || '').trim().toLowerCase();
+  if (!verified || savedStatus !== 'deleted') {
+    return {
+      ok: false,
+      stage: 'verify-delete',
+      postId,
+      ownerId: postOwnerId,
+      currentMemberId,
+      beforeStatus,
+      savedStatus: savedStatus || '',
+      message: '投稿の削除状態を確認できませんでした。',
+    };
   }
-  return { ok: true, id: postId, post: normalizePost_(verified.object) };
+  logStylebookDebug_('deletePost verified', {
+    postId,
+    ownerId: postOwnerId,
+    currentMemberId,
+    beforeStatus,
+    savedStatus,
+  });
+  return {
+    ok: true,
+    stage: 'delete',
+    id: postId,
+    postId,
+    ownerId: postOwnerId,
+    currentMemberId,
+    beforeStatus,
+    savedStatus,
+    post: normalizePost_(verified.object),
+  };
 }
 
 function restorePost_(postId, userId) {
@@ -1818,6 +1859,7 @@ function normalizePost_(row) {
     status: row.status || 'draft',
     isPublished: normalizeBoolean_(row.isPublished),
     deletedAt: row.deletedAt || '',
+    deletedBy: row.deletedBy || row.deletedByUserId || '',
     deletedByUserId: row.deletedByUserId || '',
     deleteReason: row.deleteReason || '',
     authorId: row.authorId || row.createdByUserId || '',

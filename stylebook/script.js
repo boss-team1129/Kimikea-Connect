@@ -519,7 +519,11 @@ async function apiRequest(action, payload = {}) {
     message: data.message || '',
     colorCount: data.database?.extensionColors?.length,
   });
-  if (!data.ok) throw new Error(data.message || '処理に失敗しました。');
+  if (!data.ok) {
+    const error = new Error(data.message || '処理に失敗しました。');
+    error.response = data;
+    throw error;
+  }
   return data;
 }
 
@@ -2285,6 +2289,15 @@ async function logicalDeletePost(postId) {
   try {
     if (state.backendMode === 'remote') {
       const result = await apiRequest('deletePost', { postId, reason });
+      if (!result?.post || normalizeUserId(result.post.status).toLowerCase() !== 'deleted') {
+        console.error('Stylebook delete verification failed', {
+          postId,
+          ownerId: normalizeUserId(post.ownerId),
+          currentMemberId: currentStylebookOwnerId(),
+          response: result,
+        });
+        throw new Error(result?.message || '削除状態を確認できませんでした。');
+      }
       markLocalPostDeleted(postId, result.post);
     } else {
       post.deletedAt = new Date().toISOString();
@@ -2298,6 +2311,14 @@ async function logicalDeletePost(postId) {
     renderMine(state.currentManagedPosts);
     alert('投稿を削除しました。');
   } catch (error) {
+    console.error('Stylebook delete failed', {
+      postId,
+      ownerId: normalizeUserId(post?.ownerId),
+      currentMemberId: currentStylebookOwnerId(),
+      message: error?.message || String(error),
+      response: error?.response || null,
+      error,
+    });
     upsertLocalPost(previousPost);
     if (state.currentView === 'mine') renderMine(state.currentManagedPosts);
     alert(error.message || '削除できませんでした。');
