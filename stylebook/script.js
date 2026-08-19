@@ -14,7 +14,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260818-mine-loading-fix-1';
+const STYLEBOOK_ASSET_VERSION = '20260819-mine-delete-speed-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -817,19 +817,26 @@ function upsertLocalPost(post) {
 }
 
 function markLocalPostDeleted(postId, deletedPost = null) {
-  if (!state.db) return;
-  const index = state.db.stylePosts.findIndex(item => item.id === postId);
-  if (index < 0) return;
-  state.db.stylePosts[index] = {
-    ...state.db.stylePosts[index],
-    ...(deletedPost || {}),
-    status: 'deleted',
-    isPublished: false,
-    isDeleted: true,
-    deletedAt: deletedPost?.deletedAt || new Date().toISOString(),
-  };
-  state.currentManagedPosts = state.currentManagedPosts.filter(post => post.id !== postId);
-  saveDb();
+  const id = String(postId || '').trim();
+  if (!id) return;
+  const deletedAt = deletedPost?.deletedAt || new Date().toISOString();
+  state.currentManagedPosts = (state.currentManagedPosts || []).filter(post => String(post.id || '').trim() !== id);
+  if (state.db) {
+    const index = state.db.stylePosts.findIndex(item => String(item.id || '').trim() === id);
+    if (index >= 0) {
+      state.db.stylePosts[index] = {
+        ...state.db.stylePosts[index],
+        ...(deletedPost || {}),
+        status: 'deleted',
+        isPublished: false,
+        isDeleted: true,
+        deletedAt,
+      };
+    }
+    state.db.savedStyles = (state.db.savedStyles || []).filter(save => saveStyleId(save) !== id);
+    state.db.saveSummaries = (state.db.saveSummaries || []).filter(summary => String(summary.styleId || '').trim() !== id);
+    saveDb();
+  }
 }
 
 function setPostSubmitting(isSubmitting, message = '') {
@@ -2326,18 +2333,17 @@ async function logicalDeletePost(postId) {
       post.status = 'deleted';
       saveDb();
     }
-    state.db.savedStyles = state.db.savedStyles.filter(save => saveStyleId(save) !== postId);
-    state.db.saveSummaries = (state.db.saveSummaries || []).filter(summary => String(summary.styleId || '').trim() !== postId);
-    saveDb();
+    renderMine(state.currentManagedPosts);
     alert('投稿を削除しました。');
   } catch (error) {
     upsertLocalPost(previousPost);
+    if (state.currentView === 'mine') renderMine(state.currentManagedPosts);
     alert(error.message || '削除できませんでした。');
     return;
   }
   if (state.currentView === 'detail') showMine({ push: false, reusePasscode: true });
   else if (state.currentView === 'drafts') renderDrafts();
-  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') showMine({ push: false, reusePasscode: true });
+  else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine(state.currentManagedPosts);
   else if (state.currentView === 'admin' || state.currentDetailMode === 'admin') renderAdmin();
   else showView('gallery');
 }

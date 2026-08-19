@@ -207,7 +207,6 @@ function getStylebookPostsByEditPasscode_(editPasscode) {
   const hash = hashStylebookPasscode_(editPasscode);
   if (!hash) throw new Error('加盟店IDを入力してください。');
   const ss = getKimikeaConnectSpreadsheet_();
-  setupSheetsIfNeeded_(ss);
   return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
     .filter(row => String(row.editPasscodeHash || '').trim() === hash)
     .map(normalizePost_)
@@ -565,7 +564,12 @@ function deletePost_(postId, userId, reason, authContext) {
   found.object.deleteReason = reason || '';
   found.object.updatedAt = new Date().toISOString();
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
-  return { ok: true, id: postId, post: normalizePost_(found.object) };
+  SpreadsheetApp.flush();
+  const verified = findRowObject_(sheet, 'id', postId);
+  if (!verified || !isDeletedStylebookPost_(verified.object)) {
+    throw new Error(`投稿の削除状態を確認できませんでした。postId=${postId}`);
+  }
+  return { ok: true, id: postId, post: normalizePost_(verified.object) };
 }
 
 function restorePost_(postId, userId) {
