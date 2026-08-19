@@ -1177,6 +1177,100 @@ function summarizeStylebookOwnerIdMigration() {
   };
 }
 
+function diagnoseStylebookOwnerIdBackfillPreview() {
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const values = sheet.getDataRange().getValues();
+  const result = {
+    ok: true,
+    dryRun: true,
+    totalPosts: 0,
+    resolvedCount: 0,
+    unresolvedCount: 0,
+    invalidOwnerIdCount: 0,
+    multipleCandidateCount: 0,
+    ownerIdCounts: {},
+    masterNameCounts: {},
+    methodCounts: {},
+    ownerMasterPairs: {},
+    teamHair: {
+      targetFound: false,
+      expectedOwnerId: '',
+      assignedCount: 0,
+      invalidAssignmentCount: 0,
+      ok: false,
+    },
+    anomalies: [],
+  };
+  if (values.length < 2) return result;
+
+  const headers = values[0].map(function(header) { return String(header || '').trim(); });
+  const targets = resolveStylebookOwnerIdBackfillTargets_(ss);
+  const ownerIdsInMaster = {};
+  targets.forEach(function(target) {
+    if (target.ownerId) ownerIdsInMaster[target.ownerId] = true;
+  });
+  const teamHairTarget = findStylebookOwnerIdTargetByName_(targets, 'TEAM hair');
+  if (teamHairTarget) {
+    result.teamHair.targetFound = true;
+    result.teamHair.expectedOwnerId = teamHairTarget.ownerId;
+  }
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return value !== ''; })) continue;
+    result.totalPosts += 1;
+    const post = rowToObjectByHeaders_(headers, row);
+    const resolved = resolveStylebookOwnerIdForExistingPost_(post, targets);
+    const multipleCandidates = isStylebookMultipleOwnerCandidateReason_(resolved.reason);
+    if (multipleCandidates) result.multipleCandidateCount += 1;
+
+    if (!resolved.ownerId) {
+      result.unresolvedCount += 1;
+      result.anomalies.push(stylebookOwnerIdAnomaly_(rowIndex + 1, post, resolved, 'unresolved'));
+      continue;
+    }
+
+    result.resolvedCount += 1;
+    incrementStylebookCount_(result.ownerIdCounts, resolved.ownerId);
+    incrementStylebookCount_(result.masterNameCounts, resolved.masterName || '(masterNameなし)');
+    incrementStylebookCount_(result.methodCounts, resolved.method || '(methodなし)');
+    incrementStylebookCount_(result.ownerMasterPairs, `${resolved.ownerId} / ${resolved.masterName || '(masterNameなし)'}`);
+
+    if (!ownerIdsInMaster[resolved.ownerId]) {
+      result.invalidOwnerIdCount += 1;
+      result.anomalies.push(stylebookOwnerIdAnomaly_(rowIndex + 1, post, resolved, 'ownerId_not_in_master'));
+    }
+
+    if (teamHairTarget && resolved.masterName === teamHairTarget.masterName) {
+      result.teamHair.assignedCount += 1;
+      if (resolved.ownerId !== teamHairTarget.ownerId) {
+        result.teamHair.invalidAssignmentCount += 1;
+        result.anomalies.push(stylebookOwnerIdAnomaly_(rowIndex + 1, post, resolved, 'team_hair_ownerId_mismatch'));
+      }
+    }
+  }
+
+  result.teamHair.ok = Boolean(
+    result.teamHair.targetFound
+    && result.teamHair.expectedOwnerId === 'K-1'
+    && result.teamHair.assignedCount > 0
+    && result.teamHair.invalidAssignmentCount === 0
+  );
+
+  Logger.log('style_posts ownerId diagnostic: total=%s resolved=%s unresolved=%s invalidOwnerId=%s multipleCandidates=%s teamHairOwnerId=%s teamHairAssigned=%s teamHairOk=%s',
+    result.totalPosts,
+    result.resolvedCount,
+    result.unresolvedCount,
+    result.invalidOwnerIdCount,
+    result.multipleCandidateCount,
+    result.teamHair.expectedOwnerId,
+    result.teamHair.assignedCount,
+    result.teamHair.ok);
+  return result;
+}
+
 function backfillStylebookOwnerIdForExistingPosts_(dryRun) {
   const ss = getKimikeaConnectSpreadsheet_();
   setupSheetsIfNeeded_(ss);
@@ -1272,6 +1366,44 @@ function backfillStylebookOwnerIdForExistingPosts_(dryRun) {
     ownerIdCounts: summary.ownerIdCounts,
     unsetPosts: summary.unsetPosts,
     rows: changes,
+  };
+}
+
+function findStylebookOwnerIdTargetByName_(targets, name) {
+  const normalizedName = normalizeStylebookBackfillName_(name);
+  for (let i = 0; i < targets.length; i += 1) {
+    const labels = targets[i].labels || [];
+    if (labels.some(function(label) {
+      return normalizeStylebookBackfillName_(label) === normalizedName;
+    })) {
+      return targets[i];
+    }
+  }
+  return null;
+}
+
+function isStylebookMultipleOwnerCandidateReason_(reason) {
+  return String(reason || '').indexOf('ambiguous_') === 0;
+}
+
+function incrementStylebookCount_(counts, key) {
+  const normalizedKey = String(key || '').trim() || '(空)';
+  counts[normalizedKey] = Number(counts[normalizedKey] || 0) + 1;
+}
+
+function stylebookOwnerIdAnomaly_(rowNumber, post, resolved, type) {
+  return {
+    type,
+    row: rowNumber,
+    id: String(post.id || '').trim(),
+    salonName: String(post.salonName || '').trim(),
+    staffName: String(post.staffName || '').trim(),
+    shopId: String(post.shopId || '').trim(),
+    hasEditPasscodeHash: Boolean(String(post.editPasscodeHash || '').trim()),
+    resolvedOwnerId: String(resolved.ownerId || '').trim(),
+    resolvedMasterName: String(resolved.masterName || '').trim(),
+    method: String(resolved.method || '').trim(),
+    reason: String(resolved.reason || '').trim(),
   };
 }
 
