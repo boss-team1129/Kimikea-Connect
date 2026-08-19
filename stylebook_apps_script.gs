@@ -102,13 +102,14 @@ function doPost(e) {
     logStylebookDebug_('doPost received', {
       action,
       userId,
+      ownerId: payload.ownerId || payload.memberId || payload.franchiseId || '',
       hasPost: Boolean(payload.post),
       postId: payload.post && payload.post.id,
     });
     const auth = stylebookAuthContext_(payload, userId);
     if (action === 'savePost') return json_(savePost_(payload.post, userId, auth));
     if (action === 'getPostsByEditPasscode') return json_(getStylebookPostsByEditPasscode_(payload.editPasscode || ''));
-    if (action === 'getPostsByOwner') return json_({ ok: true, posts: getStylebookPostsByOwner_(auth) });
+    if (action === 'getPostsByOwner') return json_(getStylebookPostsByOwner_(auth));
     if (action === 'publishPost') return json_(publishPost_(payload.postId, userId, auth));
     if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || '', auth));
     if (action === 'restorePost') return json_(restorePost_(payload.postId, userId));
@@ -220,12 +221,29 @@ function getStylebookPostsByEditPasscode_(editPasscode) {
 function getStylebookPostsByOwner_(authContext) {
   const ownerId = normalizeOwnerId_(authContext && authContext.ownerId);
   if (!ownerId) throw new Error('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
+  const startedAt = Date.now();
   const ss = getKimikeaConnectSpreadsheet_();
-  return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
-    .map(normalizePost_)
-    .filter(post => !isDeletedStylebookPost_(post))
-    .filter(post => normalizeOwnerId_(post.ownerId) === ownerId)
+  const rows = rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS));
+  const posts = rows
+    .filter(row => normalizeOwnerId_(row.ownerId) === ownerId)
+    .filter(row => normalizeStylebookStatus_(row.status) !== 'deleted')
+    .filter(row => !isDeletedStylebookPost_(row))
+    .map(normalizeStylebookOwnerPost_)
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+  logStylebookDebug_('getPostsByOwner result', {
+    ownerId,
+    scannedRows: rows.length,
+    returnedPosts: posts.length,
+    durationMs: Date.now() - startedAt,
+  });
+  return {
+    ok: true,
+    posts,
+    ownerId,
+    scannedRows: rows.length,
+    returnedPosts: posts.length,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 function buildSaveSummaries_(posts, saves) {
@@ -406,7 +424,7 @@ function isDraftStylebookPost_(post) {
 }
 
 function isDeletedStylebookPost_(post) {
-  const status = String((post && post.status) || '').normalize('NFKC').trim().toLowerCase();
+  const status = normalizeStylebookStatus_(post && post.status);
   const visibility = String((post && post.visibility) || '').normalize('NFKC').trim().toLowerCase();
   const deletedFlags = [
     post && post.isDeleted,
@@ -424,6 +442,10 @@ function isDeletedStylebookPost_(post) {
     || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].indexOf(status) >= 0
     || ['deleted', 'delete', 'removed', 'trash', '削除', '削除済み'].indexOf(visibility) >= 0
   );
+}
+
+function normalizeStylebookStatus_(value) {
+  return String(value || '').normalize('NFKC').trim().toLowerCase();
 }
 
 function normalizeRankingColorKey_(value) {
@@ -777,6 +799,7 @@ function resolveStylebookFranchiseMemberId_(payload, user) {
   const post = payload && payload.post || {};
   const candidates = [
     payload && payload.memberId,
+    payload && payload.ownerId,
     payload && payload.franchiseId,
     payload && payload.userId,
     payload && payload.shopId,
@@ -1852,6 +1875,43 @@ function normalizePost_(row) {
     staffId: row.staffId || '',
     salonName: row.salonName || getShopName_(row.shopId) || '',
     staffName: row.staffName || getStaffName_(row.staffId) || '',
+    createdByUserId: row.createdByUserId || '',
+    createdAt: row.createdAt || '',
+    updatedAt: row.updatedAt || '',
+    saveCount: Number(row.saveCount || 0),
+    status: row.status || 'draft',
+    isPublished: normalizeBoolean_(row.isPublished),
+    deletedAt: row.deletedAt || '',
+    deletedBy: row.deletedBy || row.deletedByUserId || '',
+    deletedByUserId: row.deletedByUserId || '',
+    deleteReason: row.deleteReason || '',
+    authorId: row.authorId || row.createdByUserId || '',
+    isDeleted: normalizeBoolean_(row.isDeleted),
+    visitorId: row.visitorId || '',
+  };
+}
+
+function normalizeStylebookOwnerPost_(row) {
+  return {
+    id: row.id,
+    ownerId: row.ownerId || '',
+    title: row.title || '',
+    description: row.description || '',
+    imageUrl: row.imageUrl || row.imageUrls || row.photo || row.photoUrl || '',
+    imageFileId: row.imageFileId || row.imageFileID || row.fileId || '',
+    additionalImages: splitArray_(row.additionalImages || row.additionalImageUrls || row.imageUrls),
+    additionalImageFileIds: splitArray_(row.additionalImageFileIds),
+    extensionColorIds: splitArray_(row.extensionColorIds),
+    extensionColors: row.extensionColors || '',
+    colorCodes: row.colorCodes || '',
+    colors: row.colors || '',
+    colorLabels: row.colorLabels || '',
+    styleTypeIds: splitArray_(row.styleTypeIds),
+    extensionCount: Number(row.extensionCount || 0),
+    shopId: row.shopId || '',
+    staffId: row.staffId || '',
+    salonName: row.salonName || row.shopName || '',
+    staffName: row.staffName || row.stylistName || '',
     createdByUserId: row.createdByUserId || '',
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',

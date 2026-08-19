@@ -14,14 +14,26 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260819-ownerid-phase2-1';
+const STYLEBOOK_ASSET_VERSION = '20260819-owner-delete-speed-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
 const COLOR_IMAGE_VERSION = '20260716-color-image-fix-1';
-const STYLEBOOK_INITIAL_PARAMS = new URLSearchParams(window.location.search);
+const STYLEBOOK_INITIAL_PARAMS = createStylebookInitialParams();
 const STYLEBOOK_INITIAL_SHOP_ID = String(STYLEBOOK_INITIAL_PARAMS.get('shopId') || '').trim();
 const STYLEBOOK_INITIAL_SHOP_NAME = String(STYLEBOOK_INITIAL_PARAMS.get('shopName') || '').trim();
+
+function createStylebookInitialParams() {
+  try {
+    return new URLSearchParams(window.location.search || '');
+  } catch (error) {
+    console.error('Stylebook initial URLSearchParams failed', {
+      search: window.location.search || '',
+      error,
+    });
+    return new URLSearchParams('');
+  }
+}
 
 function readConnectFranchiseSession() {
   try {
@@ -76,10 +88,14 @@ const state = {
   isRestoringAppHistory: false,
   immediateActionUntil: 0,
   savingPostIds: new Set(),
+  deletingPostIds: new Set(),
   isSubmittingPost: false,
   currentManagedPosts: [],
   mineLoadState: 'idle',
   mineLoadError: '',
+  mineLoadPromise: null,
+  mineLoadOwnerId: '',
+  apiCallCount: 0,
   externalShopId: STYLEBOOK_INITIAL_SHOP_ID,
   externalShopName: STYLEBOOK_INITIAL_SHOP_NAME,
   externalShopScopeApplied: false,
@@ -483,11 +499,13 @@ function requestJson(url, options = {}) {
 function stylebookAuthPayload(extra = {}) {
   const user = currentUser();
   const franchise = readConnectFranchiseSession();
+  const ownerId = currentStylebookOwnerId();
   return {
     userId: user?.id || '',
     staffId: currentSelectedStaffId(),
     staffName: currentSelectedStaffName(),
     visitorId: getStylebookVisitorId(),
+    ownerId,
     memberId: String(franchise?.memberId || '').trim(),
     franchiseId: String(franchise?.franchiseId || franchise?.memberId || '').trim(),
     shopId: String(franchise?.shopId || user?.shopId || '').trim(),
@@ -498,9 +516,13 @@ function stylebookAuthPayload(extra = {}) {
 async function apiRequest(action, payload = {}) {
   if (!hasRemoteApi()) throw new Error('STYLEBOOK_API_URL is not configured.');
   const auth = stylebookAuthPayload();
+  const requestId = ++state.apiCallCount;
+  const startedAt = performance.now();
   debugStylebook('API POST request', {
     action,
+    requestId,
     userId: auth.userId,
+    ownerId: auth.ownerId,
     staffId: auth.staffId,
     visitorId: auth.visitorId,
   });
@@ -515,10 +537,21 @@ async function apiRequest(action, payload = {}) {
   });
   debugStylebook('API POST response', {
     action,
+    requestId,
     ok: data.ok,
     message: data.message || '',
     colorCount: data.database?.extensionColors?.length,
   });
+  if (action === 'getPostsByOwner' || action === 'deletePost') {
+    console.info('Stylebook API timing', {
+      action,
+      requestId,
+      ok: Boolean(data.ok),
+      durationMs: Math.round(performance.now() - startedAt),
+      ownerId: auth.ownerId,
+      postId: payload.postId || payload.post?.id || '',
+    });
+  }
   if (!data.ok) {
     const error = new Error(data.message || '処理に失敗しました。');
     error.response = data;
@@ -737,29 +770,19 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
   return posts.filter(post => !isDeletedStylePost(post) && isSameUserId(postAuthorId(post), userId));
 }
 
-async function fetchPostsByOwnerFromApi() {
-  const ownerId = currentStylebookOwnerId();
-  if (!ownerId) throw new Error('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
-  let data;
-  try {
-    data = await apiRequest('getPostsByOwner');
-  } catch (error) {
-    if (!String(error?.message || '').includes('未対応')) throw error;
-    return fetchPostsByOwnerFromDatabaseFallback(ownerId);
-  }
+async function fetchPostsByOwnerFromApi(ownerId) {
+  const currentMemberId = normalizeUserId(ownerId || currentStylebookOwnerId());
+  if (!currentMemberId) throw new Error('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
+  const data = await apiRequest('getPostsByOwner', { ownerId: currentMemberId });
   const posts = Array.isArray(data.posts) ? data.posts : [];
-  return posts.filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === ownerId);
-}
-
-async function fetchPostsByOwnerFromDatabaseFallback(ownerId) {
-  const databaseUrl = `${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&_=${Date.now()}`;
-  const data = await requestJson(databaseUrl, { cache: 'no-store' });
-  if (!data.ok || !data.database) throw new Error(data.message || '自分の投稿を取得できませんでした。');
-  state.db = normalizeDatabase(data.database);
-  state.backendMode = 'remote';
-  saveDb();
-  return state.db.stylePosts
-    .filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === ownerId)
+  console.info('Stylebook owner posts response', {
+    ownerId: currentMemberId,
+    receivedPosts: posts.length,
+    scannedRows: data.scannedRows,
+    serverDurationMs: data.durationMs,
+  });
+  return posts
+    .filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === currentMemberId)
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
@@ -1451,6 +1474,22 @@ function saveButtonLabel(postId) {
   return isSaved(postId) ? '保存済み' : '保存';
 }
 
+function cssIdentifier(value) {
+  if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(value));
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+}
+
+function setDeleteActionState(postId, deleting) {
+  const id = String(postId || '').trim();
+  if (!id) return;
+  if (deleting) state.deletingPostIds.add(id);
+  else state.deletingPostIds.delete(id);
+  document.querySelectorAll(`[data-action="delete"][data-id="${cssIdentifier(id)}"]`).forEach(button => {
+    button.disabled = deleting;
+    button.textContent = deleting ? '削除中…' : '削除';
+  });
+}
+
 function renderManageItem(post, mode = 'mine') {
   const salonName = displaySalonName(post);
   const staffName = displayStaffName(post);
@@ -1460,7 +1499,8 @@ function renderManageItem(post, mode = 'mine') {
   const photoUrl = imageUrlFromPost(post);
   const canShowManage = mode === 'drafts' && canShowManageButtons(post, 'myPosts');
   const editButton = canShowManage ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : '';
-  const deleteButton = canShowManage ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : '';
+  const isDeleting = state.deletingPostIds.has(post.id);
+  const deleteButton = canShowManage ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}" ${isDeleting ? 'disabled' : ''}>${isDeleting ? '削除中…' : '削除'}</button>` : '';
   return `
     <article class="manage-card">
       <button type="button" class="manage-thumb" data-action="detail" data-id="${post.id}">
@@ -1552,22 +1592,43 @@ function renderGallery() {
 }
 
 function stylebookUrlFor(name, id = '') {
-  const url = new URL(window.location.href);
-  if (name === 'menu') {
-    url.searchParams.delete('view');
-    url.searchParams.delete('id');
-  } else {
-    url.searchParams.set('view', name);
-    if (id) url.searchParams.set('id', id);
-    else url.searchParams.delete('id');
+  try {
+    const url = new URL(window.location.href);
+    if (name === 'menu') {
+      url.searchParams.delete('view');
+      url.searchParams.delete('id');
+    } else {
+      url.searchParams.set('view', name);
+      if (id) url.searchParams.set('id', id);
+      else url.searchParams.delete('id');
+    }
+    return url.toString();
+  } catch (error) {
+    const params = new URLSearchParams('');
+    if (name !== 'menu') {
+      params.set('view', name);
+      if (id) params.set('id', id);
+    }
+    const fallbackUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+    console.error('Stylebook URL generation failed', {
+      view: name,
+      id,
+      href: window.location.href,
+      fallbackUrl,
+      error,
+    });
+    return fallbackUrl;
   }
-  return url;
 }
 
 function replaceStylebookHistory(name = state.currentView, id = state.currentDetailId || '', mode = state.currentDetailMode || 'public') {
   if (!window.history?.replaceState) return;
   const url = stylebookUrlFor(name, id);
-  window.history.replaceState({ kimikeaStylebook: true, view: name, id, mode: normalizeDetailMode(mode) }, '', url);
+  try {
+    window.history.replaceState({ kimikeaStylebook: true, view: name, id, mode: normalizeDetailMode(mode) }, '', url);
+  } catch (error) {
+    console.error('Stylebook history replace failed', { view: name, id, url, error });
+  }
   state.historyReady = true;
 }
 
@@ -1578,7 +1639,11 @@ function pushStylebookHistory(name, id = '', mode = '') {
   const normalizedMode = normalizeDetailMode(mode || (name === 'detail' ? state.currentDetailMode : 'public'));
   if (current?.kimikeaStylebook && current.view === name && (current.id || '') === normalizedId && (current.mode || 'public') === normalizedMode) return;
   const url = stylebookUrlFor(name, normalizedId);
-  window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId, mode: normalizedMode }, '', url);
+  try {
+    window.history.pushState({ kimikeaStylebook: true, view: name, id: normalizedId, mode: normalizedMode }, '', url);
+  } catch (error) {
+    console.error('Stylebook history push failed', { view: name, id: normalizedId, url, error });
+  }
 }
 
 function notifyStylebookNavigationState() {
@@ -1706,6 +1771,7 @@ function showDetail(postId, options = {}) {
   const canShowManage = canShowManageButtons(post, detailMode);
   const canEdit = canShowManage && canEditPost(post);
   const canDelete = canShowManage && canDeletePost(post);
+  const isDeleting = state.deletingPostIds.has(post.id);
   el.detailView.innerHTML = `
     <article class="detail-card">
       <div class="detail-photo-wrap">
@@ -1734,7 +1800,7 @@ function showDetail(postId, options = {}) {
           <button type="button" class="ghost-button" data-action="share" data-id="${post.id}">共有</button>
           <button type="button" class="ghost-button" data-action="similar" data-id="${post.id}">似ているスタイルを見る</button>
           ${canEdit ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : ''}
-          ${canDelete ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : ''}
+          ${canDelete ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}" ${isDeleting ? 'disabled' : ''}>${isDeleting ? '削除中…' : '削除'}</button>` : ''}
         </div>
       </div>
     </article>`;
@@ -1868,8 +1934,9 @@ async function showDrafts(options = {}) {
   showView('drafts', { push });
   el.draftsGrid.innerHTML = '<p class="empty-state">下書きを読み込んでいます...</p>';
   try {
+    const ownerId = currentStylebookOwnerId();
     const posts = (state.backendMode === 'remote' || hasRemoteApi())
-      ? (await fetchPostsByOwnerFromApi()).filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished)
+      ? (await fetchPostsByOwnerFromApi(ownerId)).filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished)
       : ownPosts({ draftsOnly: true });
     renderDrafts(posts);
   } catch (error) {
@@ -1915,18 +1982,49 @@ function renderMine(posts = state.currentManagedPosts) {
 async function showMine(options = {}) {
   const { push = true } = options;
   showView('mine', { push });
-  renderMineLoading();
-  try {
-    const shouldFetchRemote = state.backendMode === 'remote' || hasRemoteApi();
-    state.currentManagedPosts = shouldFetchRemote
-      ? await fetchPostsByOwnerFromApi()
-      : [];
-    state.currentManagedPosts.forEach(upsertLocalPost);
-    renderMine(state.currentManagedPosts);
-  } catch (error) {
+  const currentMemberId = currentStylebookOwnerId();
+  if (!currentMemberId) {
     state.currentManagedPosts = [];
-    renderMineError(error.message || '');
+    state.mineLoadPromise = null;
+    state.mineLoadOwnerId = '';
+    renderMineError('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
+    return;
   }
+  if (state.mineLoadState === 'loading' && state.mineLoadPromise && state.mineLoadOwnerId === currentMemberId) {
+    return state.mineLoadPromise;
+  }
+  state.mineLoadOwnerId = currentMemberId;
+  renderMineLoading();
+  const startedAt = performance.now();
+  const loadPromise = (async () => {
+    try {
+      const shouldFetchRemote = state.backendMode === 'remote' || hasRemoteApi();
+      state.currentManagedPosts = shouldFetchRemote
+        ? await fetchPostsByOwnerFromApi(currentMemberId)
+        : ownPosts();
+      state.currentManagedPosts.forEach(upsertLocalPost);
+      renderMine(state.currentManagedPosts);
+      console.info('Stylebook mine loaded', {
+        ownerId: currentMemberId,
+        posts: state.currentManagedPosts.length,
+        durationMs: Math.round(performance.now() - startedAt),
+        apiCalls: shouldFetchRemote ? 1 : 0,
+      });
+    } catch (error) {
+      console.error('Stylebook mine load failed', {
+        ownerId: currentMemberId,
+        durationMs: Math.round(performance.now() - startedAt),
+        response: error?.response || null,
+        error,
+      });
+      state.currentManagedPosts = [];
+      renderMineError(error.message || '');
+    } finally {
+      if (state.mineLoadPromise === loadPromise) state.mineLoadPromise = null;
+    }
+  })();
+  state.mineLoadPromise = loadPromise;
+  return loadPromise;
 }
 
 function selectedValues(select) {
@@ -2037,6 +2135,11 @@ function handleActionElement(action) {
 
 function runActionNow(action, event) {
   if (!action) return false;
+  if (action.disabled) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    return true;
+  }
   event?.preventDefault?.();
   event?.stopPropagation?.();
   state.immediateActionUntil = Date.now() + 450;
@@ -2279,21 +2382,28 @@ async function publishPost(postId) {
 
 async function logicalDeletePost(postId) {
   const post = findStylePostById(postId);
-  if (!post || !canManagePost(post)) {
+  const currentMemberId = currentStylebookOwnerId();
+  if (!post || !currentMemberId || normalizeUserId(post.ownerId) !== currentMemberId) {
     alert('この投稿を削除する権限がありません。');
     return;
   }
-  if (!confirm('この投稿を削除します。よろしいですか？')) return;
+  if (state.deletingPostIds.has(postId)) return;
+  setDeleteActionState(postId, true);
+  if (!confirm('この投稿を削除します。よろしいですか？')) {
+    setDeleteActionState(postId, false);
+    return;
+  }
   const reason = '投稿者本人による削除';
   const previousPost = { ...post };
+  const startedAt = performance.now();
   try {
     if (state.backendMode === 'remote') {
-      const result = await apiRequest('deletePost', { postId, reason });
+      const result = await apiRequest('deletePost', { postId, reason, ownerId: currentMemberId });
       if (!result?.post || normalizeUserId(result.post.status).toLowerCase() !== 'deleted') {
         console.error('Stylebook delete verification failed', {
           postId,
           ownerId: normalizeUserId(post.ownerId),
-          currentMemberId: currentStylebookOwnerId(),
+          currentMemberId,
           response: result,
         });
         throw new Error(result?.message || '削除状態を確認できませんでした。');
@@ -2301,20 +2411,27 @@ async function logicalDeletePost(postId) {
       markLocalPostDeleted(postId, result.post);
     } else {
       post.deletedAt = new Date().toISOString();
-      post.deletedByUserId = currentUser().id;
+      post.deletedBy = currentMemberId;
+      post.deletedByUserId = currentMemberId;
       post.deleteReason = reason;
       post.isPublished = false;
       post.isDeleted = true;
       post.status = 'deleted';
       saveDb();
     }
+    console.info('Stylebook delete completed', {
+      postId,
+      ownerId: normalizeUserId(post.ownerId),
+      currentMemberId,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     renderMine(state.currentManagedPosts);
     alert('投稿を削除しました。');
   } catch (error) {
     console.error('Stylebook delete failed', {
       postId,
       ownerId: normalizeUserId(post?.ownerId),
-      currentMemberId: currentStylebookOwnerId(),
+      currentMemberId,
       message: error?.message || String(error),
       response: error?.response || null,
       error,
@@ -2323,6 +2440,8 @@ async function logicalDeletePost(postId) {
     if (state.currentView === 'mine') renderMine(state.currentManagedPosts);
     alert(error.message || '削除できませんでした。');
     return;
+  } finally {
+    setDeleteActionState(postId, false);
   }
   if (state.currentView === 'detail') showMine({ push: false });
   else if (state.currentView === 'drafts') renderDrafts();
