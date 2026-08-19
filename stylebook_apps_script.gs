@@ -498,6 +498,9 @@ function savePost_(post, userId, authContext) {
   if (!verified || !verified.object || String(verified.object.id || '').trim() !== String(id).trim()) {
     throw new Error(`style_postsへの保存確認に失敗しました。postId=${id}`);
   }
+  if (!existing && String(verified.object.editPasscodeHash || '').trim() !== newPostEditPasscodeHash) {
+    throw new Error(`editPasscodeHashの保存確認に失敗しました。postId=${id}`);
+  }
   const sheetMs = Date.now() - sheetStart;
   const normalizedPost = normalizePost_(verified.object);
   logStylebookDebug_('savePost timing', {
@@ -1021,6 +1024,80 @@ function setStylebookEditPasscodeForPost(postId, passcode) {
   throw new Error('指定されたpostIdの投稿が見つかりません。postId=' + normalizedPostId);
 }
 
+function repairMisplacedStylebookEditPasscodeHash() {
+  const ss = getKimikeaConnectSpreadsheet_();
+  setupSheetsIfNeeded_(ss);
+  const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return {
+      ok: true,
+      repairedCount: 0,
+      rows: [],
+    };
+  }
+
+  const headers = values[0].map(function(header) {
+    return String(header || '').trim();
+  });
+  const targetColumnIndex = headers.indexOf('editPasscodeHash');
+  if (targetColumnIndex < 0) throw new Error('style_postsにeditPasscodeHash列がありません。');
+
+  const candidateColumnIndexes = [];
+  headers.forEach(function(header, index) {
+    if (index < targetColumnIndex && !header) {
+      candidateColumnIndexes.push(index);
+    }
+  });
+
+  const repairedRows = [];
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    const targetValue = String(values[rowIndex][targetColumnIndex] || '').trim();
+    if (targetValue) continue;
+
+    for (let candidateIndex = candidateColumnIndexes.length - 1; candidateIndex >= 0; candidateIndex -= 1) {
+      const sourceColumnIndex = candidateColumnIndexes[candidateIndex];
+      const sourceValue = String(values[rowIndex][sourceColumnIndex] || '').trim();
+      if (!isStylebookSha256Hash_(sourceValue)) continue;
+
+      const rowNumber = rowIndex + 1;
+      sheet.getRange(rowNumber, targetColumnIndex + 1).setValue(sourceValue);
+      sheet.getRange(rowNumber, sourceColumnIndex + 1).clearContent();
+      repairedRows.push({
+        row: rowNumber,
+        postId: String(values[rowIndex][headers.indexOf('id')] || '').trim(),
+        fromColumn: columnLetter_(sourceColumnIndex + 1),
+        toColumn: columnLetter_(targetColumnIndex + 1),
+      });
+      break;
+    }
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log('style_posts misplaced editPasscodeHash repaired: rows=%s', repairedRows.length);
+
+  return {
+    ok: true,
+    repairedCount: repairedRows.length,
+    rows: repairedRows,
+  };
+}
+
+function isStylebookSha256Hash_(value) {
+  return /^[a-f0-9]{64}$/i.test(String(value || '').trim());
+}
+
+function columnLetter_(columnNumber) {
+  let value = Number(columnNumber || 0);
+  let letter = '';
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    letter = String.fromCharCode(65 + remainder) + letter;
+    value = Math.floor((value - 1) / 26);
+  }
+  return letter;
+}
+
 function hashStylebookPasscode_(passcode) {
   const value = String(passcode || '').trim();
   if (!value) return '';
@@ -1457,14 +1534,17 @@ function findRowObject_(sheet, key, value) {
 
 function upsertObject_(sheet, headers, object, key) {
   setHeaders_(sheet, headers);
+  const sheetHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0]
+    .map(function(header) { return String(header || '').trim(); });
   const found = findRowObject_(sheet, key, object[key]);
-  const rowValues = headers.map(header => {
+  const rowValues = sheetHeaders.map(header => {
+    if (!header) return '';
     const value = object[header];
     if (Array.isArray(value)) return value.join('\n');
     return value == null ? '' : value;
   });
   if (found) {
-    sheet.getRange(found.row, 1, 1, headers.length).setValues([rowValues]);
+    sheet.getRange(found.row, 1, 1, sheetHeaders.length).setValues([rowValues]);
     return { action: 'update', rowNumber: found.row };
   } else {
     sheet.appendRow(rowValues);
