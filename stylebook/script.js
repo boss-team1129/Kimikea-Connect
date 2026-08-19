@@ -307,6 +307,27 @@ function colorImageMarkup(color, className = 'color-choice-image') {
   return `<span class="${className}"><img src="${escapeHtml(src)}" data-fallback-src="${escapeHtml(fallbackSrc)}" alt="${escapeHtml(label)}" loading="lazy" onerror="if(!this.dataset.fallbackTried&&this.dataset.fallbackSrc){this.dataset.fallbackTried='1';this.src=this.dataset.fallbackSrc;}else{this.parentElement.classList.add('is-missing');this.remove();}"><em>画像準備中</em></span>`;
 }
 
+async function loadExtensionColorsFromMaster() {
+  if (!STYLEBOOK_API_URL) return [];
+
+  const url = `${STYLEBOOK_API_URL}?action=extensionColors&_=${Date.now()}`;
+
+  const response = await fetch(url, {
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error('カラー情報を取得できませんでした');
+  }
+
+  const data = await response.json();
+
+  if (!data.ok || !Array.isArray(data.extensionColors)) {
+    throw new Error('カラー情報の形式が正しくありません');
+  }
+
+  return data.extensionColors;
+}
 function activeColors() {
   return (state.db.extensionColors || [])
     .filter(color => color.isActive)
@@ -581,6 +602,16 @@ async function loadRemoteDb() {
     });
     if (!fallback.ok || !fallback.database) throw new Error(fallback.message || data.message || 'スタイル図鑑データを取得できませんでした。');
     state.db = normalizeDatabase(fallback.database);
+    try {
+  const masterColors = await loadExtensionColorsFromMaster();
+
+  if (masterColors.length) {
+    state.db.extensionColors = masterColors;
+  }
+} catch (error) {
+  console.warn('Extension colors load failed:', error);
+  state.db.extensionColors = [];
+}
     state.db.stylePosts = state.db.stylePosts.filter(post => String(post.shopId || '').trim() === scopedShopId);
     state.backendMode = 'remote';
     saveDb();
@@ -594,6 +625,16 @@ async function loadRemoteDb() {
   }
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
   state.db = normalizeDatabase(data.database);
+  try {
+  const masterColors = await loadExtensionColorsFromMaster();
+
+  if (masterColors.length) {
+    state.db.extensionColors = masterColors;
+  }
+} catch (error) {
+  console.warn('Extension colors load failed:', error);
+  state.db.extensionColors = [];
+}
   state.backendMode = 'remote';
   saveDb();
   const validPublishedPosts = getValidPublishedPosts(state.db.stylePosts);
