@@ -14,7 +14,7 @@ const DEBUG_STYLEBOOK = false;
 // Google Apps ScriptのWebアプリURLを設定すると、投稿・下書き・保存が本番DBへ保存されます。
 // 未設定の場合は、画面確認用としてブラウザ内保存で動作します。
 const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
-const STYLEBOOK_ASSET_VERSION = '20260819-mine-delete-speed-1';
+const STYLEBOOK_ASSET_VERSION = '20260819-ownerid-phase2-1';
 const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
   ? '/Kimikea-Connect/color-images/'
   : '../color-images/';
@@ -34,6 +34,11 @@ function readConnectFranchiseSession() {
 
 function stylebookUserIdFromFranchise(franchise) {
   return normalizeUserId(franchise?.userId || franchise?.id || franchise?.memberId || franchise?.franchiseId || '');
+}
+
+function currentStylebookOwnerId() {
+  const franchise = readConnectFranchiseSession();
+  return normalizeUserId(franchise?.memberId || franchise?.franchiseId || '');
 }
 
 const roles = {
@@ -72,7 +77,6 @@ const state = {
   immediateActionUntil: 0,
   savingPostIds: new Set(),
   isSubmittingPost: false,
-  currentManageEditPasscode: '',
   currentManagedPosts: [],
   mineLoadState: 'idle',
   mineLoadError: '',
@@ -729,12 +733,30 @@ async function fetchOwnPostsFromApi({ draftsOnly = false } = {}) {
   return posts.filter(post => !isDeletedStylePost(post) && isSameUserId(postAuthorId(post), userId));
 }
 
-async function fetchPostsByEditPasscodeFromApi(editPasscode) {
-  const normalizedPasscode = String(editPasscode || '').trim();
-  if (!normalizedPasscode) throw new Error('加盟店IDを入力してください。');
-  const data = await apiRequest('getPostsByEditPasscode', { editPasscode: normalizedPasscode });
+async function fetchPostsByOwnerFromApi() {
+  const ownerId = currentStylebookOwnerId();
+  if (!ownerId) throw new Error('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
+  let data;
+  try {
+    data = await apiRequest('getPostsByOwner');
+  } catch (error) {
+    if (!String(error?.message || '').includes('未対応')) throw error;
+    return fetchPostsByOwnerFromDatabaseFallback(ownerId);
+  }
   const posts = Array.isArray(data.posts) ? data.posts : [];
-  return posts.filter(post => !isDeletedStylePost(post));
+  return posts.filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === ownerId);
+}
+
+async function fetchPostsByOwnerFromDatabaseFallback(ownerId) {
+  const databaseUrl = `${STYLEBOOK_API_URL}?action=database&userId=${encodeURIComponent(state.currentUserId)}&_=${Date.now()}`;
+  const data = await requestJson(databaseUrl, { cache: 'no-store' });
+  if (!data.ok || !data.database) throw new Error(data.message || '自分の投稿を取得できませんでした。');
+  state.db = normalizeDatabase(data.database);
+  state.backendMode = 'remote';
+  saveDb();
+  return state.db.stylePosts
+    .filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === ownerId)
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
 async function loadDb() {
@@ -1013,7 +1035,8 @@ function canDeletePost(post) {
 }
 
 function canManagePost(post) {
-  return canEditPost(post);
+  const ownerId = currentStylebookOwnerId();
+  return Boolean(post && !isDeletedStylePost(post) && ownerId && normalizeUserId(post.ownerId) === ownerId);
 }
 
 function normalizeDetailMode(mode) {
@@ -1028,8 +1051,7 @@ function detailModeForCurrentView() {
 
 function canShowManageButtons(post, mode = 'public') {
   const detailMode = normalizeDetailMode(mode);
-  if (detailMode === 'myPosts') return true;
-  if (detailMode === 'admin') return canManageAll();
+  if (detailMode === 'myPosts') return canManagePost(post);
   return false;
 }
 
@@ -1432,7 +1454,7 @@ function renderManageItem(post, mode = 'mine') {
   const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
   const dateLabel = new Date(post.updatedAt || post.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const photoUrl = imageUrlFromPost(post);
-  const canShowManage = (mode === 'mine' || mode === 'drafts') && canShowManageButtons(post, 'myPosts');
+  const canShowManage = mode === 'drafts' && canShowManageButtons(post, 'myPosts');
   const editButton = canShowManage ? `<button type="button" class="ghost-button" data-action="edit" data-id="${post.id}">編集</button>` : '';
   const deleteButton = canShowManage ? `<button type="button" class="danger-button" data-action="delete" data-id="${post.id}">削除</button>` : '';
   return `
@@ -1447,7 +1469,7 @@ function renderManageItem(post, mode = 'mine') {
         <small>${mode === 'drafts' ? '保存日時' : '更新'}：${dateLabel}</small>
         <div class="manage-actions">
           ${editButton}
-          ${isDraft ? `<button type="button" class="primary-button" data-action="publish" data-id="${post.id}">投稿する</button>` : ''}
+          ${canShowManage && isDraft ? `<button type="button" class="primary-button" data-action="publish" data-id="${post.id}">投稿する</button>` : ''}
           ${deleteButton}
         </div>
       </div>
@@ -1777,7 +1799,7 @@ async function toggleSave(postId) {
 function renderCurrentAfterSave(postId) {
   if (state.currentView === 'detail') showDetail(postId, { push: false, mode: state.currentDetailMode });
   else if (state.currentView === 'saved') renderSaved();
-  else if (state.currentView === 'mine') showMine({ push: false, reusePasscode: true });
+  else if (state.currentView === 'mine') showMine({ push: false });
   else renderGallery();
 }
 
@@ -1788,7 +1810,7 @@ function renderCurrentViewAfterDataLoad() {
   renderSelectOptions();
   if (state.currentView === 'saved') renderSaved();
   else if (state.currentView === 'drafts') showDrafts({ push: false });
-  else if (state.currentView === 'mine') showMine({ push: false, reusePasscode: true });
+  else if (state.currentView === 'mine') showMine({ push: false });
   else if (state.currentView === 'admin') renderAdmin({ push: false });
   else if (state.currentView === 'detail' && state.currentDetailId) showDetail(state.currentDetailId, { push: false, mode: state.currentDetailMode });
   else renderGallery();
@@ -1816,10 +1838,10 @@ function showSaved(options = {}) {
 }
 
 function ownPosts({ draftsOnly = false } = {}) {
-  const user = currentUser();
-  if (!user) return [];
+  const ownerId = currentStylebookOwnerId();
+  if (!ownerId) return [];
   return state.db.stylePosts
-    .filter(post => !isDeletedStylePost(post) && isSameUserId(postAuthorId(post), user.id))
+    .filter(post => !isDeletedStylePost(post) && normalizeUserId(post.ownerId) === ownerId)
     .filter(post => {
       const isDraft = post.status === 'draft' || post.status === 'private' || !post.isPublished;
       return draftsOnly ? isDraft : true;
@@ -1842,35 +1864,12 @@ async function showDrafts(options = {}) {
   showView('drafts', { push });
   el.draftsGrid.innerHTML = '<p class="empty-state">下書きを読み込んでいます...</p>';
   try {
-    const posts = state.backendMode === 'remote'
-      ? await fetchOwnPostsFromApi({ draftsOnly: true })
+    const posts = (state.backendMode === 'remote' || hasRemoteApi())
+      ? (await fetchPostsByOwnerFromApi()).filter(post => post.status === 'draft' || post.status === 'private' || !post.isPublished)
       : ownPosts({ draftsOnly: true });
     renderDrafts(posts);
   } catch (error) {
     el.draftsGrid.innerHTML = `<p class="empty-state">${escapeHtml(error.message || '下書きを取得できませんでした。')}</p>`;
-  }
-}
-
-function renderMinePasscodeForm(message = '') {
-  state.mineLoadState = 'idle';
-  state.mineLoadError = message || '';
-  el.mineGrid.innerHTML = `
-    <form id="minePasscodeForm" class="post-form">
-      <label class="field">
-        <span>加盟店IDを入力してください</span>
-        <input id="mineEditPasscodeInput" type="password" autocomplete="new-password" placeholder="例：K-1" required>
-      </label>
-      <div class="form-actions">
-        <button class="primary-button" type="submit">投稿を表示</button>
-      </div>
-      ${message ? `<p class="message error">${escapeHtml(message)}</p>` : '<p class="empty-state compact">加盟店IDが一致する投稿だけを表示します。</p>'}
-    </form>`;
-  const form = document.getElementById('minePasscodeForm');
-  if (form) {
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      verifyMineEditPasscode();
-    });
   }
 }
 
@@ -1881,7 +1880,7 @@ function renderMineLoading() {
     <div class="mine-loading-state" aria-live="polite">
       <span class="loading-spinner" aria-hidden="true"></span>
       <strong>投稿を読み込んでいます...</strong>
-      <span>加盟店IDに紐づく投稿を確認しています</span>
+      <span>ログイン中の加盟店に紐づく投稿を確認しています</span>
     </div>`;
 }
 
@@ -1905,43 +1904,25 @@ function renderMine(posts = state.currentManagedPosts) {
     <div class="manage-section-title">公開中 ${published.length}件</div>
     ${published.map(post => renderManageItem(post, 'mine')).join('') || '<p class="empty-state compact">公開中の投稿はありません。</p>'}
     <div class="manage-section-title">下書き ${drafts.length}件</div>
-    ${drafts.map(post => renderManageItem(post, 'drafts')).join('') || '<p class="empty-state compact">下書きはありません。</p>'}
+    ${drafts.map(post => renderManageItem(post, 'mine')).join('') || '<p class="empty-state compact">下書きはありません。</p>'}
   ` : '<p class="empty-state">自分の投稿はありません。</p>';
 }
 
 async function showMine(options = {}) {
-  const { push = true, reusePasscode = false } = options;
+  const { push = true } = options;
   showView('mine', { push });
-  if (!reusePasscode || !state.currentManageEditPasscode) {
-    state.currentManageEditPasscode = '';
-    state.currentManagedPosts = [];
-    renderMinePasscodeForm();
-    return;
-  }
   renderMineLoading();
   try {
     const shouldFetchRemote = state.backendMode === 'remote' || hasRemoteApi();
     state.currentManagedPosts = shouldFetchRemote
-      ? await fetchPostsByEditPasscodeFromApi(state.currentManageEditPasscode)
+      ? await fetchPostsByOwnerFromApi()
       : [];
     state.currentManagedPosts.forEach(upsertLocalPost);
     renderMine(state.currentManagedPosts);
   } catch (error) {
-    state.currentManageEditPasscode = '';
     state.currentManagedPosts = [];
     renderMineError(error.message || '');
   }
-}
-
-async function verifyMineEditPasscode() {
-  const input = document.getElementById('mineEditPasscodeInput');
-  const editPasscode = String(input?.value || '').trim();
-  if (!editPasscode) {
-    renderMinePasscodeForm('加盟店IDを入力してください。');
-    return;
-  }
-  state.currentManageEditPasscode = editPasscode;
-  await showMine({ push: false, reusePasscode: true });
 }
 
 function selectedValues(select) {
@@ -2168,10 +2149,6 @@ function showPostForm(postId = '', options = {}) {
       alert('この投稿を編集する権限がありません。');
       return;
     }
-    if (!state.currentManageEditPasscode) {
-      alert('自分の投稿画面で加盟店IDを入力してから編集してください。');
-      return;
-    }
     fillPostForm(post);
     updatePostIdentityFields();
   } else {
@@ -2207,14 +2184,8 @@ async function submitPost(event) {
   const selectedColorIds = selectedValues(el.colorSelect);
   const salonName = String(el.salonNameInput?.value || '').trim();
   const staffName = String(el.staffNameInput?.value || '').trim();
-  const editPasscode = String(state.currentEditId ? state.currentManageEditPasscode : '').trim();
   const user = currentUser();
   const resolvedShopId = editing ? (editing.shopId || '') : '';
-  if (state.currentEditId && !editPasscode) {
-    el.formMessage.textContent = '自分の投稿画面で加盟店IDを入力してから編集してください。';
-    el.formMessage.classList.add('error');
-    return;
-  }
   const resolvedStaffId = editing ? (editing.staffId || '') : '';
   const post = {
     id: editing?.id || uid('post'),
@@ -2227,6 +2198,7 @@ async function submitPost(event) {
     extensionCount: Number(el.extensionCountInput.value || 0),
     shopId: resolvedShopId,
     staffId: resolvedStaffId,
+    ownerId: editing?.ownerId || currentStylebookOwnerId(),
     salonName,
     staffName,
     authorId: editing ? postAuthorId(editing) : (user?.id || ''),
@@ -2251,7 +2223,7 @@ async function submitPost(event) {
     : '投稿内容を登録しています...');
   try {
     if (hasRemoteApi()) {
-      const result = await apiRequest('savePost', editPasscode ? { post, editPasscode } : { post });
+      const result = await apiRequest('savePost', { post });
       if (!result?.ok || !result?.post?.id || !result?.written) {
         throw new Error(result?.message || '投稿データを本番管理表へ保存できませんでした。');
       }
@@ -2259,7 +2231,7 @@ async function submitPost(event) {
       clearPostForm();
       setPostSubmitting(false);
       alert(requestedStatus === 'draft' ? '下書きを保存しました。' : '投稿しました。');
-      if (editing) showMine({ push: false, reusePasscode: true });
+      if (editing) showMine({ push: false });
       else showDetail(result.id || post.id, { mode: 'myPosts' });
       return;
     }
@@ -2285,14 +2257,9 @@ async function publishPost(postId) {
     alert('この投稿を公開する権限がありません。');
     return;
   }
-  const editPasscode = state.currentManageEditPasscode;
-  if (!editPasscode) {
-    alert('自分の投稿画面で加盟店IDを入力してから公開してください。');
-    return;
-  }
   try {
     if (state.backendMode === 'remote') {
-      const result = await apiRequest('publishPost', { postId, editPasscode });
+      const result = await apiRequest('publishPost', { postId });
       upsertLocalPost(result.post || { ...post, status: 'published', isPublished: true, updatedAt: new Date().toISOString() });
     } else {
       post.status = 'published';
@@ -2308,13 +2275,8 @@ async function publishPost(postId) {
 
 async function logicalDeletePost(postId) {
   const post = findStylePostById(postId);
-  if (!post || !canDeletePost(post)) {
+  if (!post || !canManagePost(post)) {
     alert('この投稿を削除する権限がありません。');
-    return;
-  }
-  const editPasscode = state.currentManageEditPasscode;
-  if (!editPasscode) {
-    alert('自分の投稿画面で加盟店IDを入力してから削除してください。');
     return;
   }
   if (!confirm('この投稿を削除します。よろしいですか？')) return;
@@ -2322,7 +2284,7 @@ async function logicalDeletePost(postId) {
   const previousPost = { ...post };
   try {
     if (state.backendMode === 'remote') {
-      const result = await apiRequest('deletePost', { postId, reason, editPasscode });
+      const result = await apiRequest('deletePost', { postId, reason });
       markLocalPostDeleted(postId, result.post);
     } else {
       post.deletedAt = new Date().toISOString();
@@ -2341,7 +2303,7 @@ async function logicalDeletePost(postId) {
     alert(error.message || '削除できませんでした。');
     return;
   }
-  if (state.currentView === 'detail') showMine({ push: false, reusePasscode: true });
+  if (state.currentView === 'detail') showMine({ push: false });
   else if (state.currentView === 'drafts') renderDrafts();
   else if (state.currentView === 'mine' || state.currentDetailMode === 'myPosts') renderMine(state.currentManagedPosts);
   else if (state.currentView === 'admin' || state.currentDetailMode === 'admin') renderAdmin();

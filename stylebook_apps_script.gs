@@ -107,6 +107,7 @@ function doPost(e) {
     const auth = stylebookAuthContext_(payload, userId);
     if (action === 'savePost') return json_(savePost_(payload.post, userId, auth));
     if (action === 'getPostsByEditPasscode') return json_(getStylebookPostsByEditPasscode_(payload.editPasscode || ''));
+    if (action === 'getPostsByOwner') return json_({ ok: true, posts: getStylebookPostsByOwner_(auth) });
     if (action === 'publishPost') return json_(publishPost_(payload.postId, userId, auth));
     if (action === 'deletePost') return json_(deletePost_(payload.postId, userId, payload.reason || '', auth));
     if (action === 'restorePost') return json_(restorePost_(payload.postId, userId));
@@ -212,6 +213,17 @@ function getStylebookPostsByEditPasscode_(editPasscode) {
     .filter(row => String(row.editPasscodeHash || '').trim() === hash)
     .map(normalizePost_)
     .filter(post => !isDeletedStylebookPost_(post))
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+}
+
+function getStylebookPostsByOwner_(authContext) {
+  const ownerId = normalizeOwnerId_(authContext && authContext.ownerId);
+  if (!ownerId) throw new Error('加盟店IDを確認できません。ログイン後にもう一度お試しください。');
+  const ss = getKimikeaConnectSpreadsheet_();
+  return rowsToObjects_(getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS))
+    .map(normalizePost_)
+    .filter(post => !isDeletedStylebookPost_(post))
+    .filter(post => normalizeOwnerId_(post.ownerId) === ownerId)
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 }
 
@@ -429,7 +441,6 @@ function savePost_(post, userId, authContext) {
   const newPostOwnerId = existing ? '' : String(auth.ownerId || auth.franchiseEditPasscode || '').trim();
   const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(newPostOwnerId);
   if (!existing && !newPostEditPasscodeHash) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
-  if (existing && !auth.editPasscode) throw new Error('加盟店IDを入力してください。');
   if (existing && !canManagePost_(existing.object, auth)) {
     throw new Error('この投稿を編集する権限がありません。');
   }
@@ -788,8 +799,8 @@ function stylebookAuthContext_(payload, userId) {
 function canManagePost_(post, authOrUser) {
   const auth = authOrUser && Object.prototype.hasOwnProperty.call(authOrUser, 'user')
     ? authOrUser
-    : { user: authOrUser, staffId: '', staffName: '', visitorId: '', editPasscode: '' };
-  return canEditPasscodeManagePost_(post, auth);
+    : { user: authOrUser, ownerId: '', staffId: '', staffName: '', visitorId: '', editPasscode: '' };
+  return canOwnerManagePost_(post, auth);
 }
 
 function canDeletePost_(post, authOrUser) {
@@ -799,6 +810,16 @@ function canDeletePost_(post, authOrUser) {
 function canEditPasscodeManagePost_(post, auth) {
   const storedHash = String(post && post.editPasscodeHash || '').trim();
   return Boolean(storedHash && auth.editPasscode && storedHash === hashStylebookPasscode_(auth.editPasscode));
+}
+
+function canOwnerManagePost_(post, auth) {
+  const postOwnerId = normalizeOwnerId_(post && post.ownerId);
+  const authOwnerId = normalizeOwnerId_(auth && auth.ownerId);
+  return Boolean(postOwnerId && authOwnerId && postOwnerId === authOwnerId);
+}
+
+function normalizeOwnerId_(value) {
+  return String(value || '').normalize('NFKC').trim();
 }
 
 function previewStylebookEditPasscodeBackfillForExistingPosts() {
