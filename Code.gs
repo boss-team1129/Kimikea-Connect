@@ -119,6 +119,7 @@ const KCO_ORDER_HEADERS = [
   'lineOrderNotifySentAt',
   'lineOrderNotifyError',
   'lineOrderNotifyTargetUserId',
+  'clientRequestId',
 ];
 
 const KCO_SETTING_HEADERS = [
@@ -2123,6 +2124,11 @@ function submitCartOrder(order) {
   const invoiceSettings = getInvoiceSettings_(ss);
   const orderRules = getOrderRules_(ss);
   validateInvoiceSettings_(invoiceSettings);
+  const clientRequestId = normalizeOrderClientRequestId_(order.clientRequestId || order.requestId || order.idempotencyKey);
+  const existingOrder = findOrderByClientRequestId_(ordersSheet, franchise, clientRequestId);
+  if (existingOrder) {
+    return buildSubmitOrderResponseFromExisting_(existingOrder.row, existingOrder.index, orderRules, clientRequestId);
+  }
 
   const now = new Date();
   const orderNo = createOrderNumber_(now, ordersSheet.getLastRow());
@@ -2190,27 +2196,28 @@ function submitCartOrder(order) {
   const shippingFee = totalBags >= orderRules.freeShippingBags ? 0 : orderRules.shippingFee;
   const invoiceTotal = productTotal + shippingFee;
 
-  ordersSheet.appendRow([
-    orderNo,
-    now,
-    franchise.franchiseId,
-    franchise.franchiseName,
-    franchise.contactName,
-    franchise.email,
-    totalBags,
-    shippingFee,
-    productTotal,
-    invoiceTotal,
-    '',
-    '発送準備',
-    order.note || '',
-    '',
+  appendOrderRow_(ordersSheet, {
+    '注文番号': orderNo,
+    '注文日時': now,
+    '加盟店ID': franchise.franchiseId,
+    '加盟店名': franchise.franchiseName,
+    '担当者名': franchise.contactName,
+    'メールアドレス': franchise.email,
+    '合計袋数': totalBags,
+    '送料': shippingFee,
+    '商品合計': productTotal,
+    '請求合計': invoiceTotal,
+    '入金状況': '',
+    '発送状況': '発送準備',
+    '備考': order.note || '',
+    '発送通知日時': '',
     priceType,
-    shippingFee,
+    invoiceShipping: shippingFee,
     invoiceTotal,
-    franchise.shopId,
-    franchise.userId,
-  ]);
+    shopId: franchise.shopId,
+    userId: franchise.userId,
+    clientRequestId,
+  });
   const orderRowNumber = ordersSheet.getLastRow();
 
   detailsSheet
@@ -2261,6 +2268,49 @@ function submitCartOrder(order) {
     freeShippingMessage: shippingFee === 0
       ? '送料無料です'
       : `あと${orderRules.freeShippingBags - totalBags}袋で送料無料です`,
+    clientRequestId,
+  };
+}
+
+function normalizeOrderClientRequestId_(value) {
+  return String(value || '').trim().slice(0, 120);
+}
+
+function appendOrderRow_(sheet, record) {
+  const headers = getHeaderValues_(sheet);
+  const row = headers.map((header) => Object.prototype.hasOwnProperty.call(record, header) ? record[header] : '');
+  sheet.appendRow(row);
+}
+
+function findOrderByClientRequestId_(sheet, franchise, clientRequestId) {
+  const key = normalizeOrderClientRequestId_(clientRequestId);
+  if (!key || !sheet || sheet.getLastRow() <= 1) return null;
+  const values = sheet.getDataRange().getValues();
+  const index = createIndex_(values[0]);
+  if (index.clientRequestId === undefined) return null;
+  for (let i = values.length - 1; i >= 1; i -= 1) {
+    const row = values[i];
+    if (String(row[index.clientRequestId] || '').trim() !== key) continue;
+    if (!orderRowBelongsToFranchise_(row, index, franchise)) continue;
+    return { row, index };
+  }
+  return null;
+}
+
+function buildSubmitOrderResponseFromExisting_(row, index, orderRules, clientRequestId) {
+  const shippingFee = Number(row[index.invoiceShipping] || row[index['送料']] || 0);
+  const totalBags = Number(row[index['合計袋数']] || 0);
+  return {
+    orderNo: String(row[index['注文番号']] || ''),
+    totalBags,
+    shippingFee,
+    productTotal: Number(row[index['商品合計']] || 0),
+    invoiceTotal: Number(row[index.invoiceTotal] || row[index['請求合計']] || 0),
+    freeShippingMessage: shippingFee === 0
+      ? '送料無料です'
+      : `あと${orderRules.freeShippingBags - totalBags}袋で送料無料です`,
+    clientRequestId: normalizeOrderClientRequestId_(clientRequestId),
+    alreadyRegistered: true,
   };
 }
 
@@ -4833,6 +4883,7 @@ function getFranchiseOrders_(franchiseId) {
         shippingStatus: String(row[orderIndex['発送状況']] || '発送準備'),
         shopId: orderIndex.shopId === undefined ? franchise.shopId : String(row[orderIndex.shopId] || franchise.shopId || ''),
         userId: orderIndex.userId === undefined ? '' : String(row[orderIndex.userId] || ''),
+        clientRequestId: orderIndex.clientRequestId === undefined ? '' : String(row[orderIndex.clientRequestId] || ''),
         note: String(row[orderIndex['備考']] || ''),
         items: detailsByOrder[orderNo] || [],
       };
