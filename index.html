@@ -7018,13 +7018,10 @@
           loadPortalData();
         })
         .catch((error) => {
-          setBusy('loginButton', false);
-          const message = getErrorMessage(error);
-          const safeMessage = message.includes('入力してください')
-            ? message
-            : '会員IDまたはメールアドレス、またはパスワードが正しくありません。';
-          setMessage('loginMessage', safeMessage, true);
-        });
+  setBusy('loginButton', false);
+  const message = getErrorMessage(error);
+  setMessage('loginMessage', message, true);
+});
     }
 
     function toggleLoginPasswordVisibility() {
