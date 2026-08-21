@@ -118,9 +118,9 @@ Kimikea ConnectのMVPは、会員向け仕事アプリとして設計する。
 
 | ファイル | 内容 |
 | --- | --- |
-| `Code.gs` | Google Apps Scriptの `Code.gs` に貼り付ける完成版コード |
+| `Code.gs` | 本番Google Apps Scriptへ反映する唯一の正本コード |
 | `Index.html` | Apps ScriptのHTMLファイル `Index` に貼り付ける完成版カート注文画面 |
-| `apps_script_code.gs` | `Code.gs` と同じ内容の管理用コピー |
+| `apps_script_code.gs` | 旧構成の参照用コピー（本番へはデプロイしない） |
 | `web_app_index.html` | `Index.html` と同じ内容の管理用コピー |
 | `setup_guide.md` | 初心者向け設定手順 |
 | `spreadsheet_schema.md` | スプレッドシート名、シート構成、列定義 |

@@ -753,7 +753,6 @@ function loginFranchise(credentials) {
   logOrderDebug_('loginFranchise received', {
     receivedLoginId: loginId,
     receivedPasswordLength: password.length,
-    receivedPasswordNormalized: password,
   });
   if (!loginId || !password) {
     logOrderDebug_('loginFranchise failed', {
@@ -777,7 +776,7 @@ function loginFranchise(credentials) {
       visible: item.visible,
       membershipStatus: item.membershipStatus,
       hasPasswordHash: Boolean(item.passwordHash),
-      initialPassword: item.initialPassword,
+      hasInitialPassword: Boolean(item.initialPassword),
     })),
   });
   const franchise = franchises.find((item) => (
@@ -810,18 +809,7 @@ function loginFranchise(credentials) {
   }
 
   const sessionToken = Utilities.getUuid();
-  CacheService.getScriptCache().put(
-    createSessionKey_(sessionToken),
-    JSON.stringify({
-      franchiseId: franchise.franchiseId,
-      userId: franchise.userId,
-      shopId: franchise.shopId,
-      loginId: franchise.loginId || franchise.email || '',
-      role: franchise.role || 'member',
-      passwordChangeRequired: false,
-    }),
-    KCO_CONFIG.SESSION_SECONDS
-  );
+  saveSession_(sessionToken, franchise);
   updateUserMasterLastLogin_(franchise.userId);
   return {
     sessionToken,
@@ -834,18 +822,7 @@ function completeInitialPasswordSetup(sessionToken, newPassword, confirmPassword
   const franchise = getSessionFranchise_(sessionToken, { allowPasswordChange: true });
   validateNewPassword_(newPassword, confirmPassword);
   updateFranchisePassword_(franchise.franchiseId, newPassword);
-  CacheService.getScriptCache().put(
-    createSessionKey_(sessionToken),
-    JSON.stringify({
-      franchiseId: franchise.franchiseId,
-      userId: franchise.userId,
-      shopId: franchise.shopId,
-      loginId: franchise.loginId || franchise.email || '',
-      role: franchise.role || 'member',
-      passwordChangeRequired: false,
-    }),
-    KCO_CONFIG.SESSION_SECONDS
-  );
+  saveSession_(sessionToken, franchise);
   return {
     franchise: sanitizeFranchise_(findFranchiseById_(franchise.franchiseId)),
     passwordChangeRequired: false,
@@ -4796,6 +4773,42 @@ function createSessionKey_(sessionToken) {
   return `KCO_SESSION_${String(sessionToken || '').trim()}`;
 }
 
+function createSessionRecord_(source) {
+  const sessionSource = source || {};
+  const franchiseId = String(sessionSource.franchiseId || '').trim();
+  if (!franchiseId) {
+    throw new Error('セッションに必要な加盟店情報がありません。');
+  }
+  return {
+    franchiseId,
+    userId: String(sessionSource.userId || '').trim(),
+    shopId: String(sessionSource.shopId || '').trim(),
+    loginId: String(sessionSource.loginId || sessionSource.email || '').trim(),
+    role: String(sessionSource.role || 'member').trim() || 'member',
+    passwordChangeRequired: Boolean(sessionSource.passwordChangeRequired),
+  };
+}
+
+function saveSession_(sessionToken, sessionSource) {
+  const token = String(sessionToken || '').trim();
+  if (!token) {
+    throw new Error('セッショントークンを作成できませんでした。');
+  }
+
+  const sessionSeconds = Number(KCO_CONFIG.SESSION_SECONDS);
+  if (!Number.isFinite(sessionSeconds) || sessionSeconds <= 0 || sessionSeconds > 21600) {
+    throw new Error('セッション有効期限の設定が正しくありません。');
+  }
+
+  const session = createSessionRecord_(sessionSource);
+  CacheService.getScriptCache().put(
+    createSessionKey_(token),
+    JSON.stringify(session),
+    Math.floor(sessionSeconds)
+  );
+  return session;
+}
+
 function getSessionFranchise_(sessionToken, options) {
   const token = String(sessionToken || '').trim();
   if (!token) {
@@ -4808,7 +4821,17 @@ function getSessionFranchise_(sessionToken, options) {
     throw new Error('ログインの有効期限が切れました。再度ログインしてください。');
   }
 
-  const session = JSON.parse(sessionJson);
+  let session;
+  try {
+    session = JSON.parse(sessionJson);
+  } catch (error) {
+    cache.remove(createSessionKey_(token));
+    throw new Error('ログイン情報が破損しています。再度ログインしてください。');
+  }
+  if (!session || !session.franchiseId) {
+    cache.remove(createSessionKey_(token));
+    throw new Error('ログイン情報が無効です。再度ログインしてください。');
+  }
 
   const franchise = getFranchiseMasterRecords_().find((item) => (
     item.visible && item.franchiseId === session.franchiseId
@@ -4818,18 +4841,7 @@ function getSessionFranchise_(sessionToken, options) {
     throw new Error('加盟店情報が無効です。管理者へお問い合わせください。');
   }
 
-  cache.put(
-    createSessionKey_(token),
-    JSON.stringify({
-      franchiseId: franchise.franchiseId,
-      userId: franchise.userId,
-      shopId: franchise.shopId,
-      loginId: franchise.loginId || franchise.email || '',
-      role: franchise.role || 'member',
-      passwordChangeRequired: false,
-    }),
-    KCO_CONFIG.SESSION_SECONDS
-  );
+  saveSession_(token, franchise);
   return franchise;
 }
 
@@ -5437,8 +5449,6 @@ function getFranchisePasswordCheckResult_(franchise, password) {
       ok: franchise.passwordHash === loginHash,
       reason: franchise.passwordHash === loginHash ? 'changed_password_match' : 'changed_password_mismatch',
       mode: 'passwordHash',
-      loginHashPrefix: loginHash.slice(0, 10),
-      storedHashPrefix: String(franchise.passwordHash).slice(0, 10),
     };
   }
   const storedInitialPassword = normalizeInitialPasswordValue_(franchise.initialPassword);
@@ -5447,8 +5457,6 @@ function getFranchisePasswordCheckResult_(franchise, password) {
     ok: initialMatch,
     reason: initialMatch ? 'initial_password_match' : 'initial_password_mismatch',
     mode: 'initialPassword',
-    storedInitialPassword,
-    normalizedLoginPassword: normalizedPassword,
   };
 }
 
