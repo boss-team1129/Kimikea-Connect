@@ -385,6 +385,7 @@ function handleJsonpApi_(event) {
     updateMyProfile,
     changeMemberPassword,
     submitCartOrder,
+    getOrderSubmissionStatus,
     getInvoicePdfData,
     logoutFranchise,
     resetMemberPasswordToInitial,
@@ -2094,116 +2095,135 @@ function submitCartOrder(order) {
   const ss = getKcoSpreadsheet_();
   const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const detailsSheet = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
-  ensureOrderHeaders_(ordersSheet);
-  ensureOrderDetailHeaders_(detailsSheet);
   const productMap = getProductMap_();
   const franchise = getSessionFranchise_(order.sessionToken);
   const invoiceSettings = getInvoiceSettings_(ss);
   const orderRules = getOrderRules_(ss);
   validateInvoiceSettings_(invoiceSettings);
   const clientRequestId = normalizeOrderClientRequestId_(order.clientRequestId || order.requestId || order.idempotencyKey);
-  const existingOrder = findOrderByClientRequestId_(ordersSheet, franchise, clientRequestId);
-  if (existingOrder) {
-    return buildSubmitOrderResponseFromExisting_(existingOrder.row, existingOrder.index, orderRules, clientRequestId);
+  if (!clientRequestId) {
+    throw new Error('注文識別IDを確認できませんでした。画面を再読み込みしてからお試しください。');
   }
 
-  const now = new Date();
-  const orderNo = createOrderNumber_(now, ordersSheet.getLastRow());
-  const priceType = getInvoicePriceType_(franchise.franchiseId);
+  let now;
+  let orderNo;
+  let priceType;
   let totalBags = 0;
   let productTotal = 0;
-  const detailRows = [];
-  const detailItems = [];
+  let shippingFee = 0;
+  let invoiceTotal = 0;
+  let orderRowNumber = 0;
+  let detailStartRowNumber = 0;
+  let detailRows = [];
+  let detailItems = [];
 
-  order.items.forEach((item) => {
-    const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
-    const product = productMap[key];
-    if (!product) {
-      throw new Error(`商品マスタに見つかりません: ${item.category || ''} / ${item.color || ''}`);
+  const registrationLock = LockService.getScriptLock();
+  registrationLock.waitLock(10000);
+  try {
+    ensureOrderHeaders_(ordersSheet);
+    ensureOrderDetailHeaders_(detailsSheet);
+    const existingOrder = findOrderByClientRequestId_(ordersSheet, franchise, clientRequestId);
+    if (existingOrder) {
+      return buildSubmitOrderResponseFromExisting_(existingOrder.row, existingOrder.index, orderRules, clientRequestId);
     }
 
-    const qty = Number(item.quantity || 0);
-    if (qty <= 0) return;
+    now = new Date();
+    orderNo = createOrderNumber_(now, ordersSheet.getLastRow());
+    priceType = getInvoicePriceType_(franchise.franchiseId);
 
-    const invoiceUnitPrice = getInvoiceUnitPrice_(product, priceType);
-    const subtotal = invoiceUnitPrice * qty;
-    const profit = (invoiceUnitPrice - product.purchasePrice) * qty;
-    totalBags += qty;
-    productTotal += subtotal;
+    order.items.forEach((item) => {
+      const key = item.productCode ? createProductCodeKey_(item.productCode) : createProductKey_(item.category, item.color);
+      const product = productMap[key];
+      if (!product) {
+        throw new Error(`商品マスタに見つかりません: ${item.category || ''} / ${item.color || ''}`);
+      }
 
-    detailRows.push([
-      orderNo,
-      product.category,
-      product.color,
-      qty,
-      invoiceUnitPrice,
-      subtotal,
-      product.purchasePrice,
-      profit,
-      product.productCode,
-      `${product.category} ${product.color}`,
-      priceType,
-      invoiceUnitPrice,
-      subtotal,
-    ]);
+      const qty = Number(item.quantity || 0);
+      if (qty <= 0) return;
 
-    detailItems.push({
-      orderNo,
-      productCode: product.productCode,
-      productName: `${product.category} ${product.color}`,
-      category: product.category,
-      color: product.color,
-      colorName: product.colorName || product.color,
-      quantity: qty,
-      unitPrice: invoiceUnitPrice,
-      invoiceUnitPrice,
-      lineTotal: subtotal,
-      subtotal,
-      purchasePrice: product.purchasePrice,
-      salesPrice: product.salesPrice,
-      priceType,
-      profit,
+      const invoiceUnitPrice = getInvoiceUnitPrice_(product, priceType);
+      const subtotal = invoiceUnitPrice * qty;
+      const profit = (invoiceUnitPrice - product.purchasePrice) * qty;
+      totalBags += qty;
+      productTotal += subtotal;
+
+      detailRows.push([
+        orderNo,
+        product.category,
+        product.color,
+        qty,
+        invoiceUnitPrice,
+        subtotal,
+        product.purchasePrice,
+        profit,
+        product.productCode,
+        `${product.category} ${product.color}`,
+        priceType,
+        invoiceUnitPrice,
+        subtotal,
+      ]);
+
+      detailItems.push({
+        orderNo,
+        productCode: product.productCode,
+        productName: `${product.category} ${product.color}`,
+        category: product.category,
+        color: product.color,
+        colorName: product.colorName || product.color,
+        quantity: qty,
+        unitPrice: invoiceUnitPrice,
+        invoiceUnitPrice,
+        lineTotal: subtotal,
+        subtotal,
+        purchasePrice: product.purchasePrice,
+        salesPrice: product.salesPrice,
+        priceType,
+        profit,
+      });
     });
-  });
 
-  if (detailRows.length === 0) {
-    throw new Error('注文商品がありません。');
+    if (detailRows.length === 0) {
+      throw new Error('注文商品がありません。');
+    }
+
+    shippingFee = totalBags >= orderRules.freeShippingBags ? 0 : orderRules.shippingFee;
+    invoiceTotal = productTotal + shippingFee;
+
+    appendOrderRow_(ordersSheet, {
+      '注文番号': orderNo,
+      '注文日時': now,
+      '加盟店ID': franchise.franchiseId,
+      '加盟店名': franchise.franchiseName,
+      '担当者名': franchise.contactName,
+      'メールアドレス': franchise.email,
+      '合計袋数': totalBags,
+      '送料': shippingFee,
+      '商品合計': productTotal,
+      '請求合計': invoiceTotal,
+      '入金状況': '',
+      '発送状況': '発送準備',
+      '備考': order.note || '',
+      '発送通知日時': '',
+      priceType,
+      invoiceShipping: shippingFee,
+      invoiceTotal,
+      shopId: franchise.shopId,
+      userId: franchise.userId,
+      clientRequestId,
+    });
+    orderRowNumber = ordersSheet.getLastRow();
+
+    detailStartRowNumber = detailsSheet.getLastRow() + 1;
+    detailsSheet
+      .getRange(detailStartRowNumber, 1, detailRows.length, KCO_DETAIL_HEADERS.length)
+      .setValues(detailRows);
+
+    SpreadsheetApp.flush();
+  } finally {
+    registrationLock.releaseLock();
   }
 
-  const shippingFee = totalBags >= orderRules.freeShippingBags ? 0 : orderRules.shippingFee;
-  const invoiceTotal = productTotal + shippingFee;
-
-  appendOrderRow_(ordersSheet, {
-    '注文番号': orderNo,
-    '注文日時': now,
-    '加盟店ID': franchise.franchiseId,
-    '加盟店名': franchise.franchiseName,
-    '担当者名': franchise.contactName,
-    'メールアドレス': franchise.email,
-    '合計袋数': totalBags,
-    '送料': shippingFee,
-    '商品合計': productTotal,
-    '請求合計': invoiceTotal,
-    '入金状況': '',
-    '発送状況': '発送準備',
-    '備考': order.note || '',
-    '発送通知日時': '',
-    priceType,
-    invoiceShipping: shippingFee,
-    invoiceTotal,
-    shopId: franchise.shopId,
-    userId: franchise.userId,
-    clientRequestId,
-  });
-  const orderRowNumber = ordersSheet.getLastRow();
-
-  detailsSheet
-    .getRange(detailsSheet.getLastRow() + 1, 1, detailRows.length, KCO_DETAIL_HEADERS.length)
-    .setValues(detailRows);
-
-  formatOrderSheets_(ss);
-
-  sendOrderNotificationEmails_(ss, {
+  const notificationSummary = {
     orderNo,
     orderDate: now,
     franchiseId: franchise.franchiseId,
@@ -2222,19 +2242,36 @@ function submitCartOrder(order) {
     invoiceTotal,
     priceType,
     lineUserId: franchise.lineUserId || '',
-  }, invoiceSettings, orderRules);
+  };
 
-  notifyLineOrderAcceptedSafely_(ordersSheet, orderRowNumber, {
-    orderNo,
-    orderDate: now,
-    franchiseId: franchise.franchiseId,
-    franchiseName: franchise.franchiseName,
-    contactName: franchise.contactName,
-    lineUserId: franchise.lineUserId || '',
-    detailItems,
-    totalBags,
-    invoiceTotal,
-  });
+  try {
+    formatOrderSheets_(ss, {
+      orderRowNumber,
+      detailStartRowNumber,
+      detailRowCount: detailRows.length,
+    });
+  } catch (error) {
+    logOrderDebug_('Order formatting failed after registration', {
+      orderNo,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+  try {
+    sendOrderNotificationEmails_(ss, notificationSummary, invoiceSettings, orderRules);
+  } catch (error) {
+    logOrderDebug_('Order email post-processing failed', {
+      orderNo,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+  try {
+    notifyLineOrderAcceptedSafely_(ordersSheet, orderRowNumber, notificationSummary);
+  } catch (error) {
+    logOrderDebug_('Order LINE post-processing failed', {
+      orderNo,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
 
   return {
     orderNo,
@@ -2263,15 +2300,51 @@ function findOrderByClientRequestId_(sheet, franchise, clientRequestId) {
   const key = normalizeOrderClientRequestId_(clientRequestId);
   if (!key || !sheet || sheet.getLastRow() <= 1) return null;
   const values = sheet.getDataRange().getValues();
-  const index = createIndex_(values[0]);
-  if (index.clientRequestId === undefined) return null;
+  const headers = values[0].map((header) => String(header || '').trim());
+  const clientRequestIdColumns = [];
+  headers.forEach((header, columnIndex) => {
+    if (header === 'clientRequestId') clientRequestIdColumns.push(columnIndex);
+  });
+  if (clientRequestIdColumns.length === 0) return null;
+  if (clientRequestIdColumns.length > 1) {
+    throw new Error('注文一覧にclientRequestId列が複数あります。列構成を確認してください。');
+  }
+  const clientRequestIdColumn = clientRequestIdColumns[0];
+  const index = createIndex_(headers);
   for (let i = values.length - 1; i >= 1; i -= 1) {
     const row = values[i];
-    if (String(row[index.clientRequestId] || '').trim() !== key) continue;
+    if (String(row[clientRequestIdColumn] || '').trim() !== key) continue;
     if (!orderRowBelongsToFranchise_(row, index, franchise)) continue;
     return { row, index };
   }
   return null;
+}
+
+function getOrderSubmissionStatus(sessionToken, clientRequestId) {
+  const franchise = getSessionFranchise_(sessionToken);
+  const key = normalizeOrderClientRequestId_(clientRequestId);
+  if (!key) {
+    throw new Error('注文識別IDがありません。');
+  }
+
+  const ss = getKcoSpreadsheet_();
+  const ordersSheet = ss.getSheetByName(KCO_CONFIG.ORDERS);
+  if (!ordersSheet || ordersSheet.getLastRow() <= 1) {
+    return { registered: false, clientRequestId: key };
+  }
+  ensureOrderHeaders_(ordersSheet);
+  const existingOrder = findOrderByClientRequestId_(ordersSheet, franchise, key);
+  if (!existingOrder) {
+    return { registered: false, clientRequestId: key };
+  }
+
+  const response = buildSubmitOrderResponseFromExisting_(
+    existingOrder.row,
+    existingOrder.index,
+    getOrderRules_(ss),
+    key
+  );
+  return Object.assign({ registered: true }, response);
 }
 
 function buildSubmitOrderResponseFromExisting_(row, index, orderRules, clientRequestId) {
@@ -3378,12 +3451,18 @@ function ensureOrderHeaders_(sheet) {
   }
 
   headers = getHeaderValues_(sheet);
-  KCO_ORDER_HEADERS.forEach((header) => {
-    if (headers.indexOf(header) !== -1) return;
-    sheet.insertColumnAfter(sheet.getLastColumn());
-    sheet.getRange(1, sheet.getLastColumn()).setValue(header);
-    headers.push(header);
-  });
+  const missingHeaders = KCO_ORDER_HEADERS.filter((header) => headers.indexOf(header) === -1);
+  if (missingHeaders.length === 0) return;
+
+  const firstNewColumn = Math.max(sheet.getLastColumn() + 1, 1);
+  const requiredLastColumn = firstNewColumn + missingHeaders.length - 1;
+  const columnsToAdd = requiredLastColumn - sheet.getMaxColumns();
+  if (columnsToAdd > 0) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), columnsToAdd);
+  }
+  sheet
+    .getRange(1, firstNewColumn, 1, missingHeaders.length)
+    .setValues([missingHeaders]);
 }
 
 function ensureOrderDetailHeaders_(sheet) {
@@ -3498,21 +3577,34 @@ function setupOrderDropdowns_(sheet) {
   sheet.getRange(2, index['発送状況'] + 1, maxRows, 1).setDataValidation(shippingRule);
 }
 
-function formatOrderSheets_(ss) {
+function formatOrderSheets_(ss, targetRows) {
   const orders = ss.getSheetByName(KCO_CONFIG.ORDERS);
   const details = ss.getSheetByName(KCO_CONFIG.ORDER_DETAILS);
+  const hasOrderTarget = targetRows
+    && Number.isInteger(Number(targetRows.orderRowNumber))
+    && Number(targetRows.orderRowNumber) > 1;
+  const hasDetailTarget = targetRows
+    && Number.isInteger(Number(targetRows.detailStartRowNumber))
+    && Number(targetRows.detailStartRowNumber) > 1
+    && Number.isInteger(Number(targetRows.detailRowCount))
+    && Number(targetRows.detailRowCount) > 0;
+
   if (orders.getLastRow() > 1) {
-    orders.getRange(2, 2, orders.getLastRow() - 1, 1).setNumberFormat('yyyy/mm/dd hh:mm');
-    orders.getRange(2, 7, orders.getLastRow() - 1, 1).setNumberFormat('#,##0');
-    orders.getRange(2, 8, orders.getLastRow() - 1, 3).setNumberFormat('¥#,##0');
+    const orderStartRow = hasOrderTarget ? Number(targetRows.orderRowNumber) : 2;
+    const orderRowCount = hasOrderTarget ? 1 : orders.getLastRow() - 1;
+    orders.getRange(orderStartRow, 2, orderRowCount, 1).setNumberFormat('yyyy/mm/dd hh:mm');
+    orders.getRange(orderStartRow, 7, orderRowCount, 1).setNumberFormat('#,##0');
+    orders.getRange(orderStartRow, 8, orderRowCount, 3).setNumberFormat('¥#,##0');
   }
   if (details.getLastRow() > 1) {
-    details.getRange(2, 5, details.getLastRow() - 1, 4).setNumberFormat('¥#,##0');
+    const detailStartRow = hasDetailTarget ? Number(targetRows.detailStartRowNumber) : 2;
+    const detailRowCount = hasDetailTarget ? Number(targetRows.detailRowCount) : details.getLastRow() - 1;
+    details.getRange(detailStartRow, 5, detailRowCount, 4).setNumberFormat('¥#,##0');
     const detailHeaders = details.getRange(1, 1, 1, details.getLastColumn()).getValues()[0];
     const detailIndex = createIndex_(detailHeaders);
     ['invoiceUnitPrice', 'lineTotal'].forEach((header) => {
       if (detailIndex[header] === undefined) return;
-      details.getRange(2, detailIndex[header] + 1, details.getLastRow() - 1, 1).setNumberFormat('¥#,##0');
+      details.getRange(detailStartRow, detailIndex[header] + 1, detailRowCount, 1).setNumberFormat('¥#,##0');
     });
   }
 }
