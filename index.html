@@ -7174,6 +7174,7 @@
     const HOME_GALLERY_IMAGE_VERSION = '20260726-franchise-partner-2';
     const HOME_GALLERY_PLACEHOLDER = `./assets/home-gallery/placeholder.svg?v=${HOME_GALLERY_IMAGE_VERSION}`;
     const homeGalleryImage = (fileName) => `./assets/home-gallery/${fileName}?v=${HOME_GALLERY_IMAGE_VERSION}`;
+    const KIMIKEA_LOUNGE_URL = 'https://kimikea-lounge.takeshinomise8376.chatgpt.site/';
 
     const HOME_GALLERY_CARDS = [
       {
@@ -7194,6 +7195,16 @@
         imageUrl: homeGalleryImage('order.jpg'),
         imagePosition: 'center center',
         sortOrder: 20,
+        isVisible: true,
+      },
+      {
+        key: 'lounge',
+        label: 'MEMBERS COMMUNITY',
+        title: 'Kimikea Lounge',
+        subtitle: '加盟店・コーディネーターの情報交換スペース',
+        imageUrl: homeGalleryImage('lounge.png'),
+        imagePosition: 'center center',
+        sortOrder: 25,
         isVisible: true,
       },
       {
@@ -7539,6 +7550,10 @@
 
     function openOrbitMenu(key) {
       if (blockExtensionSimulatorNavigation()) return;
+      if (key === 'lounge') {
+        window.location.assign(KIMIKEA_LOUNGE_URL);
+        return;
+      }
       if (key === 'stylebook') {
         openStylebook();
         return;

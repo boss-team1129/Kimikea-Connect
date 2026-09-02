@@ -31,6 +31,7 @@ Kimikea Connect は、注文サイトではない。
 - 加盟店マップ: [https://boss-team1129.github.io/Kimikea-Connect/map/](https://boss-team1129.github.io/Kimikea-Connect/map/)
 - スタイル図鑑: [https://boss-team1129.github.io/Kimikea-Connect/stylebook/](https://boss-team1129.github.io/Kimikea-Connect/stylebook/)
 - マイページ: [https://boss-team1129.github.io/Kimikea-Connect/mypage/](https://boss-team1129.github.io/Kimikea-Connect/mypage/)
+- Kimikea Lounge: [https://kimikea-lounge.takeshinomise8376.chatgpt.site/](https://kimikea-lounge.takeshinomise8376.chatgpt.site/)
 
 各ディープリンクはGitHub Pages上の固定パスとして管理し、必要な画面へ自動遷移する。
 
