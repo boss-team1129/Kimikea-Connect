@@ -88,6 +88,11 @@ function doGet(e) {
   if (action === 'colorUsageRankings') {
     return json_({ ok: true, ranking: getStylebookColorUsageRanking_() });
   }
+  if (action === 'extensionColors') {
+    const ss = getKimikeaConnectSpreadsheet_();
+    setupSheetsIfNeeded_(ss);
+    return json_({ ok: true, extensionColors: getProductMasterColors_(ss) });
+  }
   if (action === 'stylesByColor') {
     return json_(getPublicStylebookPostsByColor_(e.parameter || {}));
   }

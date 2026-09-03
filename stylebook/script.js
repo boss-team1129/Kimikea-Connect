@@ -581,6 +581,17 @@ async function apiRequest(action, payload = {}) {
   return data;
 }
 
+async function refreshExtensionColorsFromMaster() {
+  try {
+    const masterColors = await loadExtensionColorsFromMaster();
+    if (masterColors.length) {
+      state.db.extensionColors = masterColors;
+    }
+  } catch (error) {
+    console.warn('Extension colors load failed. Keeping existing colors.', error);
+  }
+}
+
 async function loadRemoteDb() {
   const scopedShopId = String(state.externalShopId || '').trim();
   const action = scopedShopId ? 'shopDatabase' : 'database';
@@ -602,16 +613,7 @@ async function loadRemoteDb() {
     });
     if (!fallback.ok || !fallback.database) throw new Error(fallback.message || data.message || 'スタイル図鑑データを取得できませんでした。');
     state.db = normalizeDatabase(fallback.database);
-    try {
-  const masterColors = await loadExtensionColorsFromMaster();
-
-  if (masterColors.length) {
-    state.db.extensionColors = masterColors;
-  }
-} catch (error) {
-  console.warn('Extension colors load failed:', error);
-  state.db.extensionColors = [];
-}
+    await refreshExtensionColorsFromMaster();
     state.db.stylePosts = state.db.stylePosts.filter(post => String(post.shopId || '').trim() === scopedShopId);
     state.backendMode = 'remote';
     saveDb();
@@ -625,16 +627,7 @@ async function loadRemoteDb() {
   }
   if (!data.ok || !data.database) throw new Error(data.message || 'スタイル図鑑データを取得できませんでした。');
   state.db = normalizeDatabase(data.database);
-  try {
-  const masterColors = await loadExtensionColorsFromMaster();
-
-  if (masterColors.length) {
-    state.db.extensionColors = masterColors;
-  }
-} catch (error) {
-  console.warn('Extension colors load failed:', error);
-  state.db.extensionColors = [];
-}
+  await refreshExtensionColorsFromMaster();
   state.backendMode = 'remote';
   saveDb();
   const validPublishedPosts = getValidPublishedPosts(state.db.stylePosts);
