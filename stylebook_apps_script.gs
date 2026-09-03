@@ -131,6 +131,7 @@ function setupKimikeaStylebook() {
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   setHeaders_(postSheet, KC_POST_HEADERS);
   clearStylebookStaffNameValidation_(postSheet);
+  clearStylebookDeleteReasonValidation_(postSheet);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER), KC_PRODUCT_MASTER_HEADERS);
   fillMissingProductCodes_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER));
@@ -468,6 +469,7 @@ function savePost_(post, userId, authContext) {
   const user = auth.user;
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   clearStylebookStaffNameValidation_(sheet);
+  clearStylebookDeleteReasonValidation_(sheet);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
   const newPostOwnerId = existing ? '' : String(auth.ownerId || auth.franchiseEditPasscode || '').trim();
   const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(newPostOwnerId);
@@ -735,6 +737,7 @@ function setupSheetsIfNeeded_(ss) {
   const postSheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   setHeaders_(postSheet, KC_POST_HEADERS);
   clearStylebookStaffNameValidation_(postSheet);
+  clearStylebookDeleteReasonValidation_(postSheet);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.SAVES), KC_SAVE_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.PRODUCT_MASTER), KC_PRODUCT_MASTER_HEADERS);
   setHeaders_(getOrCreateSheet_(ss, KC_STYLEBOOK.TYPES), KC_TYPE_HEADERS);
@@ -753,6 +756,16 @@ function clearStylebookStaffNameValidation_(sheet) {
   if (staffNameIndex < 0) return;
   const rowCount = Math.max(sheet.getMaxRows() - 1, 1);
   sheet.getRange(2, staffNameIndex + 1, rowCount, 1).clearDataValidations();
+}
+
+function clearStylebookDeleteReasonValidation_(sheet) {
+  if (!sheet || sheet.getLastRow() <= 1) return;
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), KC_POST_HEADERS.length)).getValues()[0]
+    .map((value) => String(value || '').trim());
+  const deleteReasonIndex = headers.indexOf('deleteReason');
+  if (deleteReasonIndex < 0) return;
+  const rowCount = Math.max(sheet.getMaxRows() - 1, 1);
+  sheet.getRange(2, deleteReasonIndex + 1, rowCount, 1).clearDataValidations();
 }
 
 function seedMastersIfEmpty_(ss) {
