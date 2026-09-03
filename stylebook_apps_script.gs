@@ -469,8 +469,8 @@ function savePost_(post, userId, authContext) {
   const user = auth.user;
   const sheet = getOrCreateSheet_(ss, KC_STYLEBOOK.POSTS);
   clearStylebookStaffNameValidation_(sheet);
-  clearStylebookDeleteReasonValidation_(sheet);
   const existing = post.id ? findRowObject_(sheet, 'id', post.id) : null;
+  clearStylebookDeleteReasonValidation_(sheet, existing ? existing.row : sheet.getLastRow() + 1);
   const newPostOwnerId = existing ? '' : String(auth.ownerId || auth.franchiseEditPasscode || '').trim();
   const newPostEditPasscodeHash = existing ? '' : hashStylebookPasscode_(newPostOwnerId);
   if (!existing && !newPostEditPasscodeHash) throw new Error('加盟店IDを確認できません。ログイン後に投稿してください。');
@@ -626,6 +626,7 @@ function deletePost_(postId, userId, reason, authContext) {
   found.object.deletedByUserId = currentMemberId || postOwnerId;
   found.object.deleteReason = reason || '';
   found.object.updatedAt = deletedAt;
+  clearStylebookDeleteReasonValidation_(sheet, found.row);
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
   SpreadsheetApp.flush();
   const verified = findRowObject_(sheet, 'id', postId);
@@ -674,6 +675,7 @@ function restorePost_(postId, userId) {
   found.object.deletedByUserId = '';
   found.object.deleteReason = '';
   found.object.updatedAt = new Date().toISOString();
+  clearStylebookDeleteReasonValidation_(sheet, found.row);
   upsertObject_(sheet, KC_POST_HEADERS, found.object, 'id');
   return { ok: true, id: postId };
 }
@@ -758,8 +760,12 @@ function clearStylebookStaffNameValidation_(sheet) {
   sheet.getRange(2, staffNameIndex + 1, rowCount, 1).clearDataValidations();
 }
 
-function clearStylebookDeleteReasonValidation_(sheet) {
-  if (!sheet || sheet.getLastRow() <= 1) return;
+function clearStylebookDeleteReasonValidation_(sheet, includeRow) {
+  if (!sheet) return;
+  const requiredRows = Math.max(Number(includeRow || 0), sheet.getLastRow(), 2);
+  if (sheet.getMaxRows() < requiredRows) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), requiredRows - sheet.getMaxRows());
+  }
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), KC_POST_HEADERS.length)).getValues()[0]
     .map((value) => String(value || '').trim());
   const deleteReasonIndex = headers.indexOf('deleteReason');
@@ -2113,6 +2119,9 @@ function upsertObject_(sheet, headers, object, key) {
   const sheetHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0]
     .map(function(header) { return String(header || '').trim(); });
   const found = findRowObject_(sheet, key, object[key]);
+  if (sheetHeaders.indexOf('deleteReason') >= 0) {
+    clearStylebookDeleteReasonValidation_(sheet, found ? found.row : sheet.getLastRow() + 1);
+  }
   const rowValues = sheetHeaders.map(header => {
     if (!header) return '';
     const value = object[header];
