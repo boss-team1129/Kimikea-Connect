@@ -2431,7 +2431,7 @@ async function logicalDeletePost(postId) {
   const previousPost = { ...post };
   const startedAt = performance.now();
   try {
-    if (state.backendMode === 'remote') {
+    if (hasRemoteApi()) {
       const result = await apiRequest('deletePost', { postId, reason, ownerId: currentMemberId });
       if (!result?.post || normalizeUserId(result.post.status).toLowerCase() !== 'deleted') {
         console.error('Stylebook delete verification failed', {
