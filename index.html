@@ -6168,6 +6168,108 @@
 
     .message { margin: 12px 0 0; color: var(--success); font-weight: 750; overflow-wrap: anywhere; }
     .message .button { margin-top: 10px; }
+    #orderTab {
+      padding-bottom: max(180px, calc(170px + env(safe-area-inset-bottom)));
+    }
+    .order-support-panel {
+      position: fixed;
+      left: 50%;
+      bottom: max(92px, calc(82px + env(safe-area-inset-bottom)));
+      z-index: 850;
+      display: flex;
+      width: min(720px, calc(100% - 28px));
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border: 1px solid rgba(185, 145, 67, .48);
+      border-radius: 12px;
+      background: rgba(255, 253, 248, .97);
+      box-shadow: 0 12px 34px rgba(34, 29, 21, .2);
+      text-align: left;
+      transform: translateX(-50%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .order-support-panel p { flex: 1 1 auto; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .order-support-panel .button { flex: 0 0 auto; white-space: nowrap; }
+    .order-failure-help {
+      margin-top: 14px;
+      padding: 14px;
+      border: 2px solid #b4493d;
+      border-radius: 10px;
+      background: #fff5f3;
+    }
+    .order-complete-card {
+      max-width: 720px;
+      margin: 22px auto;
+      padding: clamp(24px, 5vw, 44px);
+      border: 1px solid #dfd7c8;
+      border-radius: 16px;
+      background: var(--white);
+      box-shadow: 0 14px 40px rgba(34, 29, 21, 0.1);
+      text-align: center;
+    }
+    .order-complete-mark {
+      display: grid;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 18px;
+      place-items: center;
+      border-radius: 50%;
+      background: #e7f5ea;
+      color: #24713a;
+      font-size: 34px;
+      font-weight: 900;
+    }
+    .order-complete-card h2 { margin: 0 0 14px; font-size: clamp(24px, 5vw, 34px); }
+    .order-complete-number { margin: 0 0 18px; color: var(--muted); }
+    .order-complete-number strong { display: block; margin-top: 6px; color: var(--black); font-size: 22px; }
+    .order-complete-mail {
+      margin: 0 0 22px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #eef8f0;
+      color: #236b36;
+      font-weight: 800;
+      line-height: 1.65;
+    }
+    .order-complete-mail.attention { background: #fff1ee; color: #9b352b; }
+    .order-complete-support { width: 100%; margin: 0 0 18px; }
+    .order-complete-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .order-inquiry-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(20, 18, 15, 0.66);
+    }
+    .order-inquiry-dialog {
+      width: min(680px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      padding: 24px;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .order-inquiry-head { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+    .order-inquiry-head h2 { margin: 0 0 6px; }
+    .order-inquiry-close { min-width: 44px; min-height: 44px; border: 0; background: transparent; font-size: 28px; }
+    .order-inquiry-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px 14px;
+      margin: 18px 0;
+      padding: 14px;
+      border-radius: 10px;
+      background: #f7f4ee;
+    }
+    .order-inquiry-summary div { min-width: 0; }
+    .order-inquiry-summary span { display: block; color: var(--muted); font-size: 12px; }
+    .order-inquiry-summary strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
+    .order-inquiry-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
     .error { color: var(--danger); }
     .form-note {
       margin: 12px 0 0;
@@ -6332,6 +6434,18 @@
       .detail-row .detail-category { grid-column: 1 / -1; font-weight: 800; }
       .detail-row .detail-price { text-align: right; }
       .history-actions .button { width: 100%; }
+      #orderTab { padding-bottom: max(246px, calc(236px + env(safe-area-inset-bottom))); }
+      .order-support-panel {
+        bottom: max(154px, calc(148px + env(safe-area-inset-bottom)));
+        width: calc(100% - 16px);
+        padding: 9px;
+      }
+      .order-support-panel p { display: none; }
+      .order-support-panel .button { width: 100%; }
+      .order-complete-actions { grid-template-columns: 1fr; }
+      .order-inquiry-summary { grid-template-columns: 1fr; }
+      .order-inquiry-actions { flex-direction: column-reverse; }
+      .order-inquiry-actions .button { width: 100%; }
       .tabs {
         position: fixed;
         right: 10px;
@@ -6552,6 +6666,27 @@
           </div>
           <button id="submitButton" type="button" class="button submit-button" onclick="submitOrder()">注文を送信</button>
           <p id="orderMessage" class="message" aria-live="polite"></p>
+          <div id="orderFailureHelp" class="order-failure-help" hidden>
+            <button type="button" class="button button-gold" onclick="openOrderTroubleInquiry()">注文トラブル・お問い合わせ</button>
+          </div>
+        </section>
+        <section class="order-support-panel" aria-label="注文のお問い合わせ">
+          <p>注文したのに確認メールが届かない場合や、注文でお困りの場合はこちらからご連絡ください。</p>
+          <button type="button" class="button button-outline" onclick="openOrderTroubleInquiry()">注文トラブル・お問い合わせ</button>
+        </section>
+      </div>
+
+      <div id="orderCompleteView" hidden>
+        <section class="order-complete-card" aria-labelledby="orderCompleteTitle">
+          <div class="order-complete-mark" aria-hidden="true">✓</div>
+          <h2 id="orderCompleteTitle">ご注文が完了しました</h2>
+          <p class="order-complete-number">注文番号<strong id="orderCompleteNumber"></strong></p>
+          <p id="orderCompleteMailMessage" class="order-complete-mail" aria-live="polite"></p>
+          <button id="orderCompleteInquiryButton" type="button" class="button button-outline order-complete-support" onclick="openOrderTroubleInquiry()">注文トラブル・お問い合わせ</button>
+          <div class="order-complete-actions">
+            <button type="button" class="button button-outline" onclick="openOrderHistoryFromCompletion()">注文履歴を見る</button>
+            <button type="button" class="button button-muted" onclick="showHomePage()">ホームへ戻る</button>
+          </div>
         </section>
       </div>
 
@@ -6598,6 +6733,35 @@
           </div>
         </section>
       </div>
+
+      <div id="orderInquiryModal" class="order-inquiry-backdrop" hidden>
+        <section class="order-inquiry-dialog" role="dialog" aria-modal="true" aria-labelledby="orderInquiryTitle">
+          <div class="order-inquiry-head">
+            <div>
+              <h2 id="orderInquiryTitle">注文トラブル・お問い合わせ</h2>
+              <p>下記の登録情報と注文状況を添えてKimikea本部へ送信します。</p>
+            </div>
+            <button type="button" class="order-inquiry-close" aria-label="閉じる" onclick="closeOrderTroubleInquiry()">×</button>
+          </div>
+          <div class="order-inquiry-summary">
+            <div><span>加盟店ID</span><strong id="inquiryFranchiseId"></strong></div>
+            <div><span>加盟店名</span><strong id="inquiryFranchiseName"></strong></div>
+            <div><span>担当者名</span><strong id="inquiryContactName"></strong></div>
+            <div><span>登録メールアドレス</span><strong id="inquiryRegisteredEmail"></strong></div>
+            <div><span>発生日時</span><strong id="inquiryOccurredAt"></strong></div>
+            <div><span>直近の注文番号 / clientRequestId</span><strong id="inquiryOrderReference"></strong></div>
+          </div>
+          <label class="field" for="orderInquiryText">
+            <span>お問い合わせ内容</span>
+            <textarea id="orderInquiryText" maxlength="5000" placeholder="状況を入力してください" required></textarea>
+          </label>
+          <p id="orderInquiryMessage" class="message" aria-live="polite"></p>
+          <div class="order-inquiry-actions">
+            <button type="button" class="button button-muted" onclick="closeOrderTroubleInquiry()">キャンセル</button>
+            <button id="orderInquirySubmitButton" type="button" class="button button-gold" onclick="submitOrderTroubleInquiry()">お問い合わせを送信</button>
+          </div>
+        </section>
+      </div>
       </div>
     </main>
   </div>
@@ -6641,6 +6805,8 @@
       myPageActiveTab: 'profile',
       myPageLoading: false,
       orderSubmitting: false,
+      orderInquirySubmitting: false,
+      lastOrderTroubleContext: null,
       lineLinkToken: null,
       myPageStylebook: {
         loaded: false,
@@ -13265,6 +13431,8 @@
       const isOrder = tabName === 'order';
       const isHistory = tabName === 'history';
       const isNotice = tabName === 'notice';
+      document.getElementById('orderWorkspaceTabs').hidden = false;
+      document.getElementById('orderCompleteView').hidden = true;
       document.getElementById('orderTab').hidden = !isOrder;
       document.getElementById('historyTab').hidden = !isHistory;
       document.getElementById('noticeTab').hidden = !isNotice;
@@ -13520,22 +13688,161 @@
         });
     }
 
-    function finishOrderSubmission(message) {
+    function finishOrderSubmission(orderResult) {
       clearPendingOrderSnapshot();
-      setMessage('orderMessage', message, false);
+      document.getElementById('orderFailureHelp').hidden = true;
+      setMessage('orderMessage', '', false);
       state.cart.length = 0;
       document.getElementById('note').value = '';
       renderCart();
       state.orderSubmitting = false;
       setBusy('submitButton', false);
-      loadPortal();
+      state.lastOrderTroubleContext = {
+        orderNo: String(orderResult && orderResult.orderNo || ''),
+        clientRequestId: String(orderResult && orderResult.clientRequestId || ''),
+        commitStatus: String(orderResult && orderResult.commitStatus || 'complete'),
+      };
+      showOrderCompletion(state.lastOrderTroubleContext);
+      callServer('getOrderNotificationDisplayStatus', state.sessionToken, state.lastOrderTroubleContext)
+        .then((notificationStatus) => {
+          state.lastOrderTroubleContext = Object.assign({}, state.lastOrderTroubleContext, notificationStatus || {});
+          showOrderCompletion(state.lastOrderTroubleContext);
+        })
+        .catch((error) => {
+          console.warn('Order notification status check failed:', error);
+          showOrderCompletion(Object.assign({}, state.lastOrderTroubleContext, { notificationStatusUnavailable: true }));
+        });
     }
 
     function failOrderSubmission(message, options = {}) {
       if (options.clearPending) clearPendingOrderSnapshot();
       state.orderSubmitting = false;
       setBusy('submitButton', false);
-      setMessage('orderMessage', message, true);
+      state.lastOrderTroubleContext = {
+        orderNo: String(options.orderNo || ''),
+        clientRequestId: String(options.clientRequestId || (state.lastOrderTroubleContext && state.lastOrderTroubleContext.clientRequestId) || ''),
+        commitStatus: String(options.commitStatus || 'failed'),
+        clientError: String(message || ''),
+      };
+      setMessage(
+        'orderMessage',
+        '注文を完了できませんでした。再度お試しいただくか、解決しない場合はお問い合わせください',
+        true
+      );
+      document.getElementById('orderFailureHelp').hidden = false;
+    }
+
+    function showOrderCompletion(orderContext) {
+      const context = orderContext || {};
+      document.getElementById('orderWorkspaceTabs').hidden = true;
+      document.getElementById('orderTab').hidden = true;
+      document.getElementById('historyTab').hidden = true;
+      document.getElementById('noticeTab').hidden = true;
+      document.getElementById('orderCompleteView').hidden = false;
+      document.getElementById('orderCompleteNumber').textContent = context.orderNo || '確認中';
+      const mailMessage = document.getElementById('orderCompleteMailMessage');
+      const inquiryButton = document.getElementById('orderCompleteInquiryButton');
+      const franchiseMailSent = context.franchiseEmailStatus === 'sent';
+      const mailFailed = ['failed', 'partial'].includes(String(context.emailStatus || ''))
+        || ['failed', 'skipped'].includes(String(context.franchiseEmailStatus || ''));
+      mailMessage.classList.toggle('attention', mailFailed || Boolean(context.notificationStatusUnavailable));
+      inquiryButton.classList.toggle('button-gold', mailFailed || Boolean(context.notificationStatusUnavailable));
+      inquiryButton.classList.toggle('button-outline', !mailFailed && !context.notificationStatusUnavailable);
+      if (franchiseMailSent) {
+        mailMessage.textContent = '登録メールアドレスへ確認メールを送信しました';
+      } else if (mailFailed) {
+        mailMessage.textContent = '注文は正常に完了しましたが、確認メールの送信に失敗しました';
+      } else if (context.notificationStatusUnavailable) {
+        mailMessage.textContent = '注文は正常に完了しました。確認メールの送信状況を確認できないため、届かない場合はお問い合わせください';
+      } else {
+        mailMessage.textContent = '確認メールの送信状況を確認しています…';
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openOrderHistoryFromCompletion() {
+      switchTab('history');
+      loadPortalData();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function getLatestOrderTroubleContext() {
+      if (state.lastOrderTroubleContext) return state.lastOrderTroubleContext;
+      const latestOrder = Array.isArray(state.orders) && state.orders.length ? state.orders[0] : null;
+      return latestOrder ? {
+        orderNo: latestOrder.orderNo || '',
+        clientRequestId: latestOrder.clientRequestId || '',
+        commitStatus: 'complete',
+      } : {};
+    }
+
+    function formatInquiryOccurredAt(date) {
+      const value = date instanceof Date ? date : new Date();
+      const parts = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(value).reduce((result, part) => {
+        result[part.type] = part.value;
+        return result;
+      }, {});
+      return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+    }
+
+    function openOrderTroubleInquiry(context = {}) {
+      const franchise = state.franchise || {};
+      const reference = Object.assign({}, getLatestOrderTroubleContext(), context || {});
+      state.lastOrderTroubleContext = reference;
+      reference.occurredAt = formatInquiryOccurredAt(new Date());
+      document.getElementById('inquiryFranchiseId').textContent = franchise.franchiseId || franchise.memberId || '未登録';
+      document.getElementById('inquiryFranchiseName').textContent = franchise.salonName || franchise.franchiseName || '未登録';
+      document.getElementById('inquiryContactName').textContent = franchise.contactName || franchise.displayName || '未登録';
+      document.getElementById('inquiryRegisteredEmail').textContent = franchise.email || '未登録';
+      document.getElementById('inquiryOccurredAt').textContent = reference.occurredAt;
+      document.getElementById('inquiryOrderReference').textContent = reference.orderNo || reference.clientRequestId || '注文番号未確定';
+      setMessage('orderInquiryMessage', '', false);
+      document.getElementById('orderInquiryModal').hidden = false;
+      window.setTimeout(() => document.getElementById('orderInquiryText').focus(), 0);
+    }
+
+    function closeOrderTroubleInquiry() {
+      if (state.orderInquirySubmitting) return;
+      document.getElementById('orderInquiryModal').hidden = true;
+    }
+
+    function submitOrderTroubleInquiry() {
+      if (state.orderInquirySubmitting) return;
+      const inquiryText = document.getElementById('orderInquiryText').value.trim();
+      if (!inquiryText) {
+        setMessage('orderInquiryMessage', 'お問い合わせ内容を入力してください。', true);
+        return;
+      }
+      const context = getLatestOrderTroubleContext();
+      state.orderInquirySubmitting = true;
+      setBusy('orderInquirySubmitButton', true);
+      setMessage('orderInquiryMessage', 'お問い合わせを送信しています…', false);
+      callServer('sendOrderTroubleInquiry', {
+        sessionToken: state.sessionToken,
+        inquiryText,
+        occurredAt: context.occurredAt || formatInquiryOccurredAt(new Date()),
+        orderNo: context.orderNo || '',
+        clientRequestId: context.clientRequestId || '',
+      })
+        .then(() => {
+          document.getElementById('orderInquiryText').value = '';
+          setMessage('orderInquiryMessage', 'お問い合わせを送信しました。', false);
+        })
+        .catch((error) => {
+          if (getErrorMessage(error).includes('ログイン')) {
+            document.getElementById('orderInquiryModal').hidden = true;
+            handleSessionError(error, { route: { name: 'order' } });
+            return;
+          }
+          setMessage('orderInquiryMessage', getErrorMessage(error), true);
+        })
+        .finally(() => {
+          state.orderInquirySubmitting = false;
+          setBusy('orderInquirySubmitButton', false);
+        });
     }
 
     function confirmPendingOrderSubmission(pendingOrder, options = {}) {
@@ -13545,13 +13852,15 @@
       return confirmSubmittedOrderFromHistory(pendingOrder)
         .then((matchedOrder) => {
           if (matchedOrder) {
-            finishOrderSubmission(
-              `注文を受け付けました。注文番号：${matchedOrder.orderNo}／請求合計：${yen(matchedOrder.invoiceTotal)}`
-            );
+            finishOrderSubmission(matchedOrder);
             return;
           }
           if (options.failureMessage) {
-            failOrderSubmission(options.failureMessage, { clearPending: true });
+            failOrderSubmission(options.failureMessage, {
+              clearPending: true,
+              clientRequestId: pendingOrder.clientRequestId,
+              commitStatus: 'failed',
+            });
             return;
           }
           state.orderSubmitting = false;
@@ -13605,7 +13914,9 @@
       const clientRequestId = createOrderClientRequestId();
       const pendingOrder = createPendingOrderSnapshot(clientRequestId, note, items);
       savePendingOrderSnapshot(pendingOrder);
+      state.lastOrderTroubleContext = { orderNo: '', clientRequestId, commitStatus: 'submitting' };
       state.orderSubmitting = true;
+      document.getElementById('orderFailureHelp').hidden = true;
       setBusy('submitButton', true);
       setMessage('orderMessage', '注文を送信しています...', false);
       callServer('submitCartOrder', {
@@ -13615,7 +13926,7 @@
         items,
       })
         .then((response) => {
-          finishOrderSubmission(`注文を受け付けました。注文番号：${response.orderNo}／請求合計：${yen(response.invoiceTotal)}`);
+          finishOrderSubmission(response);
         })
         .catch((error) => {
           const message = getErrorMessage(error);
