@@ -6807,6 +6807,7 @@
       orderSubmitting: false,
       orderInquirySubmitting: false,
       lastOrderTroubleContext: null,
+      activeOrderTab: 'order',
       lineLinkToken: null,
       myPageStylebook: {
         loaded: false,
@@ -6875,6 +6876,8 @@
     const ORDER_API_URL = 'https://script.google.com/macros/s/AKfycbyWxvyWZ7_qTkCgvkuim-h_AhDQEHag7xexg8iDqyHE-toaRA6ttQPpNjUaNfTyTYhA/exec';
     const STYLEBOOK_API_URL = 'https://script.google.com/macros/s/AKfycbwPJPYIHNtVXh8I1CCs7SAZT-Ow6JeHNnazz_YRrK4m_Rr_jjy7UYPJCJx19RcklLam/exec';
     const PENDING_ORDER_STORAGE_KEY = 'kimikeaPendingOrder';
+    const PENDING_INQUIRY_STORAGE_KEY = 'kimikeaPendingOrderInquiry';
+    const UI_STATE_STORAGE_KEY = 'kimikeaUiStateV1';
     const COLOR_IMAGE_BASE_PATH = location.hostname.endsWith('github.io')
       ? '/Kimikea-Connect/color-images/'
       : './color-images/';
@@ -6982,6 +6985,12 @@
     function clearSession() {
       localStorage.removeItem('kimikeaSessionToken');
       localStorage.removeItem('kimikeaFranchise');
+      try {
+        sessionStorage.removeItem(UI_STATE_STORAGE_KEY);
+        sessionStorage.removeItem(PENDING_INQUIRY_STORAGE_KEY);
+      } catch (error) {
+        // Storage cleanup is best effort only.
+      }
       state.sessionToken = '';
       state.franchise = null;
       state.products = [];
@@ -7085,6 +7094,12 @@
       return callServerWithTimeout(functionName, 20000, ...args);
     }
 
+    function createOrderApiClientError(message, code) {
+      const error = new Error(message);
+      error.code = code || 'api';
+      return error;
+    }
+
     function callServerWithTimeout(functionName, timeoutMs, ...args) {
       if (canUseAppsScript()) {
         return new Promise((resolve, reject) => {
@@ -7102,7 +7117,10 @@
         const script = document.createElement('script');
         const timeoutId = window.setTimeout(() => {
           cleanup();
-          reject(new Error('通信に時間がかかっています。時間をおいて再度お試しください。'));
+          reject(createOrderApiClientError(
+            '通信に時間がかかっています。時間をおいて再度お試しください。',
+            'timeout'
+          ));
         }, timeoutMs);
 
         function cleanup() {
@@ -7127,11 +7145,30 @@
         url.searchParams.set('v', String(Date.now()));
         script.onerror = () => {
           cleanup();
-          reject(new Error('注文システムへ接続できませんでした。'));
+          reject(createOrderApiClientError('注文システムへ接続できませんでした。', 'transport'));
         };
         script.src = url.toString();
         document.head.appendChild(script);
       });
+    }
+
+    function waitForLoginRetry(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+
+    function loginFranchiseWithSingleRetry(credentials, attempt = 1) {
+      return callServerWithTimeout('loginFranchise', 45000, credentials)
+        .catch((error) => {
+          if (error && ['transport', 'timeout'].includes(error.code) && attempt === 1) {
+            console.warn('[LOGIN] communication retry', {
+              requestId: credentials.requestId,
+              attempt: 2,
+            });
+            return waitForLoginRetry(900)
+              .then(() => loginFranchiseWithSingleRetry(credentials, 2));
+          }
+          throw error;
+        });
     }
 
     function postOrderApi(api, payload, options = {}) {
@@ -7186,7 +7223,7 @@
         return;
       }
 
-      callServerWithTimeout('loginFranchise', 45000, { loginId, password, requestId: loginRequestId })
+      loginFranchiseWithSingleRetry({ loginId, password, requestId: loginRequestId })
         .then((response) => {
           console.info('[LOGIN] end', {
             requestId: loginRequestId,
@@ -7283,7 +7320,12 @@
         showDashboard();
         return;
       }
-      showDashboard();
+      const restoredRoute = getRestorableKimikeaRoute();
+      state.pendingOpenOrder = restoredRoute.name === 'order';
+      state.pendingPostLoginRoute = restoredRoute.name === 'order' || restoredRoute.name === 'home'
+        ? null
+        : restoredRoute;
+      showDashboard({ deferRoute: restoredRoute.name !== 'home' });
       loadPortalData();
     }
 
@@ -7305,7 +7347,7 @@
           renderHistory();
           if (state.pendingOpenOrder) {
             state.pendingOpenOrder = false;
-            openOrderPage();
+            openOrderPage({ restoreTab: true });
           } else if (state.pendingPostLoginRoute) {
             const route = state.pendingPostLoginRoute;
             state.pendingPostLoginRoute = null;
@@ -7327,8 +7369,32 @@
             handleSessionError(error, { route: routeFromKimikeaUrl() });
             return;
           }
-          showDashboard();
+          preservePortalViewAfterLoadFailure(error);
         });
+    }
+
+    function preservePortalViewAfterLoadFailure(error) {
+      const currentRoute = getCurrentKimikeaRoute();
+      const fallbackRoute = state.pendingOpenOrder
+        ? { name: 'order' }
+        : state.pendingPostLoginRoute || getRestorableKimikeaRoute();
+      const route = currentRoute.name !== 'home' ? currentRoute : fallbackRoute;
+      showDashboard({ deferRoute: route.name !== 'home' });
+      if (route.name === 'order') {
+        state.pendingOpenOrder = true;
+        document.getElementById('homeView').hidden = true;
+        document.getElementById('publicPageView').hidden = true;
+        document.getElementById('orderWorkspace').hidden = false;
+        switchTab(state.activeOrderTab || 'order');
+        setMessage('orderMessage', '通信に失敗しました。現在の画面を保持しています。再度お試しください。', true);
+        notifyKimikeaNavigationState();
+        return;
+      }
+      if (route.name === 'public') {
+        restoreKimikeaRoute(route);
+        return;
+      }
+      showHomePage({ updateUrl: false });
     }
 
     function resolvePostLoginRoute(defaultRoute = { name: 'home' }) {
@@ -7896,10 +7962,12 @@
       }
       const nextUrl = `${url.pathname}${url.search}${url.hash}`;
       if (nextUrl === `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+        persistKimikeaUiState(normalizedRoute);
         return;
       }
       const method = options.replace ? 'replaceState' : 'pushState';
       window.history[method]({ kimikeaRoute: normalizedRoute }, '', nextUrl);
+      persistKimikeaUiState(normalizedRoute);
     }
 
     function requireKimikeaLogin(route, message) {
@@ -7924,6 +7992,41 @@
         if (homeView && !homeView.hidden) return { name: 'home' };
       }
       return { name: 'home' };
+    }
+
+    function readPersistedKimikeaUiState() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(UI_STATE_STORAGE_KEY) || 'null');
+        if (!saved || typeof saved !== 'object') return null;
+        if (Date.now() - Number(saved.savedAt || 0) > 24 * 60 * 60 * 1000) return null;
+        return saved;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function persistKimikeaUiState(route = null) {
+      try {
+        const currentRoute = route || getCurrentKimikeaRoute();
+        sessionStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
+          route: currentRoute,
+          activeOrderTab: state.activeOrderTab || 'order',
+          savedAt: Date.now(),
+        }));
+      } catch (error) {
+        // iOS private browsing can disable sessionStorage. URL state remains the fallback.
+      }
+    }
+
+    function getRestorableKimikeaRoute() {
+      const urlRoute = routeFromKimikeaUrl();
+      if (urlRoute.name !== 'home') return urlRoute;
+      const saved = readPersistedKimikeaUiState();
+      if (!saved || !saved.route) return urlRoute;
+      state.activeOrderTab = ['order', 'history', 'notice'].includes(saved.activeOrderTab)
+        ? saved.activeOrderTab
+        : 'order';
+      return saved.route;
     }
 
     function getKimikeaRouteId(route) {
@@ -7979,7 +8082,7 @@
           return;
         }
         if (route.name === 'order') {
-          openOrderPage({ replaceUrl: true });
+          openOrderPage({ replaceUrl: true, restoreTab: true });
           return;
         }
         if (route.name === 'stylebook') {
@@ -8032,7 +8135,7 @@
       document.getElementById('homeView').hidden = true;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = false;
-      switchTab('order');
+      switchTab(options.restoreTab ? state.activeOrderTab : 'order');
       if (!state.products.length && canUseOrderApi()) loadPortalData();
       if (!state.products.length && !canUseOrderApi()) {
         setMessage('orderMessage', '注文機能はApps Script版で利用できます。ホーム画面とスタイル図鑑はこのまま確認できます。', true);
@@ -13415,7 +13518,7 @@
         if (route.name === 'home') {
           showHomePage({ updateUrl: false });
         } else if (route.name === 'order') {
-          openOrderPage({ updateUrl: false });
+          openOrderPage({ updateUrl: false, restoreTab: true });
         } else if (route.name === 'stylebook') {
           openStylebook();
         } else if (route.name === 'public' && route.key === 'search') {
@@ -13460,6 +13563,7 @@
       const isOrder = tabName === 'order';
       const isHistory = tabName === 'history';
       const isNotice = tabName === 'notice';
+      state.activeOrderTab = isHistory ? 'history' : isNotice ? 'notice' : 'order';
       document.getElementById('orderWorkspaceTabs').hidden = false;
       document.getElementById('orderCompleteView').hidden = true;
       document.getElementById('orderTab').hidden = !isOrder;
@@ -13468,6 +13572,7 @@
       document.getElementById('orderTabButton').classList.toggle('active', isOrder);
       document.getElementById('historyTabButton').classList.toggle('active', isHistory);
       document.getElementById('noticeTabButton').classList.toggle('active', isNotice);
+      persistKimikeaUiState({ name: 'order' });
     }
 
     function populateCategorySelect() {
@@ -13838,6 +13943,92 @@
       document.getElementById('orderInquiryModal').hidden = true;
     }
 
+    function createOrderInquiryRequestId() {
+      const randomPart = window.crypto && window.crypto.getRandomValues
+        ? Array.from(window.crypto.getRandomValues(new Uint32Array(2))).map((value) => value.toString(36)).join('')
+        : Math.random().toString(36).slice(2);
+      return `inquiry_${Date.now()}_${randomPart}`;
+    }
+
+    function createOrderInquirySignature(inquiryText, context) {
+      const franchise = state.franchise || {};
+      return JSON.stringify([
+        franchise.franchiseId || franchise.memberId || '',
+        context.orderNo || '',
+        context.clientRequestId || '',
+        inquiryText,
+      ]);
+    }
+
+    function loadPendingOrderInquiry() {
+      try {
+        return JSON.parse(sessionStorage.getItem(PENDING_INQUIRY_STORAGE_KEY) || 'null');
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function savePendingOrderInquiry(pending) {
+      try {
+        sessionStorage.setItem(PENDING_INQUIRY_STORAGE_KEY, JSON.stringify(pending));
+      } catch (error) {
+        // Keep the in-memory submission lock even when storage is unavailable.
+      }
+    }
+
+    function clearPendingOrderInquiry() {
+      try {
+        sessionStorage.removeItem(PENDING_INQUIRY_STORAGE_KEY);
+      } catch (error) {
+        // Storage cleanup is best effort only.
+      }
+    }
+
+    function waitForInquiryStatus(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+
+    function confirmOrderTroubleInquiryStatus(inquiryRequestId, attempt = 1) {
+      const maxAttempts = 6;
+      return callServerWithTimeout(
+        'getOrderTroubleInquiryStatus',
+        20000,
+        state.sessionToken,
+        inquiryRequestId
+      )
+        .then((status) => {
+          if (status && (status.sent || status.status === 'sent')) return status;
+          if (status && status.status === 'failed') {
+            throw createOrderApiClientError(
+              status.error || 'お問い合わせを送信できませんでした。再度お試しください。',
+              'inquiry_failed'
+            );
+          }
+          if (attempt >= maxAttempts) {
+            throw createOrderApiClientError(
+              'お問い合わせは受付処理中です。重複防止のため再送せず、時間をおいて送信結果をご確認ください。',
+              'inquiry_pending'
+            );
+          }
+          return waitForInquiryStatus(Math.min(1000 + attempt * 750, 4000))
+            .then(() => confirmOrderTroubleInquiryStatus(inquiryRequestId, attempt + 1));
+        })
+        .catch((error) => {
+          const message = getErrorMessage(error);
+          if (message.includes('ログイン') || ['inquiry_failed', 'inquiry_pending'].includes(error && error.code)) {
+            throw error;
+          }
+          if (attempt >= maxAttempts) {
+            throw createOrderApiClientError(
+              '送信状態を確認できません。重複防止のため同じお問い合わせは再送していません。',
+              'inquiry_unknown'
+            );
+          }
+          return waitForInquiryStatus(Math.min(1000 + attempt * 750, 4000))
+            .then(() => confirmOrderTroubleInquiryStatus(inquiryRequestId, attempt + 1));
+        });
+    }
+
     function submitOrderTroubleInquiry() {
       if (state.orderInquirySubmitting) return;
       const inquiryText = document.getElementById('orderInquiryText').value.trim();
@@ -13846,17 +14037,50 @@
         return;
       }
       const context = getLatestOrderTroubleContext();
+      const signature = createOrderInquirySignature(inquiryText, context);
+      let pendingInquiry = loadPendingOrderInquiry();
+      if (!pendingInquiry || pendingInquiry.signature !== signature) {
+        pendingInquiry = {
+          inquiryRequestId: createOrderInquiryRequestId(),
+          signature,
+          attempted: false,
+          createdAt: new Date().toISOString(),
+          payload: {
+            inquiryText,
+            occurredAt: context.occurredAt || formatInquiryOccurredAt(new Date()),
+            orderNo: context.orderNo || '',
+            clientRequestId: context.clientRequestId || '',
+          },
+        };
+      }
       state.orderInquirySubmitting = true;
       setBusy('orderInquirySubmitButton', true);
-      setMessage('orderInquiryMessage', 'お問い合わせを送信しています…', false);
-      callServer('sendOrderTroubleInquiry', {
-        sessionToken: state.sessionToken,
-        inquiryText,
-        occurredAt: context.occurredAt || formatInquiryOccurredAt(new Date()),
-        orderNo: context.orderNo || '',
-        clientRequestId: context.clientRequestId || '',
-      })
+      setMessage(
+        'orderInquiryMessage',
+        pendingInquiry.attempted ? 'お問い合わせの送信結果を確認しています…' : 'お問い合わせを送信しています…',
+        false
+      );
+      const statusPromise = pendingInquiry.attempted
+        ? confirmOrderTroubleInquiryStatus(pendingInquiry.inquiryRequestId)
+        : (() => {
+          pendingInquiry.attempted = true;
+          savePendingOrderInquiry(pendingInquiry);
+          return callServerWithTimeout('sendOrderTroubleInquiry', 45000, {
+            sessionToken: state.sessionToken,
+            inquiryRequestId: pendingInquiry.inquiryRequestId,
+            ...pendingInquiry.payload,
+          }).then((result) => (
+            result && (result.sent || result.status === 'sent')
+              ? result
+              : confirmOrderTroubleInquiryStatus(pendingInquiry.inquiryRequestId)
+          )).catch((error) => {
+            if (getErrorMessage(error).includes('ログイン')) throw error;
+            return confirmOrderTroubleInquiryStatus(pendingInquiry.inquiryRequestId);
+          });
+        })();
+      statusPromise
         .then(() => {
+          clearPendingOrderInquiry();
           document.getElementById('orderInquiryText').value = '';
           setMessage('orderInquiryMessage', 'お問い合わせを送信しました。', false);
         })
@@ -13865,6 +14089,10 @@
             document.getElementById('orderInquiryModal').hidden = true;
             handleSessionError(error, { route: { name: 'order' } });
             return;
+          }
+          if (error && error.code === 'inquiry_failed') {
+            pendingInquiry.attempted = false;
+            savePendingOrderInquiry(pendingInquiry);
           }
           setMessage('orderInquiryMessage', getErrorMessage(error), true);
         })
@@ -14054,6 +14282,25 @@
     }
 
     loadAppAppearance();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistKimikeaUiState();
+    });
+    window.addEventListener('pagehide', () => persistKimikeaUiState());
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted || !isAuthenticatedSessionActive()) return;
+      const saved = readPersistedKimikeaUiState();
+      if (!saved || !saved.route || saved.route.name !== 'order') return;
+      state.activeOrderTab = ['order', 'history', 'notice'].includes(saved.activeOrderTab)
+        ? saved.activeOrderTab
+        : 'order';
+      if (state.orderUnlocked) {
+        openOrderPage({ replaceUrl: true, restoreTab: true });
+      } else {
+        state.pendingOpenOrder = true;
+        showDashboard({ deferRoute: true });
+        loadPortalData();
+      }
+    });
     window.addEventListener('beforeunload', (event) => {
       if (!isExtensionSimulatorGenerating()) return;
       event.preventDefault();
