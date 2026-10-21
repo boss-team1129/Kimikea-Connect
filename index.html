@@ -51,6 +51,17 @@
     button { touch-action: manipulation; }
     [hidden] { display: none !important; }
 
+    .order-entry-cards { display: grid; gap: 20px; width: 100%; max-width: 600px; margin: 0 auto; }
+    .order-entry-card { min-width: 0; padding: 24px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+    .order-entry-card h3 { margin: 0 0 12px; font-size: 20px; line-height: 1.5; }
+    .order-entry-card p { margin: 0 0 20px; color: var(--muted); line-height: 1.7; }
+    .order-entry-card .button { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 52px; white-space: normal; text-align: center; text-decoration: none; line-height: 1.5; }
+    .order-entry-card .order-entry-note { margin: 12px 0 0; font-size: 13px; }
+    @media (max-width: 480px) {
+      .order-entry-card { padding: 20px 16px; }
+      .order-entry-card h3 { font-size: 18px; }
+    }
+
     .login-shell {
       min-height: 100vh;
       min-height: 100svh;
@@ -7452,7 +7463,7 @@
         key: 'order',
         label: 'MEMBERS ONLY',
         title: 'エクステ注文',
-        subtitle: '会員専用の注文ページ',
+        subtitle: 'ご利用区分に合わせて注文へ',
         imageUrl: homeGalleryImage('order.jpg'),
         imagePosition: 'center center',
         sortOrder: 20,
@@ -7820,7 +7831,7 @@
         return;
       }
       if (key === 'order') {
-        openOrderPage();
+        openPublicPage('orderEntry');
         return;
       }
       openPublicPage(key);
@@ -7914,6 +7925,7 @@
     };
 
     const PUBLIC_PAGE_KEY_TO_VIEW = {
+      orderEntry: 'order',
       coordinator: 'academy',
       ai: 'ai-diagnosis',
       colorChart: 'color-chart',
@@ -7934,7 +7946,8 @@
       const view = normalizeKimikeaView(params.get('view'));
       const page = normalizeKimikeaView(params.get('page'));
       if (page === 'color-chart') return { name: 'public', key: 'colorChart' };
-      if (view === 'order') return { name: 'order' };
+      if (view === 'order') return { name: 'public', key: 'orderEntry' };
+      if (view === 'partner-order') return { name: 'order' };
       if (view === 'mypage') return { name: 'public', key: 'mypage', tab: params.get('tab') || 'profile' };
       if (view === 'stylebook') return { name: 'stylebook' };
       if (PUBLIC_PAGE_VIEW_ALIASES[view]) return { name: 'public', key: PUBLIC_PAGE_VIEW_ALIASES[view] };
@@ -7954,7 +7967,7 @@
       url.searchParams.delete('page');
       url.searchParams.delete('tab');
       if (normalizedRoute.name === 'order') {
-        url.searchParams.set('view', 'order');
+        url.searchParams.set('view', 'partner-order');
       } else if (normalizedRoute.name === 'public') {
         const view = PUBLIC_PAGE_KEY_TO_VIEW[normalizedRoute.key] || normalizedRoute.key || '';
         if (view) url.searchParams.set('view', view);
@@ -8050,6 +8063,11 @@
         return;
       }
       const current = getCurrentKimikeaRoute();
+      if (current?.name === 'home' && nextName === 'public' && nextKey === 'orderEntry') {
+        kimikeaAppHistory.push(current);
+        notifyKimikeaNavigationState();
+        return;
+      }
       if (!current || current.name === 'home' || current.name === 'login' || current.name === 'password') {
         notifyKimikeaNavigationState();
         return;
@@ -8112,6 +8130,9 @@
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       currentPublicPageKey = '';
       rememberKimikeaRoute('home');
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
+      document.getElementById('portalView').hidden = false;
       document.getElementById('homeView').hidden = false;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
@@ -8132,6 +8153,9 @@
       }
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('order');
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
+      document.getElementById('portalView').hidden = false;
       document.getElementById('homeView').hidden = true;
       document.getElementById('publicPageView').hidden = true;
       document.getElementById('orderWorkspace').hidden = false;
@@ -12560,7 +12584,31 @@
       }
     }
 
+    function renderOrderEntry() {
+      return `
+        <div class="order-entry-cards">
+          <section class="order-entry-card" aria-labelledby="partnerOrderTitle">
+            <h3 id="partnerOrderTitle">加盟店・コーディネーターの方</h3>
+            <p>登録済みの加盟店・コーディネーター専用の注文ページです。</p>
+            <button type="button" class="button button-gold" onclick="openOrderPage()">${isAuthenticatedSessionActive() && state.orderUnlocked ? '加盟店・コーディネーター注文へ' : '加盟店・コーディネーターログインへ'}</button>
+          </section>
+          <section class="order-entry-card" aria-labelledby="memberOrderTitle">
+            <h3 id="memberOrderTitle">きみけあ仕入れ会員の方・入会希望の方</h3>
+            <p>月額500円の会員サービス。シールエクステの注文や新規会員登録はこちら</p>
+            <a class="button button-gold" href="https://kimikea.team-hair.jp" target="_blank" rel="noopener noreferrer" aria-describedby="memberOrderNewTab">会員ログイン・新規登録へ</a>
+            <p id="memberOrderNewTab" class="order-entry-note">会員サイトを新しいタブで開きます。</p>
+          </section>
+        </div>
+      `;
+    }
+
     const publicPages = {
+      orderEntry: {
+        title: 'エクステ注文',
+        lead: 'ご利用区分をお選びください。',
+        items: [],
+        renderActions: renderOrderEntry
+      },
       colorChart: {
         title: 'カラーチャート',
         lead: 'エクステのカラーを一覧で確認できます。',
@@ -12612,6 +12660,9 @@
         clearExtensionSimulatorPhoto();
       }
       rememberKimikeaRoute('public', pageKey);
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
+      document.getElementById('portalView').hidden = false;
       currentPublicPageKey = pageKey;
       const page = publicPages[pageKey] || publicPages.notice;
       const publicPageView = document.getElementById('publicPageView');
@@ -12681,7 +12732,7 @@
     }
 
     const searchablePages = [
-      { title: 'エクステ注文', description: '加盟店専用 エクステを注文する。', action: 'order', keywords: '注文 オーダー 発注 エクステ 会員' },
+      { title: 'エクステ注文', description: '加盟店・コーディネーター、仕入れ会員の注文入口。', action: 'order', keywords: '注文 オーダー 発注 エクステ 会員' },
       { title: 'スタイル図鑑', description: '施術写真、使用色、各色の本数、合計本数を確認できます。', action: 'stylebook', keywords: '図鑑 レシピ 色 本数 施術 スタイル' },
       { title: 'コーディネーター講習案内', description: '未経験者、加盟希望者向けの講習内容と申込み。', action: 'coordinator', keywords: '講習 未経験 Zoom 対面 コーディネーター' },
       { title: 'カラーチャート', description: 'エクステのカラーを一覧で確認できます。', action: 'colorChart', keywords: 'カラー 色 チャート エクステ' },
@@ -12723,6 +12774,9 @@
       if (blockExtensionSimulatorNavigation()) return;
       if (currentPublicPageKey === 'ai') clearExtensionSimulatorPhoto();
       rememberKimikeaRoute('public', 'search');
+      document.getElementById('loginView').hidden = true;
+      document.getElementById('passwordSetupView').hidden = true;
+      document.getElementById('portalView').hidden = false;
       currentPublicPageKey = 'search';
       document.getElementById('homeView').hidden = true;
       document.getElementById('orderWorkspace').hidden = true;
@@ -12740,7 +12794,7 @@
 
     function openSearchResult(action) {
       if (action === 'order') {
-        openOrderPage();
+        openPublicPage('orderEntry');
         return;
       }
       if (action === 'stylebook') {
