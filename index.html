@@ -10978,6 +10978,14 @@
       return found || [];
     }
 
+    function isKimikeaMapEntryAllowed(row) {
+      const id = String(row.franchiseId || row.memberId || row.shopId || '').normalize('NFKC').trim().toUpperCase().replace(/^SHOP-/, '');
+      if (!id || id.startsWith('C-') || row.type === 'コーディネーター') return false;
+      if (row.mapVisibilityAllowed === false || row.mapDisplay === '非表示') return false;
+      if (row.mapVisibilityAllowed === true) return true;
+      return id.startsWith('K-');
+    }
+
     function normalizeKimikeaMapEntries(rawEntries) {
       const rowResults = [];
       const entries = (Array.isArray(rawEntries) ? rawEntries : []).map((row, index) => {
@@ -11004,12 +11012,16 @@
           prefecture
         );
         const reasons = [];
+        if (!isKimikeaMapEntryAllowed({ ...row, shopId, type })) reasons.push('map visibility denied');
         if (status !== '公開') reasons.push(`status=${status || 'empty'}`);
         if (!type) reasons.push('type empty');
         if (!prefecture) reasons.push('prefecture empty');
         if (!salonName && !staffName && !shopId) reasons.push('display name empty');
         const entry = {
           mapId,
+          franchiseId: row.franchiseId || row.memberId || '',
+          mapVisibilityAllowed: row.mapVisibilityAllowed,
+          mapDisplay: row.mapDisplay,
           shopId: shopId || mapId,
           type,
           prefecture,
@@ -11093,7 +11105,8 @@
     function visibleKimikeaMapEntries() {
       const map = state.kimikeaMap;
       return (map.entries || []).filter((entry) => (
-        String(entry.type || '') === String(map.activeType || '')
+        isKimikeaMapEntryAllowed(entry)
+        && String(entry.type || '') === String(map.activeType || '')
         && String(entry.prefecture || '') === String(map.activePrefecture || '')
       ));
     }
